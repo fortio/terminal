@@ -1,0 +1,16 @@
+# Same as full workflow (eg from fortio/multicurl) but without the goreleaser step
+name: "Shared library fortio workflows"
+
+on:
+    push:
+      branches: [ main ]
+    pull_request:
+      branches: [ main ]
+
+jobs:
+    call-gochecks:
+        uses: fortio/workflows/.github/workflows/gochecks.yml@main
+    call-codecov:
+        uses: fortio/workflows/.github/workflows/codecov.yml@main
+    call-codeql:
+        uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
