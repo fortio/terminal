@@ -3,7 +3,7 @@ all: lint test demo
 GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
 demo:
-	go run ./example/
+	go run ./example/ -loglevel debug
 
 test:
 	CGO_ENABLED=0 go test -tags $(GO_BUILD_TAGS) ./...
