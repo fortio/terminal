@@ -1,4 +1,4 @@
-module grol.io/terminal
+module fortio.org/terminal
 
 go 1.22.6
 
@@ -7,6 +7,8 @@ require (
 	fortio.org/log v1.16.0
 	golang.org/x/term v0.23.0
 )
+
+// replace fortio.org/cli => ../cli
 
 require (
 	fortio.org/struct2env v0.4.1 // indirect
