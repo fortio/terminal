@@ -43,10 +43,13 @@ func (c *CRWriter) Write(orig []byte) (n int, err error) {
 	}
 	lastEmitted := 0
 	for i, b := range orig {
-		if b != '\n' {
+		if b != '\n' { // IndexByte is probably faster than this.
 			continue
 		}
-		c.buf = append(c.buf, orig[lastEmitted:i]...) // leave the \n for next append
+		// leave the \n for next append. I wish I could write
+		//   c.buf = append(c.buf, orig[lastEmitted:i]..., `\r`)
+		// instead of the 2 lines.
+		c.buf = append(c.buf, orig[lastEmitted:i]...)
 		c.buf = append(c.buf, '\r')
 		lastEmitted = i
 	}
