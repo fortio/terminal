@@ -2,6 +2,7 @@
 package terminal // import "fortio.org/terminal"
 
 import (
+	"bufio"
 	"io"
 	"os"
 
@@ -10,10 +11,11 @@ import (
 )
 
 type Terminal struct {
-	fd       int
-	oldState *term.State
-	term     *term.Terminal
-	Out      io.Writer
+	fd          int
+	oldState    *term.State
+	term        *term.Terminal
+	Out         io.Writer
+	historyFile string
 }
 
 // CRWriter is a writer that adds \r before each \n.
@@ -100,6 +102,62 @@ func (t *Terminal) LoggerSetup() {
 	log.SetColorMode()
 }
 
+func (t *Terminal) SetHistoryFile(f string) {
+	t.historyFile = f
+	entries := readOrCreateHistory(f)
+	for _, e := range entries {
+		t.term.AddToHistory(e)
+	}
+	log.Infof("Loaded %d history entries from %s", len(entries), f)
+}
+
+func readOrCreateHistory(f string) []string {
+	if f == "" {
+		log.Infof("No history file specified")
+		return nil
+	}
+	// open file or create it
+	h, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		log.Errf("Error opening history file %s: %v", f, err)
+		return nil
+	}
+	defer h.Close()
+	// read lines separated by \n
+	var lines []string
+	scanner := bufio.NewScanner(h)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		log.Errf("Error reading history file %s: %v", f, err)
+		return nil
+	}
+	return lines
+}
+
+func saveHistory(f string, h []string) {
+	if f == "" {
+		log.Infof("No history file specified")
+		return
+	}
+	// open file or create it
+	hf, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		log.Errf("Error opening history file %s: %v", f, err)
+		return
+	}
+	defer hf.Close()
+	// write lines separated by \n
+	for _, l := range h {
+		_, err := hf.WriteString(l + "\n")
+		if err != nil {
+			log.Errf("Error writing history file %s: %v", f, err)
+			return
+		}
+	}
+}
+
 func (t *Terminal) Close() error {
 	if t.oldState == nil {
 		return nil
@@ -107,6 +165,12 @@ func (t *Terminal) Close() error {
 	err := term.Restore(t.fd, t.oldState)
 	t.oldState = nil
 	t.Out = os.Stderr
+	// saving history if any
+	if t.historyFile != "" {
+		h := t.term.History()
+		log.Infof("Saving history (%d commands) to %s", len(h), t.historyFile)
+		saveHistory(t.historyFile, h)
+	}
 	return err
 }
 

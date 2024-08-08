@@ -9,6 +9,7 @@ require (
 )
 
 // replace fortio.org/cli => ../cli
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20240808164309-1ca6c26d14bf
 
 require (
 	fortio.org/struct2env v0.4.1 // indirect

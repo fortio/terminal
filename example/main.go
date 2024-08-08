@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -56,7 +57,7 @@ func autoCompleteCallback(line string, pos int, key rune) (newLine string, newPo
 
 func Main() int {
 	// Pending https://github.com/golang/go/issues/68780
-	// flagHistory := flag.String("history", "", "History `file` to use")
+	flagHistory := flag.String("history", "/tmp/terminal_history", "History `file` to use")
 	cli.Main()
 	t, err := terminal.Open()
 	if err != nil {
@@ -65,6 +66,7 @@ func Main() int {
 	defer t.Close()
 	t.SetPrompt("Terminal demo> ")
 	t.LoggerSetup()
+	t.SetHistoryFile(*flagHistory)
 	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", t.IsTerminal())
 	fmt.Fprintf(t.Out, "Use 'prompt <new prompt>' to change the prompt\n")
 	fmt.Fprintf(t.Out, "Try 'after duration text...' to see text showing in the middle of edits after said duration\n")
