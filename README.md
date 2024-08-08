@@ -1,3 +1,4 @@
 # terminal
-Minimal Ansi terminal library to get things like "readline" like for
-the grol command line repl and others.
+
+Wrapper around [x/term](https://github.com/golang/term) for a "readline" like library for
+the [grol](https://github.com/grol-io/grol#grol) command line repl and others.
