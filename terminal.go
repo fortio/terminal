@@ -79,6 +79,23 @@ func (t *Terminal) SetHistoryFile(f string) error {
 	return nil
 }
 
+// Forward the term history API and not just the high level file history api above.
+
+// AddToHistory add commands to the history.
+func (t *Terminal) AddToHistory(commands ...string) {
+	t.term.AddToHistory(commands...)
+}
+
+// History returns the current history state.
+func (t *Terminal) History() []string {
+	return t.term.History()
+}
+
+// NewHistory creates/resets the history to a new one with the given capacity.
+func (t *Terminal) NewHistory(capacity int) {
+	t.term.NewHistory(capacity)
+}
+
 func readOrCreateHistory(f string) ([]string, error) {
 	// open file or create it
 	h, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o600)
