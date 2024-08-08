@@ -23,9 +23,10 @@ const (
 	afterCmd  = "after "
 	exitCmd   = "exit"
 	helpCmd   = "help"
+	testMLCmd = "multiline"
 )
 
-var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd}
+var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd, testMLCmd}
 
 // func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
@@ -43,6 +44,10 @@ func autoCompleteCallback(line string, pos int, key rune) (newLine string, newPo
 	}
 	for _, c := range commands { // for now all have unique prefixes
 		if strings.HasPrefix(c, line) {
+			if c == testMLCmd {
+				ret := "multiline {\r\n\tline1\r\n\tline2"
+				return ret, len(ret), true
+			}
 			return c, len(c), true
 		}
 	}
