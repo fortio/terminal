@@ -179,7 +179,7 @@ func (t *Terminal) ReadLine() (string, error) {
 	c, err := t.term.ReadLine()
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
-	if err != nil && errors.Is(err, term.ErrPasteIndicator) {
+	if errors.Is(err, term.ErrPasteIndicator) {
 		return c, nil
 	}
 	return c, err
