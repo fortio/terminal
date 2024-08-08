@@ -5,9 +5,10 @@ GO_BUILD_TAGS:=no_net,no_json,no_pprof
 demo:
 	go run  -tags $(GO_BUILD_TAGS) ./example/ -loglevel debug
 
-tinygo-run:
-	# No luck https://github.com/tinygo-org/tinygo/issues/4395
-	CGO_ENABLED=0 tinygo run -tags $(GO_BUILD_TAGS) ./example
+tinygo-demo:
+	# No luck on mac https://github.com/tinygo-org/tinygo/issues/4395
+	CGO_ENABLED=0 tinygo build -tags $(GO_BUILD_TAGS) -o example-tinygo ./example/
+	./example-tinygo -loglevel debug
 
 test:
 	CGO_ENABLED=0 go test -tags $(GO_BUILD_TAGS) ./...
