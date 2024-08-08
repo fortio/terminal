@@ -80,14 +80,28 @@ func (t *Terminal) SetHistoryFile(f string) error {
 		t.historyFile = "" // so we don't try to save during defer'ed close if we can't read
 		return err
 	}
-	start := 0
-	if len(entries) > t.capacity {
-		log.Infof("History file %s has more than %d entries, truncating.", f, t.capacity)
-		start = len(entries) - t.capacity
-	} else {
-		log.Infof("Loaded %d history entries from %s", len(entries), f)
+	// Dedup on read but really... need to dedup on add to history instead.
+	log.Debugf("Before dedup: %v", entries)
+	prev := ""
+	duplicate := 0
+	dedup := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e == prev {
+			duplicate++
+			continue
+		}
+		dedup = append(dedup, e)
+		prev = e
 	}
-	for _, e := range entries[start:] {
+	log.Debugf("Post dedup: %v", dedup)
+	start := 0
+	if len(dedup) > t.capacity {
+		log.Infof("History file %s has more than %d entries (after %d duplicate removal), truncating.", f, t.capacity, duplicate)
+		start = len(dedup) - t.capacity
+	} else {
+		log.Infof("Loaded %d history entries from %s (%d were duplicates)", len(dedup), f, duplicate)
+	}
+	for _, e := range dedup[start:] {
 		t.term.AddToHistory(e)
 	}
 	return nil
