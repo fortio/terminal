@@ -3,6 +3,7 @@ package terminal // import "fortio.org/terminal"
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"os"
 
@@ -175,15 +176,25 @@ func (t *Terminal) Close() error {
 }
 
 func (t *Terminal) ReadLine() (string, error) {
-	return t.term.ReadLine()
+	c, err := t.term.ReadLine()
+	// That error isn't an error that needs to be propagated,
+	// it's just to allow copy/paste without autocomplete.
+	if err != nil && errors.Is(err, term.ErrPasteIndicator) {
+		return c, nil
+	}
+	return c, err
 }
 
 func (t *Terminal) SetPrompt(s string) {
 	t.term.SetPrompt(s)
 }
 
-type AutoCompleteCallback func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
+// Pass "this" back so AutoCompleteCallback can use t.Out etc.
+// (compared to the original x/term callback).
+type AutoCompleteCallback func(t *Terminal, line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
 func (t *Terminal) SetAutoCompleteCallback(f AutoCompleteCallback) {
-	t.term.AutoCompleteCallback = f
+	t.term.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		return f(t, line, pos, key)
+	}
 }
