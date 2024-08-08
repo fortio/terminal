@@ -104,6 +104,10 @@ func (t *Terminal) LoggerSetup() {
 }
 
 func (t *Terminal) SetHistoryFile(f string) {
+	if !t.IsTerminal() {
+		log.Infof("Not a terminal, not setting history file")
+		return
+	}
 	t.historyFile = f
 	entries := readOrCreateHistory(f)
 	for _, e := range entries {
