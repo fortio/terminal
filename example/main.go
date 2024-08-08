@@ -18,6 +18,7 @@ func main() {
 }
 
 func Main() int {
+	// flagHistory := flag.String("history", "", "History `file` to use")
 	cli.Main()
 	t, err := terminal.Open()
 	if err != nil {
@@ -27,7 +28,7 @@ func Main() int {
 	t.SetPrompt("Terminal demo> ")
 	isTerm := t.IsTerminal()
 	// t.Out will add the needed \r for each \n when term is in raw mode
-	log.SetOutput(&terminal.CRWriter{Out: os.Stderr})
+	log.SetOutput(t.Out)
 	log.Config.ForceColor = isTerm
 	log.SetColorMode()
 	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", isTerm)
@@ -70,10 +71,4 @@ func Main() int {
 			fmt.Fprintf(t.Out, "Unknown command %q\n", l)
 		}
 	}
-	/*
-		if isTerm {
-			cli.UntilInterrupted()
-		}
-	*/
-	return 0
 }
