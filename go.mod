@@ -8,7 +8,7 @@ require (
 	golang.org/x/term v0.23.0
 )
 
-// replace fortio.org/cli => ../cli
+//nolint:gomoddirectives // pending https://github.com/golang/term/pull/15
 replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20240808164309-1ca6c26d14bf
 
 require (

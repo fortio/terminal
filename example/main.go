@@ -12,7 +12,6 @@ import (
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/terminal"
-	"golang.org/x/term"
 )
 
 func main() {
@@ -31,13 +30,13 @@ var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd, testMLCmd}
 
 // func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
-func autoCompleteCallback(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+func autoCompleteCallback(t *terminal.Terminal, line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	log.LogVf("AutoCompleteCallback: %q %d %q", line, pos, key)
 	if key != '\t' {
 		return // only tab for now
 	}
 	if len(line) == 0 {
-		log.Infof("Available commands: %v", commands)
+		fmt.Fprintf(t.Out, "Available commands: %v\n", commands)
 		return
 	}
 	if pos != len(line) {
@@ -80,8 +79,6 @@ func Main() int {
 		case errors.Is(err, io.EOF):
 			log.Infof("EOF received, exiting.")
 			return 0
-		case errors.Is(err, term.ErrPasteIndicator):
-			log.Infof("Paste indicator received, which is fine.")
 		default:
 			return log.FErrf("Error reading line: %v", err)
 		}
