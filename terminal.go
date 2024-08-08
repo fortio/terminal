@@ -19,52 +19,6 @@ type Terminal struct {
 	historyFile string
 }
 
-// CRWriter is a writer that adds \r before each \n.
-// Needed for raw mode terminals (and I guess also if you want something DOS or http headers like).
-type CRWriter struct {
-	buf []byte
-	Out io.Writer
-}
-
-// In case you want to ensure the memory used by the buffer is released.
-func (c *CRWriter) Reset() {
-	c.buf = nil
-}
-
-// Optimized to avoid many small writes by buffering and only writing \r when needed.
-// No extra syscall, relies on append() to efficiently reallocate the buffer.
-func (c *CRWriter) Write(orig []byte) (n int, err error) {
-	l := len(orig)
-	if l == 0 {
-		return 0, nil
-	}
-	if l == 1 {
-		if orig[0] != '\n' {
-			return c.Out.Write(orig)
-		}
-		_, err = c.Out.Write([]byte("\r\n"))
-		return 1, err
-	}
-	lastEmitted := 0
-	for i, b := range orig {
-		if b != '\n' { // IndexByte is probably faster than this.
-			continue
-		}
-		// leave the \n for next append. I wish I could write
-		//   c.buf = append(c.buf, orig[lastEmitted:i]..., `\r`)
-		// instead of the 2 lines.
-		c.buf = append(c.buf, orig[lastEmitted:i]...)
-		c.buf = append(c.buf, '\r')
-		lastEmitted = i
-	}
-	if lastEmitted == 0 {
-		return c.Out.Write(orig)
-	}
-	c.buf = append(c.buf, orig[lastEmitted:]...)
-	_, err = c.Out.Write(c.buf)
-	return len(orig), err // in case caller checks... but we might have written "more".
-}
-
 // Open opens stdin as a terminal, do `defer terminal.Close()`
 // to restore the terminal to its original state upon exit.
 func Open() (*Terminal, error) {
@@ -103,29 +57,34 @@ func (t *Terminal) LoggerSetup() {
 	log.SetColorMode()
 }
 
-func (t *Terminal) SetHistoryFile(f string) {
-	if !t.IsTerminal() {
-		log.Infof("Not a terminal, not setting history file")
-		return
-	}
-	t.historyFile = f
-	entries := readOrCreateHistory(f)
-	for _, e := range entries {
-		t.term.AddToHistory(e)
-	}
-	log.Infof("Loaded %d history entries from %s", len(entries), f)
-}
-
-func readOrCreateHistory(f string) []string {
+func (t *Terminal) SetHistoryFile(f string) error {
 	if f == "" {
 		log.Infof("No history file specified")
 		return nil
 	}
+	if !t.IsTerminal() {
+		log.Infof("Not a terminal, not setting history file")
+		return nil
+	}
+	t.historyFile = f
+	entries, err := readOrCreateHistory(f)
+	if err != nil {
+		t.historyFile = "" // so we don't try to save during defer'ed close if we can't read
+		return err
+	}
+	for _, e := range entries {
+		t.term.AddToHistory(e)
+	}
+	log.Infof("Loaded %d history entries from %s", len(entries), f)
+	return nil
+}
+
+func readOrCreateHistory(f string) ([]string, error) {
 	// open file or create it
 	h, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		log.Errf("Error opening history file %s: %v", f, err)
-		return nil
+		return nil, err
 	}
 	defer h.Close()
 	// read lines separated by \n
@@ -136,9 +95,9 @@ func readOrCreateHistory(f string) []string {
 	}
 	if err := scanner.Err(); err != nil {
 		log.Errf("Error reading history file %s: %v", f, err)
-		return nil
+		return nil, err
 	}
-	return lines
+	return lines, nil
 }
 
 func saveHistory(f string, h []string) {

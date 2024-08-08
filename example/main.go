@@ -65,7 +65,10 @@ func Main() int {
 	defer t.Close()
 	t.SetPrompt("Terminal demo> ")
 	t.LoggerSetup()
-	t.SetHistoryFile(*flagHistory)
+	if err := t.SetHistoryFile(*flagHistory); err != nil {
+		// error already logged
+		return 1
+	}
 	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", t.IsTerminal())
 	fmt.Fprintf(t.Out, "Use 'prompt <new prompt>' to change the prompt\n")
 	fmt.Fprintf(t.Out, "Try 'after duration text...' to see text showing in the middle of edits after said duration\n")
