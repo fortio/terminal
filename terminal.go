@@ -82,6 +82,7 @@ func Open() (*Terminal, error) {
 	if err != nil {
 		return nil, err
 	}
+	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	return t, nil
 }
 
@@ -105,4 +106,10 @@ func (t *Terminal) ReadLine() (string, error) {
 
 func (t *Terminal) SetPrompt(s string) {
 	t.term.SetPrompt(s)
+}
+
+type AutoCompleteCallback func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
+
+func (t *Terminal) SetAutoCompleteCallback(f AutoCompleteCallback) {
+	t.term.AutoCompleteCallback = f
 }
