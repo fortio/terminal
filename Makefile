@@ -7,6 +7,7 @@ demo:
 
 tinygo-demo:
 	# No luck on mac https://github.com/tinygo-org/tinygo/issues/4395
+	# on linux, after doesn't work it seems.
 	CGO_ENABLED=0 tinygo build -tags $(GO_BUILD_TAGS) -o example-tinygo ./example/
 	./example-tinygo -loglevel debug
 
@@ -21,4 +22,4 @@ lint: .golangci.yml
 	curl -fsS -o .golangci.yml https://raw.githubusercontent.com/fortio/workflows/main/golangci.yml
 
 
-.PHONY: all lint test demo tinygo-run
+.PHONY: all lint test demo tinygo-demo
