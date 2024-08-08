@@ -57,6 +57,7 @@ func autoCompleteCallback(t *terminal.Terminal, line string, pos int, key rune) 
 func Main() int {
 	// Pending https://github.com/golang/go/issues/68780
 	flagHistory := flag.String("history", "/tmp/terminal_history", "History `file` to use")
+	flagMaxHistory := flag.Int("max-history", 10, "Max number of history lines to keep")
 	cli.Main()
 	t, err := terminal.Open()
 	if err != nil {
@@ -65,6 +66,7 @@ func Main() int {
 	defer t.Close()
 	t.SetPrompt("Terminal demo> ")
 	t.LoggerSetup()
+	t.NewHistory(*flagMaxHistory)
 	if err := t.SetHistoryFile(*flagHistory); err != nil {
 		// error already logged
 		return 1
