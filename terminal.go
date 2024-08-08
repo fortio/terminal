@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"fortio.org/log"
 	"golang.org/x/term"
 )
 
@@ -88,6 +89,15 @@ func Open() (*Terminal, error) {
 
 func (t *Terminal) IsTerminal() bool {
 	return term.IsTerminal(t.fd)
+}
+
+// Setups fortio logger to write to the terminal as needed to preserve prompt.
+func (t *Terminal) LoggerSetup() {
+	isTerm := t.IsTerminal()
+	// t.Out will add the needed \r for each \n when term is in raw mode
+	log.SetOutput(t.Out)
+	log.Config.ForceColor = isTerm
+	log.SetColorMode()
 }
 
 func (t *Terminal) Close() error {

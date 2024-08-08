@@ -59,12 +59,8 @@ func Main() int {
 	}
 	defer t.Close()
 	t.SetPrompt("Terminal demo> ")
-	isTerm := t.IsTerminal()
-	// t.Out will add the needed \r for each \n when term is in raw mode
-	log.SetOutput(t.Out)
-	log.Config.ForceColor = isTerm
-	log.SetColorMode()
-	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", isTerm)
+	t.LoggerSetup()
+	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", t.IsTerminal())
 	fmt.Fprintf(t.Out, "Use 'prompt <new prompt>' to change the prompt\n")
 	fmt.Fprintf(t.Out, "Try 'after duration text...' to see text showing in the middle of edits after said duration\n")
 	fmt.Fprintf(t.Out, "Try <tab> for auto completion\n")
