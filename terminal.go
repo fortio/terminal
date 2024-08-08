@@ -69,10 +69,10 @@ func Open() (*Terminal, error) {
 		io.Writer
 	}{os.Stdin, os.Stderr}
 	t := &Terminal{
-		fd:  int(os.Stdin.Fd()),
-		Out: &CRWriter{Out: os.Stdout},
+		fd: int(os.Stdin.Fd()),
 	}
 	t.term = term.NewTerminal(rw, "")
+	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
 		return t, nil
