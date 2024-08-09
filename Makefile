@@ -1,6 +1,6 @@
 all: lint test demo
 
-GO_BUILD_TAGS?=no_net,no_json,no_pprof
+GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
 demo:
 	go run -tags $(GO_BUILD_TAGS) ./example/ -loglevel debug -only-valid
