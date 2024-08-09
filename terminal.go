@@ -55,10 +55,11 @@ func (t *Terminal) IsTerminal() bool {
 
 // Setups fortio logger to write to the terminal as needed to preserve prompt.
 func (t *Terminal) LoggerSetup() {
-	isTerm := t.IsTerminal()
+	// Keep same color logic as fortio logger, so flags like -logger-no-color work.
+	colormode := log.ColorMode()
 	// t.Out will add the needed \r for each \n when term is in raw mode
 	log.SetOutput(t.Out)
-	log.Config.ForceColor = isTerm
+	log.Config.ForceColor = colormode
 	log.SetColorMode()
 }
 
