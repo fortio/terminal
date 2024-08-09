@@ -116,6 +116,11 @@ func (t *Terminal) NewHistory(capacity int) {
 	t.term.NewHistory(capacity + 1)
 }
 
+// AutoHistory enables/disables auto history (default is enabled).
+func (t *Terminal) AutoHistory(enabled bool) {
+	t.term.AutoHistory(enabled)
+}
+
 func readOrCreateHistory(f string) ([]string, error) {
 	// open file or create it
 	h, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o600)
