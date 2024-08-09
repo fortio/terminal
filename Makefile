@@ -12,6 +12,7 @@ tinygo-demo:
 	./example-tinygo -loglevel debug
 
 test:
+	golangci-lint run -c golangci.yml
 	CGO_ENABLED=0 go test -tags $(GO_BUILD_TAGS) ./...
 	(echo -e "help\rafter 1s hi\r"; sleep 2) | go run -tags $(GO_BUILD_TAGS) ./example # check non terminal input
 

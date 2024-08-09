@@ -8,6 +8,7 @@ require (
 	golang.org/x/term v0.23.0
 )
 
+//nolint:gomoddirectives // nolint should work even in go.mod imnsho
 replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20240809182630-68dd89eaaf9e
 
 require (
