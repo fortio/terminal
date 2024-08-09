@@ -55,10 +55,11 @@ func (t *Terminal) IsTerminal() bool {
 
 // Setups fortio logger to write to the terminal as needed to preserve prompt.
 func (t *Terminal) LoggerSetup() {
-	isTerm := t.IsTerminal()
+	// Keep same color logic as fortio logger, so flags like -logger-no-color work.
+	colormode := log.ColorMode()
 	// t.Out will add the needed \r for each \n when term is in raw mode
 	log.SetOutput(t.Out)
-	log.Config.ForceColor = isTerm
+	log.Config.ForceColor = colormode
 	log.SetColorMode()
 }
 
@@ -161,6 +162,8 @@ func readOrCreateHistory(f string) ([]string, error) {
 	return lines, nil
 }
 
+// We don't return any error because this is ran through a defer at the end of the program.
+// So logging errors is the best thing we can do.
 func saveHistory(f string, h []string) {
 	// open file or create it
 	hf, err := os.OpenFile(f, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o600)
