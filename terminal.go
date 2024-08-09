@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 
 	"fortio.org/log"
 	"fortio.org/term"
@@ -144,7 +145,14 @@ func readOrCreateHistory(f string) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(h)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		// unquote to get the actual command
+		rl := scanner.Text()
+		l, err := strconv.Unquote(rl)
+		if err != nil {
+			log.Errf("Error unquoting history file %s for %q: %v", f, rl, err)
+			return nil, err
+		}
+		lines = append(lines, l)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Errf("Error reading history file %s: %v", f, err)
@@ -163,7 +171,7 @@ func saveHistory(f string, h []string) {
 	defer hf.Close()
 	// write lines separated by \n
 	for _, l := range h {
-		_, err := hf.WriteString(l + "\n")
+		_, err := hf.WriteString(strconv.Quote(l) + "\n")
 		if err != nil {
 			log.Errf("Error writing history file %s: %v", f, err)
 			return
