@@ -161,6 +161,8 @@ func readOrCreateHistory(f string) ([]string, error) {
 	return lines, nil
 }
 
+// We don't return any error because this is ran through a defer at the end of the program.
+// So logging errors is the best thing we can do.
 func saveHistory(f string, h []string) {
 	// open file or create it
 	hf, err := os.OpenFile(f, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o600)

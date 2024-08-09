@@ -69,7 +69,6 @@ func AddOrReplaceHistory(t *terminal.Terminal, replace bool, l string) {
 }
 
 func Main() int {
-	// Pending https://github.com/golang/go/issues/68780
 	flagHistory := flag.String("history", "/tmp/terminal_history", "History `file` to use")
 	flagMaxHistory := flag.Int("max-history", 10, "Max number of history lines to keep")
 	flagOnlyValid := flag.Bool("only-valid", false, "Demonstrates filtering of history, only adding valid commands to it")
