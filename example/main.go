@@ -54,6 +54,20 @@ func autoCompleteCallback(t *terminal.Terminal, line string, pos int, key rune) 
 	return
 }
 
+func AddOrReplaceHistory(t *terminal.Terminal, replace bool, l string) {
+	// if in default auto mode, we don't manage history
+	// we also don't add empty commands. (at start of program)
+	if t.AutoHistory() || l == "" {
+		return
+	}
+	log.LogVf("Adding to history %q replace %t", l, replace)
+	if replace {
+		t.ReplaceLatest(l)
+	} else {
+		t.AddToHistory(l)
+	}
+}
+
 func Main() int {
 	// Pending https://github.com/golang/go/issues/68780
 	flagHistory := flag.String("history", "/tmp/terminal_history", "History `file` to use")
@@ -67,12 +81,12 @@ func Main() int {
 	defer t.Close()
 	onlyValid := *flagOnlyValid
 	if onlyValid {
-		t.AutoHistory(false)
+		t.SetAutoHistory(false)
 	}
 	t.SetPrompt("Terminal demo> ")
 	t.LoggerSetup()
 	t.NewHistory(*flagMaxHistory)
-	if err := t.SetHistoryFile(*flagHistory); err != nil {
+	if err = t.SetHistoryFile(*flagHistory); err != nil {
 		// error already logged
 		return 1
 	}
@@ -81,8 +95,13 @@ func Main() int {
 	fmt.Fprintf(t.Out, "Try 'after duration text...' to see text showing in the middle of edits after said duration\n")
 	fmt.Fprintf(t.Out, "Try <tab> for auto completion\n")
 	t.SetAutoCompleteCallback(autoCompleteCallback)
+	previousCommandWasValid := true // won't be used because `line` is empty at start
+	isValidCommand := true
+	var cmd string
 	for {
-		l, err := t.ReadLine()
+		// Replace unless the previous command was valid.
+		AddOrReplaceHistory(t, !previousCommandWasValid, cmd)
+		cmd, err = t.ReadLine()
 		switch {
 		case err == nil:
 			// no error is good, nothing in this switch.
@@ -92,17 +111,18 @@ func Main() int {
 		default:
 			return log.FErrf("Error reading line: %v", err)
 		}
-		log.Infof("Read line got: %q", l)
+		log.Infof("Read line got: %q", cmd)
+		// Save previous command validity to know whether this one should replace it in history or not.
+		previousCommandWasValid = isValidCommand
+		isValidCommand = false // not valid unless proven otherwise (reaches the end validations etc)
 		switch {
-		case l == exitCmd:
+		case cmd == exitCmd:
 			return 0
-		case l == helpCmd:
+		case cmd == helpCmd:
 			fmt.Fprintf(t.Out, "Available commands: %v\n", commands)
-		case strings.HasPrefix(l, afterCmd):
-			if onlyValid {
-				t.AddToHistory(l) // even if there is duration parse error, so it can be edited/fixed using up arrow
-			}
-			parts := strings.SplitN(l, " ", 3)
+			isValidCommand = true
+		case strings.HasPrefix(cmd, afterCmd):
+			parts := strings.SplitN(cmd, " ", 3)
 			if len(parts) < 3 {
 				fmt.Fprintf(t.Out, "Usage: %s <duration> <text...>\n", afterCmd)
 				continue
@@ -117,13 +137,15 @@ func Main() int {
 				time.Sleep(dur)
 				fmt.Fprintf(t.Out, "%s\n", parts[2])
 			}()
-		case strings.HasPrefix(l, promptCmd):
+			isValidCommand = true
+		case strings.HasPrefix(cmd, promptCmd):
 			if onlyValid {
-				t.AddToHistory(l)
+				t.AddToHistory(cmd)
 			}
-			t.SetPrompt(l[len(promptCmd):])
+			t.SetPrompt(cmd[len(promptCmd):])
+			isValidCommand = true
 		default:
-			fmt.Fprintf(t.Out, "Unknown command %q\n", l)
+			fmt.Fprintf(t.Out, "Unknown command %q\n", cmd)
 		}
 	}
 }

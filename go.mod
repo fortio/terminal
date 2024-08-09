@@ -5,8 +5,10 @@ go 1.22.6
 require (
 	fortio.org/cli v1.8.0
 	fortio.org/log v1.16.0
-	fortio.org/term v0.23.0-fortio-3
+	fortio.org/term v0.23.0-fortio-4
 )
+
+// replace fortio.org/term => ../term
 
 require (
 	fortio.org/struct2env v0.4.1 // indirect

@@ -19,6 +19,7 @@ type Terminal struct {
 	Out         io.Writer
 	historyFile string
 	capacity    int
+	autoHistory bool
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -43,8 +44,7 @@ func Open() (*Terminal, error) {
 		return nil, err
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
-	// 100 here matches the default value in term. should expose it there.
-	t.capacity = 100 - 1 // -1 to fit "pending" command.
+	t.capacity = term.DefaultHistoryEntries
 	return t, nil
 }
 
@@ -113,12 +113,23 @@ func (t *Terminal) NewHistory(capacity int) {
 		return
 	}
 	t.capacity = capacity
-	t.term.NewHistory(capacity + 1)
+	t.term.NewHistory(capacity)
 }
 
-// AutoHistory enables/disables auto history (default is enabled).
-func (t *Terminal) AutoHistory(enabled bool) {
+// SetAutoHistory enables/disables auto history (default is enabled).
+func (t *Terminal) SetAutoHistory(enabled bool) {
+	t.autoHistory = enabled
 	t.term.AutoHistory(enabled)
+}
+
+// AutoHistory returns the current auto history setting.
+func (t *Terminal) AutoHistory() bool {
+	return t.autoHistory
+}
+
+// ReplaceLatest replaces the current history with the given commands, returns the previous value.
+func (t *Terminal) ReplaceLatest(command string) string {
+	return t.term.ReplaceLatest(command)
 }
 
 func readOrCreateHistory(f string) ([]string, error) {
