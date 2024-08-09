@@ -5,10 +5,10 @@ go 1.22.6
 require (
 	fortio.org/cli v1.8.0
 	fortio.org/log v1.16.0
-	fortio.org/term v0.23.0-fortio-4
+	golang.org/x/term v0.23.0
 )
 
-// replace fortio.org/term => ../term
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20240809182630-68dd89eaaf9e
 
 require (
 	fortio.org/struct2env v0.4.1 // indirect

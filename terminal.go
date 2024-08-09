@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"fortio.org/log"
-	"fortio.org/term"
+	"golang.org/x/term"
 )
 
 type Terminal struct {
