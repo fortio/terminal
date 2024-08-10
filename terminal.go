@@ -69,7 +69,8 @@ func (t *Terminal) loggerSetup() {
 	log.SetColorMode()
 }
 
-// Sets up a file to load and save history from/to.
+// Sets up a file to load and save history from/to. File is being read when this is called.
+// If no error is returned, the file will also be automatically updated on Close().
 func (t *Terminal) SetHistoryFile(f string) error {
 	if f == "" {
 		log.Infof("No history file specified")
@@ -114,14 +115,21 @@ func (t *Terminal) History() []string {
 	return t.term.History()
 }
 
+// DefaultHistoryCapacity is the default number of entries in the history.
+const DefaultHistoryCapacity = term.DefaultHistoryEntries
+
 // NewHistory creates/resets the history to a new one with the given capacity.
-// need + 1 to fit "pending" command.
+// Using 0 as capacity will disable history reading and writing but not change
+// the underlying history state from it's [DefaultHistoryCapacity].
 func (t *Terminal) NewHistory(capacity int) {
 	if capacity < 0 {
 		log.Errf("Invalid history capacity %d, ignoring", capacity)
 		return
 	}
 	t.capacity = capacity
+	if capacity == 0 { // leave the underlying history as is, avoids crashing with 0 as well.
+		return
+	}
 	t.term.NewHistory(capacity)
 }
 
@@ -190,7 +198,8 @@ func saveHistory(f string, h []string) {
 }
 
 // Close restores the terminal to its original state. Must be called at exit to avoid leaving
-// the terminal in raw mode. Safe to call multiple times.
+// the terminal in raw mode. Safe to call multiple times. Will save the history to the history file
+// if one was set using [SetHistoryFile] and the capacity is > 0.
 func (t *Terminal) Close() error {
 	if t.oldState == nil {
 		return nil
