@@ -8,8 +8,8 @@ require (
 	golang.org/x/term v0.23.0
 )
 
-//nolint:gomoddirectives // nolint should work even in go.mod imnsho
-replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20240809182630-68dd89eaaf9e
+//nolint:gomoddirectives // nolint should work even in go.mod imnsho https://github.com/golangci/golangci-lint/issues/4897
+replace golang.org/x/term => ../term
 
 require (
 	fortio.org/struct2env v0.4.1 // indirect

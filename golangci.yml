@@ -142,7 +142,7 @@ issues:
       text: "grpc_|_SERVING|O_"
     - linters:
         - gomoddirectives
-      text: "replacement are not allowed:.*github.com/ldemailly" # white list ldemailly as destination - doesn't work as it's not part of the message
+      text: "replacement are not allowed:.*=> github.com/ldemailly" # allowlist ldemailly as destination - doesn't work as it's not part of the message
 
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
   max-issues-per-linter: 0
