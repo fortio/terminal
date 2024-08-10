@@ -14,10 +14,12 @@ import (
 )
 
 type Terminal struct {
+	// Use this for any output to the screen/console so the required \r are added in raw mode
+	// the prompt and command edit is refresh as needed when input comes in.
+	Out         io.Writer
 	fd          int
 	oldState    *term.State
 	term        *term.Terminal
-	Out         io.Writer
 	historyFile string
 	capacity    int
 	autoHistory bool
@@ -25,6 +27,8 @@ type Terminal struct {
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
 // to restore the terminal to its original state upon exit.
+// fortio.org/log (and thus stdlib "log") will be redirected
+// to the terminal in a manner that preserves the prompt.
 func Open() (*Terminal, error) {
 	rw := struct {
 		io.Reader
@@ -46,6 +50,7 @@ func Open() (*Terminal, error) {
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = term.DefaultHistoryEntries
+	t.loggerSetup()
 	return t, nil
 }
 
@@ -53,8 +58,9 @@ func (t *Terminal) IsTerminal() bool {
 	return term.IsTerminal(t.fd)
 }
 
-// Setups fortio logger to write to the terminal as needed to preserve prompt.
-func (t *Terminal) LoggerSetup() {
+// Setups fortio logger (and thus stdlib "log" too)
+// to write to the terminal as needed to preserve prompt.
+func (t *Terminal) loggerSetup() {
 	// Keep same color logic as fortio logger, so flags like -logger-no-color work.
 	colormode := log.ColorMode()
 	// t.Out will add the needed \r for each \n when term is in raw mode
@@ -63,6 +69,7 @@ func (t *Terminal) LoggerSetup() {
 	log.SetColorMode()
 }
 
+// Sets up a file to load and save history from/to.
 func (t *Terminal) SetHistoryFile(f string) error {
 	if f == "" {
 		log.Infof("No history file specified")
@@ -182,6 +189,8 @@ func saveHistory(f string, h []string) {
 	}
 }
 
+// Close restores the terminal to its original state. Must be called at exit to avoid leaving
+// the terminal in raw mode. Safe to call multiple times.
 func (t *Terminal) Close() error {
 	if t.oldState == nil {
 		return nil
@@ -209,6 +218,9 @@ func (t *Terminal) Close() error {
 	return err
 }
 
+// ReadLine reads a line from the terminal using the setup prompt and history
+// and edit capabilities. Returns the line and an error if any. io.EOF is returned
+// when the user presses ^D or ^C.
 func (t *Terminal) ReadLine() (string, error) {
 	c, err := t.term.ReadLine()
 	// That error isn't an error that needs to be propagated,
@@ -219,14 +231,17 @@ func (t *Terminal) ReadLine() (string, error) {
 	return c, err
 }
 
+// Sets or change the prompt.
 func (t *Terminal) SetPrompt(s string) {
 	t.term.SetPrompt(s)
 }
 
-// Pass "this" back so AutoCompleteCallback can use t.Out etc.
-// (compared to the original x/term callback).
+// AutoCompleteCallback is called with "this" terminal as first argument so AutoCompleteCallback
+// can use t.Out etc. (compared to the original x/term callback).
 type AutoCompleteCallback func(t *Terminal, line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
+// SetAutoCompleteCallback sets the callback called for each key press. Can be used to implement
+// auto completion. See example/main.go for an example.
 func (t *Terminal) SetAutoCompleteCallback(f AutoCompleteCallback) {
 	t.term.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		return f(t, line, pos, key)
