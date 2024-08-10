@@ -5,7 +5,7 @@ go 1.22.6
 require (
 	fortio.org/cli v1.8.0
 	fortio.org/log v1.16.0
-	fortio.org/term v0.23.0-fortio-5
+	fortio.org/term v0.23.0-fortio-6
 )
 
 // replace fortio.org/term => ../term
