@@ -115,7 +115,7 @@ func (t *Terminal) History() []string {
 	return t.term.History()
 }
 
-// DefaultHistoryCapacity is the default number of entries in the history.
+// DefaultHistoryCapacity is the default number of entries in the history (99).
 const DefaultHistoryCapacity = term.DefaultHistoryEntries
 
 // NewHistory creates/resets the history to a new one with the given capacity.
