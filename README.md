@@ -1,7 +1,7 @@
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal.svg)](https://pkg.go.dev/fortio.org/terminal)
 # terminal
 
-Fortio's terminal is a `readline` style library.
+Fortio's terminal is a `readline` style library. It handles prompts, edit (like Ctrl-A for beginning of line etc...), navigating through history using arrow keys, loading and saving history from file, etc... It works on everywhere go does (including macOS, Windows (using Terminal app), Linux).
 
 See [example/main.go](example/main.go) for a rather complete example/demo.
 
