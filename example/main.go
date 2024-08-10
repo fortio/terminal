@@ -83,7 +83,6 @@ func Main() int {
 		t.SetAutoHistory(false)
 	}
 	t.SetPrompt("Terminal demo> ")
-	t.LoggerSetup()
 	t.NewHistory(*flagMaxHistory)
 	if err = t.SetHistoryFile(*flagHistory); err != nil {
 		// error already logged
