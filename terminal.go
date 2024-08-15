@@ -11,7 +11,30 @@ import (
 
 	"fortio.org/log"
 	"fortio.org/term"
+	"github.com/rivo/uniseg"
 )
+
+func VisualLength(runes []rune) int {
+	filtered := make([]rune, 0, len(runes))
+	inEscapeSeq := false
+	// Skip escape sequences.
+	for _, r := range runes {
+		switch {
+		// Copied from term's visualLength
+		case inEscapeSeq:
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEscapeSeq = false
+			}
+		case r == '\x1b':
+			inEscapeSeq = true
+		default:
+			filtered = append(filtered, r)
+		}
+	}
+	l := uniseg.StringWidth(string(filtered))
+	//	fmt.Printf("\nVisualLength(%q) = %d\n", string(runes), l)
+	return l
+}
 
 type Terminal struct {
 	// Use this for any output to the screen/console so the required \r are added in raw mode
@@ -38,6 +61,7 @@ func Open() (*Terminal, error) {
 		fd: int(os.Stdin.Fd()),
 	}
 	t.term = term.NewTerminal(rw, "")
+	t.term.VisualLength = VisualLength
 	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
@@ -216,7 +240,7 @@ func (t *Terminal) Close() error {
 		return nil
 	}
 	h := t.term.History()
-	log.LogVf("got history %v", h)
+	// log.LogVf("got history %v", h)
 	slices.Reverse(h)
 	extra := len(h) - t.capacity
 	if extra > 0 {

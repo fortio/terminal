@@ -5,7 +5,8 @@ go 1.22.6
 require (
 	fortio.org/cli v1.8.0
 	fortio.org/log v1.16.0
-	fortio.org/term v0.23.0-fortio-6
+	fortio.org/term v0.23.0-fortio-6.0.20240815191104-2119463b2839
+	github.com/rivo/uniseg v0.4.7
 )
 
 // replace fortio.org/term => ../term
