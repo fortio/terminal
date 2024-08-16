@@ -216,7 +216,7 @@ func (t *Terminal) Close() error {
 		return nil
 	}
 	h := t.term.History()
-	log.LogVf("got history %v", h)
+	// log.LogVf("got history %v", h)
 	slices.Reverse(h)
 	extra := len(h) - t.capacity
 	if extra > 0 {
