@@ -122,7 +122,7 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				log.Infof("Triple interrupt, exiting.")
 				return 0
 			}
-			log.Infof("Interrupted (%d), resetting, use exit or Ctrl-d. to exit.", interrupts)
+			log.Infof("Interrupted (%d), resetting, use exit or ^D. to exit.", interrupts)
 			ctx, cancel = t.ResetInterrupts(context.Background()) //nolint:fatcontext // this is only upon interrupt.
 		default:
 			return log.FErrf("Error reading line: %v", err)

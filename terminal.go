@@ -248,7 +248,8 @@ func (t *Terminal) Close() error {
 
 // ReadLine reads a line from the terminal using the setup prompt and history
 // and edit capabilities. Returns the line and an error if any. io.EOF is returned
-// when the user presses ^D or ^C.
+// when the user presses Control-D. ErrInterrupted is returned when the user presses
+// Control-C or a signal is received.
 func (t *Terminal) ReadLine() (string, error) {
 	c, err := t.term.ReadLine()
 	// That error isn't an error that needs to be propagated,

@@ -70,7 +70,7 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-const CtrlC = 3
+const CtrlC = 3 // Control-C is ascii 3 (C is 3rd letter of the alphabet)
 
 func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
@@ -82,29 +82,23 @@ func (ir *InterruptReader) start(ctx context.Context) {
 		case <-sigc:
 			log.Infof("Interrupted by signal")
 			ir.cancel()
-			ir.mu.Lock()
-			ir.err = ErrInterrupted
-			ir.mu.Unlock()
+			ir.setError(ErrInterrupted)
 			return
 		case <-ctx.Done():
 			log.Infof("Context done")
-			ir.mu.Lock()
-			ir.err = ErrInterrupted
-			ir.mu.Unlock()
+			ir.setError(ErrInterrupted)
 			return
 		default:
 			n, err := ir.reader.Read(localBuf)
 			if err != nil {
-				ir.mu.Lock()
-				ir.err = err
-				ir.mu.Unlock()
+				ir.setError(err)
 				return
 			}
 			localBuf = localBuf[:n]
 			idx := bytes.IndexByte(localBuf, CtrlC)
 			if idx != -1 {
 				log.Infof("Ctrl-C found in input")
-				localBuf = localBuf[:idx] // discard ^c and the rest.
+				localBuf = localBuf[:idx] // discard ^C and the rest.
 				ir.cancel()
 			}
 			ir.mu.Lock()
@@ -112,6 +106,12 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			ir.mu.Unlock()
 		}
 	}
+}
+
+func (ir *InterruptReader) setError(err error) {
+	ir.mu.Lock()
+	ir.err = err
+	ir.mu.Unlock()
 }
 
 func SleepWithContext(ctx context.Context, duration time.Duration) error {
