@@ -1,3 +1,7 @@
+/*
+ * A more interesting/real example is https://github.com/grol-io/grol
+ * but this demonstrates most of the features of the terminal package.
+ */
 package main
 
 import (
