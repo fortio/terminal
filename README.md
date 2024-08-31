@@ -9,4 +9,4 @@ See the godoc above for details.
 
 The [grol](https://github.com/grol-io/grol#grol) command line repl and others use this.
 
-The implementations currently is a wrapper fully encapsulating (our fork of) [x/term](https://github.com/golang/term), i.e. [fortio.org/term](https://github.com/fortio/term)
+The implementations currently is a wrapper fully encapsulating (our fork of) [x/term](https://github.com/golang/term), i.e. [fortio.org/term](https://github.com/fortio/term) and new features like the interrupts handling (filters Ctrl-C ahead of term' reads)
