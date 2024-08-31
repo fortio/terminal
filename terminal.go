@@ -37,7 +37,7 @@ type Terminal struct {
 // New cancellable context is returned, use it to cancel the terminal
 // reading or check for done for control-c or signal.
 func Open(ctx context.Context) (t *Terminal, err error) {
-	intrReader := NewInterruptReader(os.Stdin, 256)
+	intrReader := NewInterruptReader(os.Stdin, 256) // same as the internal x/term buffer size.
 	rw := struct {
 		io.Reader
 		io.Writer

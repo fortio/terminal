@@ -23,12 +23,13 @@ const (
 	promptCmd = "prompt "
 	afterCmd  = "after "
 	sleepCmd  = "sleep "
+	cancelCmd = "cancel " // simulate an external interrupt
 	exitCmd   = "exit"
 	helpCmd   = "help"
 	testMLCmd = "multiline"
 )
 
-var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd, sleepCmd, testMLCmd}
+var commands = []string{promptCmd, afterCmd, sleepCmd, cancelCmd, exitCmd, helpCmd, testMLCmd}
 
 // func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
@@ -70,7 +71,7 @@ func AddOrReplaceHistory(t *terminal.Terminal, replace bool, l string) {
 	}
 }
 
-func Main() int {
+func Main() int { //nolint:funlen // long but simple (and some amount of copy pasta because of flow control).
 	flagHistory := flag.String("history", ".history", "History `file` to use")
 	flagMaxHistory := flag.Int("max-history", 10, "Max number of history lines to keep")
 	flagOnlyValid := flag.Bool("only-valid", false, "Demonstrates filtering of history, only adding valid commands to it")
@@ -99,6 +100,8 @@ func Main() int {
 	isValidCommand := true
 	var cmd string
 	interrupts := 0
+	ctx := t.Context
+	cancel := t.Cancel
 	for {
 		// Replace unless the previous command was valid.
 		AddOrReplaceHistory(t, !previousCommandWasValid, cmd)
@@ -116,7 +119,7 @@ func Main() int {
 				return 0
 			}
 			log.Infof("Interrupted, resetting, use exit or Ctrl-d. to exit.")
-			t.ResetInterrupts(context.Background())
+			ctx, cancel = t.ResetInterrupts(context.Background()) //nolint:fatcontext // this is only upon interrupt.
 		default:
 			return log.FErrf("Error reading line: %v", err)
 		}
@@ -154,6 +157,29 @@ func Main() int {
 				log.Infof("Sleep interrupted: %v", err)
 				interrupts = 0
 			}
+		case strings.HasPrefix(cmd, cancelCmd):
+			parts := strings.SplitN(cmd, " ", 2)
+			if len(parts) < 2 {
+				fmt.Fprintf(t.Out, "Usage: %s <duration>\n", cancelCmd)
+				continue
+			}
+			dur, err := time.ParseDuration(parts[1])
+			if err != nil {
+				fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", parts[1], err)
+				continue
+			}
+			isValidCommand = true
+			log.Infof("Will generate cancel() after %v", dur)
+			interrupts = 0
+			go func(ctx context.Context, cancel context.CancelFunc) {
+				time.Sleep(dur)
+				if ctx.Err() != nil {
+					log.Infof("Already interrupted, not canceling again: %v", ctx.Err())
+					return
+				}
+				log.Infof("Canceling")
+				cancel()
+			}(ctx, cancel)
 		case strings.HasPrefix(cmd, afterCmd):
 			parts := strings.SplitN(cmd, " ", 3)
 			if len(parts) < 3 {

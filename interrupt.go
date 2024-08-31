@@ -17,6 +17,7 @@ import (
 type InterruptReader struct {
 	reader  io.Reader // stdin typically
 	buf     []byte
+	reset   []byte // original buffer start
 	bufSize int
 	err     error
 	mu      sync.Mutex
@@ -34,6 +35,7 @@ func NewInterruptReader(reader io.Reader, bufSize int) *InterruptReader {
 		bufSize: bufSize,
 		buf:     make([]byte, 0, bufSize),
 	}
+	ir.reset = ir.buf
 	log.Config.GoroutineID = true
 	return ir
 }
@@ -57,7 +59,11 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	ir.mu.Lock()
 	n := copy(p, ir.buf)
-	ir.buf = ir.buf[n:]
+	if n == len(ir.buf) {
+		ir.buf = ir.reset // consumed all, reset to initial buffer
+	} else {
+		ir.buf = ir.buf[n:] // partial read
+	}
 	err := ir.err
 	ir.err = nil
 	ir.mu.Unlock()
@@ -107,8 +113,6 @@ func (ir *InterruptReader) start(ctx context.Context) {
 		}
 	}
 }
-
-
 
 func SleepWithContext(ctx context.Context, duration time.Duration) error {
 	select {
