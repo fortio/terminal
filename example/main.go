@@ -118,7 +118,7 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				log.Infof("Triple interrupt, exiting.")
 				return 0
 			}
-			log.Infof("Interrupted, resetting, use exit or Ctrl-d. to exit.")
+			log.Infof("Interrupted (%d), resetting, use exit or Ctrl-d. to exit.", interrupts)
 			ctx, cancel = t.ResetInterrupts(context.Background()) //nolint:fatcontext // this is only upon interrupt.
 		default:
 			return log.FErrf("Error reading line: %v", err)
@@ -140,14 +140,8 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 			fmt.Fprintf(t.Out, "Available commands: %v\n", commands)
 			isValidCommand = true
 		case strings.HasPrefix(cmd, sleepCmd):
-			parts := strings.SplitN(cmd, " ", 2)
-			if len(parts) < 2 {
-				fmt.Fprintf(t.Out, "Usage: %s <duration>\n", sleepCmd)
-				continue
-			}
-			dur, err := time.ParseDuration(parts[1])
-			if err != nil {
-				fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", parts[1], err)
+			dur, _, ok := parseWithDur(t, cmd, 2, sleepCmd+"<duration>")
+			if !ok {
 				continue
 			}
 			isValidCommand = true
@@ -158,14 +152,8 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				interrupts = 0
 			}
 		case strings.HasPrefix(cmd, cancelCmd):
-			parts := strings.SplitN(cmd, " ", 2)
-			if len(parts) < 2 {
-				fmt.Fprintf(t.Out, "Usage: %s <duration>\n", cancelCmd)
-				continue
-			}
-			dur, err := time.ParseDuration(parts[1])
-			if err != nil {
-				fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", parts[1], err)
+			dur, _, ok := parseWithDur(t, cmd, 2, cancelCmd+"<duration>")
+			if !ok {
 				continue
 			}
 			isValidCommand = true
@@ -181,22 +169,16 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				cancel()
 			}(ctx, cancel)
 		case strings.HasPrefix(cmd, afterCmd):
-			parts := strings.SplitN(cmd, " ", 3)
-			if len(parts) < 3 {
-				fmt.Fprintf(t.Out, "Usage: %s <duration> <text...>\n", afterCmd)
+			dur, rest, ok := parseWithDur(t, cmd, 3, afterCmd+"<duration> <text>")
+			if !ok {
 				continue
 			}
-			dur, err := time.ParseDuration(parts[1])
-			if err != nil {
-				fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", parts[1], err)
-				continue
-			}
-			log.Infof("Will show %q after %v", parts[2], dur)
+			isValidCommand = true
+			log.Infof("Will show %q after %v", rest, dur)
 			go func() {
 				time.Sleep(dur)
-				fmt.Fprintf(t.Out, "%s\n", parts[2])
+				fmt.Fprintf(t.Out, "%s\n", rest)
 			}()
-			isValidCommand = true
 		case strings.HasPrefix(cmd, promptCmd):
 			if onlyValid {
 				t.AddToHistory(cmd)
@@ -207,4 +189,38 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 			fmt.Fprintf(t.Out, "Unknown command %q\n", cmd)
 		}
 	}
+}
+
+func parseWithDur(t *terminal.Terminal, cmd string, expected int, usage string) (time.Duration, string, bool) {
+	parts, ok := splitN(t, cmd, expected, usage)
+	if !ok {
+		return 0, "", false
+	}
+	dur, ok := getDuration(t, parts[1])
+	if !ok {
+		return 0, "", false
+	}
+	rest := ""
+	if expected > 2 {
+		rest = parts[2]
+	}
+	return dur, rest, true
+}
+
+func splitN(t *terminal.Terminal, inp string, expected int, usage string) ([]string, bool) {
+	parts := strings.SplitN(inp, " ", expected)
+	if len(parts) < expected {
+		fmt.Fprintf(t.Out, "Usage: %s\n", usage)
+		return parts, false
+	}
+	return parts, true
+}
+
+func getDuration(t *terminal.Terminal, s string) (time.Duration, bool) {
+	dur, err := time.ParseDuration(s)
+	if err != nil {
+		fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", s, err)
+		return 0, false
+	}
+	return dur, true
 }
