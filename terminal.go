@@ -3,6 +3,7 @@ package terminal // import "fortio.org/terminal"
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -16,10 +17,14 @@ import (
 type Terminal struct {
 	// Use this for any output to the screen/console so the required \r are added in raw mode
 	// the prompt and command edit is refresh as needed when input comes in.
-	Out         io.Writer
+	Out io.Writer
+	// Cancellable context after Open(). Use it to cancel the terminal reading or check for done.
+	Context     context.Context //nolint:containedctx // To avoid Open() returning 4 values.
+	Cancel      context.CancelFunc
 	fd          int
 	oldState    *term.State
 	term        *term.Terminal
+	intrReader  *InterruptReader
 	historyFile string
 	capacity    int
 	autoHistory bool
@@ -29,29 +34,42 @@ type Terminal struct {
 // to restore the terminal to its original state upon exit.
 // fortio.org/log (and thus stdlib "log") will be redirected
 // to the terminal in a manner that preserves the prompt.
-func Open() (*Terminal, error) {
+// New cancellable context is returned, use it to cancel the terminal
+// reading or check for done for control-c or signal.
+func Open(ctx context.Context) (t *Terminal, err error) {
+	intrReader := NewInterruptReader(os.Stdin, 256)
 	rw := struct {
 		io.Reader
 		io.Writer
-	}{os.Stdin, os.Stderr}
-	t := &Terminal{
-		fd: int(os.Stdin.Fd()),
+	}{intrReader, os.Stderr}
+	t = &Terminal{
+		fd:         int(os.Stdin.Fd()), //nolint:gosec // yeah right.
+		intrReader: intrReader,
+		Context:    ctx,
 	}
 	t.term = term.NewTerminal(rw, "")
 	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
-		return t, nil
+		t.ResetInterrupts(ctx)
+		return
 	}
-	var err error
 	t.oldState, err = term.MakeRaw(t.fd)
 	if err != nil {
-		return nil, err
+		return
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = term.DefaultHistoryEntries
 	t.loggerSetup()
-	return t, nil
+	t.ResetInterrupts(ctx)
+	return
+}
+
+// If you want to reset and restart after an interrupt, call this.
+func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
+	// locking should not be needed as we're (supposed to be) in the main thread.
+	t.Context, t.Cancel = t.intrReader.Start(ctx)
+	return t.Context, t.Cancel
 }
 
 func (t *Terminal) IsTerminal() bool {
@@ -207,6 +225,7 @@ func (t *Terminal) Close() error {
 	// To avoid prompt being repeated on the last line (shouldn't be necessary but... is
 	// consider fixing in term instead)
 	t.term.SetPrompt("") // will still reprint the last command on ^C in middle of typing.
+	t.Cancel()           // cancel the interrupt reader
 	err := term.Restore(t.fd, t.oldState)
 	t.oldState = nil
 	t.Out = os.Stderr

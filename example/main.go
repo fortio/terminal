@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,12 +22,13 @@ func main() {
 const (
 	promptCmd = "prompt "
 	afterCmd  = "after "
+	sleepCmd  = "sleep "
 	exitCmd   = "exit"
 	helpCmd   = "help"
 	testMLCmd = "multiline"
 )
 
-var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd, testMLCmd}
+var commands = []string{promptCmd, afterCmd, exitCmd, helpCmd, sleepCmd, testMLCmd}
 
 // func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
@@ -73,7 +75,7 @@ func Main() int {
 	flagMaxHistory := flag.Int("max-history", 10, "Max number of history lines to keep")
 	flagOnlyValid := flag.Bool("only-valid", false, "Demonstrates filtering of history, only adding valid commands to it")
 	cli.Main()
-	t, err := terminal.Open()
+	t, err := terminal.Open(context.Background())
 	if err != nil {
 		return log.FErrf("Error opening terminal: %v", err)
 	}
@@ -88,7 +90,7 @@ func Main() int {
 		// error already logged
 		return 1
 	}
-	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or ^C to exit\n", t.IsTerminal())
+	fmt.Fprintf(t.Out, "Terminal is open\nis valid %t\nuse exit or ^D or 3 ^C to exit\n", t.IsTerminal())
 	fmt.Fprintf(t.Out, "Use 'prompt <new prompt>' to change the prompt\n")
 	fmt.Fprintf(t.Out, "Try 'after duration text...' to see text showing in the middle of edits after said duration\n")
 	fmt.Fprintf(t.Out, "Try <tab> for auto completion\n")
@@ -96,6 +98,7 @@ func Main() int {
 	previousCommandWasValid := true // won't be used because `line` is empty at start
 	isValidCommand := true
 	var cmd string
+	interrupts := 0
 	for {
 		// Replace unless the previous command was valid.
 		AddOrReplaceHistory(t, !previousCommandWasValid, cmd)
@@ -106,19 +109,51 @@ func Main() int {
 		case errors.Is(err, io.EOF):
 			log.Infof("EOF received, exiting.")
 			return 0
+		case errors.Is(err, terminal.ErrInterrupted):
+			interrupts++
+			if interrupts >= 3 {
+				log.Infof("Triple interrupt, exiting.")
+				return 0
+			}
+			log.Infof("Interrupted, resetting, use exit or Ctrl-d. to exit.")
+			t.ResetInterrupts(context.Background())
 		default:
 			return log.FErrf("Error reading line: %v", err)
 		}
-		log.Infof("Read line got: %q", cmd)
 		// Save previous command validity to know whether this one should replace it in history or not.
 		previousCommandWasValid = isValidCommand
 		isValidCommand = false // not valid unless proven otherwise (reaches the end validations etc)
+		if cmd == "" {
+			// we do get empty reads on interrupt
+			log.LogVf("Empty command read")
+			continue
+		}
+		log.Infof("Read line got: %q", cmd)
 		switch {
 		case cmd == exitCmd:
+			log.Infof("Exit command received, exiting.")
 			return 0
 		case cmd == helpCmd:
 			fmt.Fprintf(t.Out, "Available commands: %v\n", commands)
 			isValidCommand = true
+		case strings.HasPrefix(cmd, sleepCmd):
+			parts := strings.SplitN(cmd, " ", 2)
+			if len(parts) < 2 {
+				fmt.Fprintf(t.Out, "Usage: %s <duration>\n", sleepCmd)
+				continue
+			}
+			dur, err := time.ParseDuration(parts[1])
+			if err != nil {
+				fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", parts[1], err)
+				continue
+			}
+			isValidCommand = true
+			log.Infof("Sleeping for %v (^C to interrupt)", dur)
+			err = terminal.SleepWithContext(t.Context, dur)
+			if err != nil {
+				log.Infof("Sleep interrupted: %v", err)
+				interrupts = 0
+			}
 		case strings.HasPrefix(cmd, afterCmd):
 			parts := strings.SplitN(cmd, " ", 3)
 			if len(parts) < 3 {
