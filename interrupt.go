@@ -133,7 +133,8 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-	// Check for signal every 250ms
+	// Check for signal and context every 250ms, though signals should interrupt the select,
+	// they don't (at least on macOS, for the signals we are watching).
 	tv := TimeoutToTimeval(250 * time.Millisecond)
 	defer ir.cond.Signal()
 	for {
