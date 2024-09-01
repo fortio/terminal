@@ -10,14 +10,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TimeoutToTimeval(timeout time.Duration) unix.Timeval {
-	return unix.NsecToTimeval(timeout.Nanoseconds())
+func TimeoutToTimeval(timeout time.Duration) *unix.Timeval {
+	tv := unix.NsecToTimeval(timeout.Nanoseconds())
+	return &tv
 }
 
-func TimeoutReader(fd int, tv unix.Timeval, buf []byte) (int, error) {
+func TimeoutReader(fd int, tv *unix.Timeval, buf []byte) (int, error) {
 	var readfds unix.FdSet
 	readfds.Set(fd)
-	n, err := unix.Select(fd+1, &readfds, nil, nil, &tv)
+	n, err := unix.Select(fd+1, &readfds, nil, nil, tv)
 	if errors.Is(err, syscall.EINTR) {
 		log.LogVf("Interrupted select")
 		return 0, nil
