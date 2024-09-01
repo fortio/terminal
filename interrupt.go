@@ -141,9 +141,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 		select {
 		case <-sigc:
 			ir.setError(NewErrInterrupted("signal received"))
-			if ir.cancel != nil {
-				ir.cancel()
-			}
+			ir.cancel()
 			return
 		case <-ctx.Done():
 			ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
@@ -163,10 +161,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 				log.Infof("Ctrl-C found in input")
 				localBuf = localBuf[:idx] // discard ^C and the rest.
 				ir.mu.Lock()
-				if ir.cancel != nil {
-					ir.cancel()
-				}
-				ir.cancel = nil
+				ir.cancel()
 				ir.buf = append(ir.buf, localBuf...)
 				ir.err = ErrUserInterrupt
 				ir.mu.Unlock()
