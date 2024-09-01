@@ -3,7 +3,6 @@ package terminal
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
 	"os/signal"
@@ -103,32 +102,6 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 
 const CtrlC = 3 // Control-C is ascii 3 (C is 3rd letter of the alphabet)
 
-func TimeoutToTimeval(timeout time.Duration) syscall.Timeval {
-	return syscall.NsecToTimeval(timeout.Nanoseconds())
-}
-
-func TimeoutReader(fd int, tv syscall.Timeval, buf []byte) (int, error) {
-	var readfds syscall.FdSet
-	readfds.Bits[fd/64] |= (1 << (uint(fd) % 64))
-	err := syscall.Select(fd+1, &readfds, nil, nil, &tv)
-	if errors.Is(err, syscall.EINTR) {
-		log.LogVf("Interrupted select")
-		return 0, nil
-	}
-	if err != nil {
-		log.Errf("Select error: %v", err)
-		return 0, err
-	}
-	if readfds.Bits[fd/64]&(1<<(uint(fd)%64)) == 0 {
-		return 0, nil // timeout case
-	}
-	n, err := syscall.Read(fd, buf)
-	if n == 0 && err == nil {
-		err = io.EOF
-	}
-	return n, err
-}
-
 func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
@@ -138,7 +111,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	tv := TimeoutToTimeval(250 * time.Millisecond)
 	defer ir.cond.Signal()
 	for {
-		// log.Debugf("InterruptReader loop")
+		log.Debugf("InterruptReader loop")
 		select {
 		case <-sigc:
 			ir.setError(NewErrInterrupted("signal received"))
