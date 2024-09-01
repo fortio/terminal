@@ -111,7 +111,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	tv := TimeoutToTimeval(250 * time.Millisecond)
 	defer ir.cond.Signal()
 	for {
-		log.Debugf("InterruptReader loop")
+		// log.Debugf("InterruptReader loop")
 		select {
 		case <-sigc:
 			ir.setError(NewErrInterrupted("signal received"))
