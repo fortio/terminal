@@ -106,6 +106,7 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 	interrupts := 0
 	ctx := t.Context
 	cancel := t.Cancel
+	var terr terminal.InterruptedError
 	for {
 		// Replace unless the previous command was valid.
 		AddOrReplaceHistory(t, !previousCommandWasValid, cmd)
@@ -116,13 +117,13 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 		case errors.Is(err, io.EOF):
 			log.Infof("EOF received, exiting.")
 			return 0
-		case errors.Is(err, terminal.ErrInterrupted):
+		case errors.As(err, &terr):
 			interrupts++
 			if interrupts >= 3 {
-				log.Infof("Triple interrupt, exiting.")
+				log.Infof("Triple %v, exiting.", terr)
 				return 0
 			}
-			log.Infof("Interrupted (%d), resetting, use exit or ^D. to exit.", interrupts)
+			log.Infof("Interrupted (%d, %v), resetting, use exit or ^D. to exit.", interrupts, terr)
 			ctx, cancel = t.ResetInterrupts(context.Background()) //nolint:fatcontext // this is only upon interrupt.
 		default:
 			return log.FErrf("Error reading line: %v", err)

@@ -3,7 +3,6 @@ package terminal
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
 	"os/signal"
@@ -16,26 +15,54 @@ import (
 
 type InterruptReader struct {
 	reader  io.Reader // stdin typically
+	fd      int
 	buf     []byte
 	reset   []byte // original buffer start
 	bufSize int
 	err     error
 	mu      sync.Mutex
+	cond    sync.Cond
 	cancel  context.CancelFunc
 }
 
-var ErrInterrupted = errors.New("terminal interrupted")
+var ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
+
+type InterruptedError struct {
+	DetailedReason string
+	OriginalError  error
+}
+
+func (e InterruptedError) Unwrap() error {
+	return e.OriginalError
+}
+
+func (e InterruptedError) Error() string {
+	if e.OriginalError != nil {
+		return "terminal interrupted: " + e.DetailedReason + ": " + e.OriginalError.Error()
+	}
+	return "terminal interrupted: " + e.DetailedReason
+}
+
+func NewErrInterrupted(reason string) InterruptedError {
+	return InterruptedError{DetailedReason: reason}
+}
+
+func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
+	return InterruptedError{DetailedReason: reason, OriginalError: err}
+}
 
 // NewInterruptReader creates a new interrupt reader.
 // it needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
-func NewInterruptReader(reader io.Reader, bufSize int) *InterruptReader {
+func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
 	ir := &InterruptReader{
 		reader:  reader,
 		bufSize: bufSize,
 		buf:     make([]byte, 0, bufSize),
+		fd:      int(reader.Fd()), //nolint:gosec // it's on almost all platforms.
 	}
 	ir.reset = ir.buf
+	ir.cond = *sync.NewCond(&ir.mu)
 	log.Config.GoroutineID = true
 	return ir
 }
@@ -58,6 +85,9 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 // Implement io.Reader interface.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	ir.mu.Lock()
+	for len(ir.buf) == 0 && ir.err == nil {
+		ir.cond.Wait()
+	}
 	n := copy(p, ir.buf)
 	if n == len(ir.buf) {
 		ir.buf = ir.reset // consumed all, reset to initial buffer
@@ -76,39 +106,51 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-
+	// Check for signal and context every 250ms, though signals should interrupt the select,
+	// they don't (at least on macOS, for the signals we are watching).
+	tv := TimeoutToTimeval(250 * time.Millisecond)
+	defer ir.cond.Signal()
 	for {
+		// log.Debugf("InterruptReader loop")
 		select {
 		case <-sigc:
-			log.Infof("Interrupted by signal")
+			ir.setError(NewErrInterrupted("signal received"))
 			ir.cancel()
-			ir.setError(ErrInterrupted)
 			return
 		case <-ctx.Done():
-			log.Infof("Context done")
-			ir.setError(ErrInterrupted)
+			ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
 			return
 		default:
-			n, err := ir.reader.Read(localBuf)
+			n, err := TimeoutReader(ir.fd, tv, localBuf)
 			if err != nil {
 				ir.setError(err)
 				return
+			}
+			if n == 0 {
+				continue
 			}
 			localBuf = localBuf[:n]
 			idx := bytes.IndexByte(localBuf, CtrlC)
 			if idx != -1 {
 				log.Infof("Ctrl-C found in input")
 				localBuf = localBuf[:idx] // discard ^C and the rest.
+				ir.mu.Lock()
 				ir.cancel()
+				ir.buf = append(ir.buf, localBuf...)
+				ir.err = ErrUserInterrupt
+				ir.mu.Unlock()
+				return
 			}
 			ir.mu.Lock()
 			ir.buf = append(ir.buf, localBuf...) // Might grow unbounded if not read.
+			ir.cond.Signal()
 			ir.mu.Unlock()
 		}
 	}
 }
 
 func (ir *InterruptReader) setError(err error) {
+	log.Infof("InterruptReader setting error: %v", err)
 	ir.mu.Lock()
 	ir.err = err
 	ir.mu.Unlock()
