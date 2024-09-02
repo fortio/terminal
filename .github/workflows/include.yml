@@ -9,7 +9,7 @@ on:
 
 jobs:
     call-gochecks:
-        uses: fortio/workflows/.github/workflows/gochecks.yml@run_ci_on_windows_and_mac_too
+        uses: fortio/workflows/.github/workflows/gochecks.yml@main
     call-codecov:
         uses: fortio/workflows/.github/workflows/codecov.yml@main
     call-codeql:
