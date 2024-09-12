@@ -6,7 +6,7 @@ require (
 	fortio.org/cli v1.9.0
 	fortio.org/log v1.16.0
 	fortio.org/term v0.23.0-fortio-6
-	golang.org/x/sys v0.24.0
+	golang.org/x/sys v0.25.0
 )
 
 // replace fortio.org/term => ../term
