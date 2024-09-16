@@ -221,20 +221,22 @@ func (t *Terminal) Suspend() {
 	if t.oldState == nil {
 		return
 	}
+	t.intrReader.Stop() // stop the interrupt reader
 	err := term.Restore(t.fd, t.oldState)
 	if err != nil {
 		log.Errf("Error restoring terminal for suspend: %v", err)
 	}
 }
 
-func (t *Terminal) Resume() {
+func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelFunc) {
 	if t.oldState == nil {
-		return
+		return nil, nil
 	}
 	_, err := term.MakeRaw(t.fd)
 	if err != nil {
 		log.Errf("Error for terminal resume: %v", err)
 	}
+	return t.ResetInterrupts(ctx) // resume the interrupt reader
 }
 
 // Close restores the terminal to its original state. Must be called at exit to avoid leaving

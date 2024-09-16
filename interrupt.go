@@ -23,6 +23,7 @@ type InterruptReader struct {
 	mu      sync.Mutex
 	cond    sync.Cond
 	cancel  context.CancelFunc
+	stopped bool
 }
 
 var ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
@@ -67,10 +68,26 @@ func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
 	return ir
 }
 
+func (ir *InterruptReader) Stop() {
+	log.Debugf("InterruptReader stopping")
+	ir.mu.Lock()
+	if ir.cancel == nil {
+		ir.mu.Unlock()
+		return
+	}
+	ir.cancel()
+	ir.stopped = true
+	ir.cancel = nil
+	ir.mu.Unlock()
+	_, _ = ir.Read([]byte{}) // wait for cancel.
+}
+
 // Start or restart (after a cancel/interrupt) the interrupt reader.
 func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.CancelFunc) {
+	log.Debugf("InterruptReader starting")
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
+	ir.stopped = false
 	if ir.cancel != nil {
 		ir.cancel()
 	}
@@ -118,7 +135,12 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			ir.cancel()
 			return
 		case <-ctx.Done():
-			ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
+			if ir.stopped {
+				ir.setError(NewErrInterrupted("context done after stop"))
+				ir.cond.Broadcast()
+			} else {
+				ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
+			}
 			return
 		default:
 			n, err := TimeoutReader(ir.fd, tv, localBuf)
