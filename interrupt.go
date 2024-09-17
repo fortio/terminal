@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"fortio.org/log"
+	"fortio.org/safecast"
 )
 
 type InterruptReader struct {
@@ -64,7 +65,7 @@ func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
 		reader:  reader,
 		bufSize: bufSize,
 		buf:     make([]byte, 0, bufSize),
-		fd:      int(reader.Fd()), //nolint:gosec // it's on almost all platforms.
+		fd:      safecast.MustConvert[int](reader.Fd()),
 	}
 	ir.reset = ir.buf
 	ir.cond = *sync.NewCond(&ir.mu)

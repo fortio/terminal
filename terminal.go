@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"fortio.org/log"
+	"fortio.org/safecast"
 	"fortio.org/term"
 )
 
@@ -43,7 +44,7 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 		io.Writer
 	}{intrReader, os.Stderr}
 	t = &Terminal{
-		fd:         int(os.Stdin.Fd()), //nolint:gosec // yeah right.
+		fd:         safecast.MustConvert[int](os.Stdin.Fd()),
 		intrReader: intrReader,
 		Context:    ctx,
 	}
