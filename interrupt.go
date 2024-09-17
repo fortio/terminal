@@ -3,6 +3,7 @@ package terminal
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/signal"
@@ -23,9 +24,13 @@ type InterruptReader struct {
 	mu      sync.Mutex
 	cond    sync.Cond
 	cancel  context.CancelFunc
+	stopped bool
 }
 
-var ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
+var (
+	ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
+	ErrStopped       = NewErrInterrupted("interrupt reader stopped") // not really an error more of a marker.
+)
 
 type InterruptedError struct {
 	DetailedReason string
@@ -67,10 +72,31 @@ func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
 	return ir
 }
 
+func (ir *InterruptReader) Stop() {
+	log.Debugf("InterruptReader stopping")
+	ir.mu.Lock()
+	if ir.cancel == nil {
+		ir.mu.Unlock()
+		return
+	}
+	ir.cancel()
+	ir.stopped = true
+	ir.cancel = nil
+	ir.mu.Unlock()
+	_, _ = ir.Read([]byte{}) // wait for cancel.
+	log.Debugf("InterruptReader done stopping")
+	ir.mu.Lock()
+	ir.buf = ir.reset
+	ir.err = nil
+	ir.mu.Unlock()
+}
+
 // Start or restart (after a cancel/interrupt) the interrupt reader.
 func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.CancelFunc) {
+	log.Debugf("InterruptReader starting")
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
+	ir.stopped = false
 	if ir.cancel != nil {
 		ir.cancel()
 	}
@@ -118,7 +144,12 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			ir.cancel()
 			return
 		case <-ctx.Done():
-			ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
+			if ir.stopped {
+				ir.setError(ErrStopped)
+				ir.cond.Broadcast()
+			} else {
+				ir.setError(NewErrInterruptedWithErr("context done", ctx.Err()))
+			}
 			return
 		default:
 			n, err := TimeoutReader(ir.fd, tv, localBuf)
@@ -150,7 +181,11 @@ func (ir *InterruptReader) start(ctx context.Context) {
 }
 
 func (ir *InterruptReader) setError(err error) {
-	log.Infof("InterruptReader setting error: %v", err)
+	level := log.Info
+	if errors.Is(err, ErrStopped) {
+		level = log.Verbose
+	}
+	log.S(level, "InterruptReader setting error", log.Any("err", err))
 	ir.mu.Lock()
 	ir.err = err
 	ir.mu.Unlock()

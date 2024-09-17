@@ -215,6 +215,30 @@ func saveHistory(f string, h []string) {
 	}
 }
 
+// Temporarily suspend/resume of the terminal back to normal (for example to run a sub process).
+// use defer t.Resume() after calling Suspend() to put the terminal back in raw mode.
+func (t *Terminal) Suspend() {
+	if t.oldState == nil {
+		return
+	}
+	t.intrReader.Stop() // stop the interrupt reader
+	err := term.Restore(t.fd, t.oldState)
+	if err != nil {
+		log.Errf("Error restoring terminal for suspend: %v", err)
+	}
+}
+
+func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelFunc) {
+	if t.oldState == nil {
+		return nil, nil
+	}
+	_, err := term.MakeRaw(t.fd)
+	if err != nil {
+		log.Errf("Error for terminal resume: %v", err)
+	}
+	return t.ResetInterrupts(ctx) // resume the interrupt reader
+}
+
 // Close restores the terminal to its original state. Must be called at exit to avoid leaving
 // the terminal in raw mode. Safe to call multiple times. Will save the history to the history file
 // if one was set using [SetHistoryFile] and the capacity is > 0.

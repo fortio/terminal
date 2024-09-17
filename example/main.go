@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ const (
 	afterCmd  = "after "
 	sleepCmd  = "sleep "
 	cancelCmd = "cancel " // simulate an external interrupt
+	runCmd    = "run "    // run a command after suspending the terminal
 	exitCmd   = "exit"
 	helpCmd   = "help"
 	testMLCmd = "multiline"
@@ -189,6 +191,24 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				t.AddToHistory(cmd)
 			}
 			t.SetPrompt(cmd[len(promptCmd):])
+			isValidCommand = true
+		case strings.HasPrefix(cmd, runCmd):
+			if onlyValid {
+				t.AddToHistory(cmd)
+			}
+			// suspend the terminal, run the command, resume the terminal
+			t.Suspend()
+			args := strings.Fields(cmd[len(runCmd):])
+			// First element is the command, rest are arguments
+			cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // this is a demo
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err = cmd.Run()
+			ctx, cancel = t.Resume(context.Background())
+			if err != nil {
+				log.Errf("Error running command %v: %v", args, err)
+			}
 			isValidCommand = true
 		default:
 			fmt.Fprintf(t.Out, "Unknown command %q\n", cmd)
