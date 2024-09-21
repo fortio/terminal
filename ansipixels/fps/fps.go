@@ -68,7 +68,7 @@ func Main() int {
 	for {
 		now := time.Now()
 		ap.WriteAt(w/2-20, h/2+1, "Last frame %v FPS: %.0f Avg %.2f",
-			elapsed, fps, float64(frames)/now.Sub(startTime).Seconds())
+			elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
 		// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 		ap.ClearEndOfLine()
 		_, _, err = ap.ReadCursorPos()
