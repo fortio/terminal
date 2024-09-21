@@ -1,16 +1,14 @@
-package main
+package ansipixels
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
-	"time"
 
-	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/term"
@@ -22,6 +20,7 @@ type AnsiPixels struct {
 	In    io.Reader
 	state *term.State
 	buf   [256]byte
+	Data  []byte
 	W, H  int // Width and Height
 	x, y  int // Cursor position
 }
@@ -78,103 +77,60 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	ap.Out.WriteString(s)
 }
 
-// This also synchronizes the the display.
-func (ap *AnsiPixels) ReadCursorPos() (x, y int, err error) {
-	return
+func (ap *AnsiPixels) ClearEndOfLine() {
+	ap.Out.WriteString("\033[K")
 }
 
-func main() {
-	os.Exit(Main())
-}
+var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 
-func isStopKey(key byte) bool {
-	return key == 'q' || key == 3 || key == 4
-}
-
-func Main() int {
-	cli.Main()
-	ap := NewAnsiPixels()
-	if err := ap.Open(); err != nil {
-		log.Fatalf("Not a terminal: %v", err)
-	}
-	defer ap.Restore()
-	if err := ap.GetSize(); err != nil {
-		return log.FErrf("Error getting terminal size: %v", err)
-	}
-	ap.ClearScreen()
-	w := ap.W
-	h := ap.H
-	ap.WriteAt(0, 0, "┌")
-	ap.WriteAt(1, 0, "─")
-	ap.WriteAt(w-2, 0, "─")
-	ap.WriteAt(w-1, 0, "┐")
-	ap.WriteAt(0, 1, "|")
-	ap.WriteAt(w-1, 1, "|")
-	ap.WriteAt(0, h-2, "|")
-	ap.WriteAt(w-1, h-2, "|")
-	ap.WriteAt(0, h-1, "└")
-	ap.WriteAt(1, h-1, "─")
-	ap.WriteAt(w-2, h-1, "─")
-	ap.WriteAt(w-1, h-1, "┘")
-	ap.WriteCentered(h/2, "Width: %d, Height: %d", ap.W, ap.H)
-	// FPS test
-	fps := 0.0
-	buf := [256]byte{}
-	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(h/2+3, "FPS test... any key to start; q, ^C, or ^D to exit... ")
-	ap.Out.Flush()
-	_, err := ap.In.Read(buf[:])
+// This also synchronizes the display.
+func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
+	x := -1
+	y := -1
+	_, err := ap.Out.WriteString("\033[6n")
 	if err != nil {
-		return log.FErrf("Error reading key: %v", err)
+		return x, y, err
 	}
-	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
-	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
-	frames := 0
-	startTime := time.Now()
-	var elapsed time.Duration
+	ap.Out.Flush()
+	n := 0
+	i := 0
 	for {
-		now := time.Now()
-		ap.WriteAt(w/2-20, h/2+1, "Last frame %v FPS: %.0f Avg %.2f ", elapsed, fps, float64(frames)/now.Sub(startTime).Seconds())
-		// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
-		_, err := ap.Out.WriteString("\033[6n")
-		if err != nil {
-			return log.FErrf("Error writing cursor position request: %v", err)
-		}
-		ap.Out.Flush()
-		n := 0
-		key := byte(0)
-		for {
-			n, err = ap.In.Read(buf[:])
-			// log.Infof("Last buffer read: %q", buf[0:n])
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if err != nil {
-				return log.FErrf("Error reading cursor position: %v", err)
-			}
-			if n == 0 {
-				return log.FErrf("No data read from cursor position")
-			}
-			for i := 0; !isStopKey(key) && i < n; i++ {
-				key = buf[i]
-				if isStopKey(key) {
-					break
-				}
-			}
-			if bytes.IndexByte(buf[:n], 'R') >= 0 {
-				break
-			}
-		}
-		// q, ^C, ^D to exit.
-		if isStopKey(key) {
+		n, err = ap.In.Read(ap.buf[i:256])
+		// log.Infof("Last buffer read: %q", buf[0:n])
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		elapsed = time.Since(now)
-		fps = 1. / elapsed.Seconds()
-		frames++
+		if err != nil {
+			return x, y, err
+		}
+		if n == 0 {
+			return x, y, errors.New("no data read from cursor position")
+		}
+		res := cursPosRegexp.FindSubmatch(ap.buf[i:n])
+		if res == nil {
+			ap.Data = append(ap.Data, ap.buf[i:n]...)
+			i = 0
+			continue
+		}
+		x, err = strconv.Atoi(string(res[2]))
+		if err != nil {
+			return x, y, err
+		}
+		y, err = strconv.Atoi(string(res[3]))
+		if err != nil {
+			return x, y, err
+		}
+		ap.Data = append(ap.Data, res[1]...)
+		ap.Data = append(ap.Data, res[4]...)
+		break
 	}
+	return x, y, err
+}
+
+func (ap *AnsiPixels) HideCursor() {
+	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
+}
+
+func (ap *AnsiPixels) ShowCursor() {
 	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
-	ap.MoveCursor(0, h-2)
-	ap.Out.Flush()
-	return 0
 }
