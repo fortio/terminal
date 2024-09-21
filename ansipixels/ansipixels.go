@@ -69,6 +69,13 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 	fmt.Fprintf(ap.Out, msg, args...)
 }
 
+func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
+	s := fmt.Sprintf(msg, args...)
+	x := (ap.W - len(s)) / 2
+	ap.MoveCursor(x, y)
+	ap.Out.WriteString(s)
+}
+
 func main() {
 	os.Exit(Main())
 }
@@ -98,15 +105,22 @@ func Main() int {
 	ap.WriteAt(1, h-1, "─")
 	ap.WriteAt(w-2, h-1, "─")
 	ap.WriteAt(w-1, h-1, "┘")
-	fmtStr := "Width: %d, Height: %d\r\n"
-	ap.WriteAt((w-len(fmtStr))/2, h/2, fmtStr, ap.W, ap.H) // about centered
+	ap.WriteCentered(h/2, "Width: %d, Height: %d", ap.W, ap.H)
 	// FPS test
 	fps := 0.0
 	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
+	ap.WriteCentered(h/2+3, "FPS test... use q/^C/^D to stop (might need a few hits), any key to start ")
+	ap.Out.Flush()
+	_, err := ap.In.Read(buf[:])
+	if err != nil {
+		return log.FErrf("Error reading key: %v", err)
+	}
+	sum := 0.0
+	count := 0
 	for {
 		now := time.Now()
-		ap.WriteAt(w/2-5, h/2+1, "FPS: %.2f", fps)
+		ap.WriteAt(w/2-10, h/2+1, "FPS: %.0f avg %.2f", fps, sum/float64(count))
 		_, err := ap.Out.WriteString("\033[6n") // request cursor position
 		if err != nil {
 			return log.FErrf("Error writing cursor position request: %v", err)
@@ -128,6 +142,17 @@ func Main() int {
 		}
 		elapsed := time.Since(now)
 		fps = 1. / elapsed.Seconds()
+		sum += fps
+		count++
+	}
+	if count > 0 {
+		_, _ = ap.In.Read(buf[:])
+		ap.Out.Flush()
+		time.Sleep(250 * time.Millisecond)
+		avg := sum / float64(count)
+		ap.ClearScreen()
+		ap.WriteAt(0, 0, "Average FPS: %.2f\r\n", avg)
+		ap.Out.Flush()
 	}
 	return 0
 }
