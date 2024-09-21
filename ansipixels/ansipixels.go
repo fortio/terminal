@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -127,14 +128,15 @@ func Main() int {
 		return log.FErrf("Error reading key: %v", err)
 	}
 	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
-	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode
+	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
 	frames := 0
 	startTime := time.Now()
 	var elapsed time.Duration
 	for {
 		now := time.Now()
 		ap.WriteAt(w/2-20, h/2+1, "Last frame %v FPS: %.0f Avg %.2f ", elapsed, fps, float64(frames)/now.Sub(startTime).Seconds())
-		_, err := ap.Out.WriteString("\033[6n") // request cursor position
+		// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
+		_, err := ap.Out.WriteString("\033[6n")
 		if err != nil {
 			return log.FErrf("Error writing cursor position request: %v", err)
 		}
@@ -159,12 +161,9 @@ func Main() int {
 					break
 				}
 			}
-			break
-			/*
-				if bytes.IndexByte(buf[:n], 'R') >= 0 {
-					break
-				}
-			*/
+			if bytes.IndexByte(buf[:n], 'R') >= 0 {
+				break
+			}
 		}
 		// q, ^C, ^D to exit.
 		if isStopKey(key) {
