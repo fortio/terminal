@@ -121,7 +121,7 @@ func Main() int {
 	fps := 0.0
 	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(h/2+3, "FPS test... use q/^C/^D to stop, any key to start ")
+	ap.WriteCentered(h/2+3, "FPS test... any key to start; q, ^C, or ^D to exit... ")
 	ap.Out.Flush()
 	_, err := ap.In.Read(buf[:])
 	if err != nil {
