@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -127,7 +126,8 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("Error reading key: %v", err)
 	}
-	_, _ = ap.Out.WriteString("\033[?25l\033[?2026h") // hide cursor + sync mode
+	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
+	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode
 	frames := 0
 	startTime := time.Now()
 	var elapsed time.Duration
@@ -159,9 +159,12 @@ func Main() int {
 					break
 				}
 			}
-			if bytes.IndexByte(buf[:n], 'R') >= 0 {
-				break
-			}
+			break
+			/*
+				if bytes.IndexByte(buf[:n], 'R') >= 0 {
+					break
+				}
+			*/
 		}
 		// q, ^C, ^D to exit.
 		if isStopKey(key) {
