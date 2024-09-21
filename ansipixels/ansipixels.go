@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ type AnsiPixels struct {
 	Out   *bufio.Writer
 	In    io.Reader
 	state *term.State
+	buf   [256]byte
 	W, H  int // Width and Height
 	x, y  int // Cursor position
 }
@@ -76,8 +78,17 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	ap.Out.WriteString(s)
 }
 
+// This also synchronizes the the display.
+func (ap *AnsiPixels) ReadCursorPos() (x, y int, err error) {
+	return
+}
+
 func main() {
 	os.Exit(Main())
+}
+
+func isStopKey(key byte) bool {
+	return key == 'q' || key == 3 || key == 4
 }
 
 func Main() int {
@@ -110,7 +121,7 @@ func Main() int {
 	fps := 0.0
 	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(h/2+3, "FPS test... use q/^C/^D to stop (might need a few hits), any key to start ")
+	ap.WriteCentered(h/2+3, "FPS test... use q/^C/^D to stop, any key to start ")
 	ap.Out.Flush()
 	_, err := ap.In.Read(buf[:])
 	if err != nil {
@@ -126,18 +137,32 @@ func Main() int {
 			return log.FErrf("Error writing cursor position request: %v", err)
 		}
 		ap.Out.Flush()
-		n, err := ap.In.Read(buf[:])
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return log.FErrf("Error reading cursor position: %v", err)
-		}
-		if n == 0 {
-			return log.FErrf("No data read from cursor position")
+		n := 0
+		key := byte(0)
+		for {
+			n, err = ap.In.Read(buf[:])
+			// log.Infof("Last buffer read: %q", buf[0:n])
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return log.FErrf("Error reading cursor position: %v", err)
+			}
+			if n == 0 {
+				return log.FErrf("No data read from cursor position")
+			}
+			for i := 0; !isStopKey(key) && i < n; i++ {
+				key = buf[i]
+				if isStopKey(key) {
+					break
+				}
+			}
+			if bytes.IndexByte(buf[:n], 'R') >= 0 {
+				break
+			}
 		}
 		// q, ^C, ^D to exit.
-		if buf[0] == 'q' || buf[0] == 3 || buf[0] == 4 {
+		if isStopKey(key) {
 			break
 		}
 		elapsed := time.Since(now)
@@ -145,14 +170,7 @@ func Main() int {
 		sum += fps
 		count++
 	}
-	if count > 0 {
-		_, _ = ap.In.Read(buf[:])
-		ap.Out.Flush()
-		time.Sleep(250 * time.Millisecond)
-		avg := sum / float64(count)
-		ap.ClearScreen()
-		ap.WriteAt(0, 0, "Average FPS: %.2f\r\n", avg)
-		ap.Out.Flush()
-	}
+	ap.MoveCursor(0, h-2)
+	ap.Out.Flush()
 	return 0
 }
