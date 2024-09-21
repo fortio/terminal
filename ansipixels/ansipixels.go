@@ -127,6 +127,7 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("Error reading key: %v", err)
 	}
+	_, _ = ap.Out.WriteString("\033[?25l\033[?2026h") // hide cursor + sync mode
 	frames := 0
 	startTime := time.Now()
 	var elapsed time.Duration
@@ -170,6 +171,7 @@ func Main() int {
 		fps = 1. / elapsed.Seconds()
 		frames++
 	}
+	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
 	ap.MoveCursor(0, h-2)
 	ap.Out.Flush()
 	return 0
