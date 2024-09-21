@@ -127,11 +127,12 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("Error reading key: %v", err)
 	}
-	sum := 0.0
-	count := 0
+	frames := 0
+	startTime := time.Now()
+	var elapsed time.Duration
 	for {
 		now := time.Now()
-		ap.WriteAt(w/2-10, h/2+1, "FPS: %.0f avg %.2f", fps, sum/float64(count))
+		ap.WriteAt(w/2-20, h/2+1, "Last frame %v FPS: %.0f Avg %.2f ", elapsed, fps, float64(frames)/now.Sub(startTime).Seconds())
 		_, err := ap.Out.WriteString("\033[6n") // request cursor position
 		if err != nil {
 			return log.FErrf("Error writing cursor position request: %v", err)
@@ -165,10 +166,9 @@ func Main() int {
 		if isStopKey(key) {
 			break
 		}
-		elapsed := time.Since(now)
+		elapsed = time.Since(now)
 		fps = 1. / elapsed.Seconds()
-		sum += fps
-		count++
+		frames++
 	}
 	ap.MoveCursor(0, h-2)
 	ap.Out.Flush()
