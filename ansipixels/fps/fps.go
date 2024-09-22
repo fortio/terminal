@@ -77,7 +77,7 @@ func posToXY(pos int, w, h int) (int, int) {
 
 func charAt(ap *ansipixels.AnsiPixels, pos, w, h int, what string) {
 	x, y := posToXY(pos, w, h)
-	ap.WriteAt(x+2, y+2, what)
+	ap.WriteAtStr(x+2, y+2, what)
 }
 
 func animate(ap *ansipixels.AnsiPixels, frame uint) {

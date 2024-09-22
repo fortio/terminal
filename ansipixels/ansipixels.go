@@ -65,9 +65,14 @@ func (ap *AnsiPixels) MoveCursor(x, y int) {
 	}
 }
 
+func (ap *AnsiPixels) WriteAtStr(x, y int, msg string) {
+	ap.MoveCursor(x, y)
+	_, _ = ap.Out.WriteString(msg)
+}
+
 func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 	ap.MoveCursor(x, y)
-	fmt.Fprintf(ap.Out, msg, args...)
+	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
