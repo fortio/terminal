@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -80,7 +83,26 @@ func animate(ap *ansipixels.AnsiPixels, frame uint) {
 }
 
 func Main() int {
+	cli.MinArgs = 0
+	cli.MaxArgs = 1
+	cli.ArgsHelp = "[maxfps]"
 	cli.Main()
+	fpsLimit := -1.0
+	fpsStr := "unlimited"
+	hasFPSLimit := false
+	if len(flag.Args()) > 0 {
+		// parse as float64
+		var err error
+		fpsLimit, err = strconv.ParseFloat(flag.Arg(0), 64)
+		if err != nil {
+			return log.FErrf("Invalid maxfps: %v", err)
+		}
+		if fpsLimit < 0 {
+			return log.FErrf("Invalid maxfps: %v", fpsLimit)
+		}
+		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
+		hasFPSLimit = true
+	}
 	ap := ansipixels.NewAnsiPixels()
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
@@ -100,7 +122,7 @@ func Main() int {
 	fps := 0.0
 	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(ap.H/2+3, "FPS test... any key to start; q, ^C, or ^D to exit... ")
+	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... ", fpsStr)
 	ap.Out.Flush()
 	_, err := ap.In.Read(buf[:])
 	if err != nil {
@@ -109,24 +131,36 @@ func Main() int {
 	ap.HideCursor()
 	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
 	frames := uint(0)
-	startTime := time.Now()
 	var elapsed time.Duration
 	var entry []byte
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGWINCH)
+	sendableTickerChan := make(chan time.Time, 1)
+	var tickerChan <-chan time.Time
+	startTime := time.Now()
+	now := startTime
+	if hasFPSLimit {
+		ticker := time.NewTicker(time.Second / time.Duration(fpsLimit))
+		tickerChan = ticker.C
+	} else {
+		tickerChan = sendableTickerChan
+		sendableTickerChan <- now
+	}
 	for {
 		select {
 		case <-sigchan:
 			_ = ap.GetSize()
 			ap.ClearScreen()
 			drawCorners(ap)
-		default:
-			now := time.Now()
-			animate(ap, frames)
+		case <-tickerChan:
+			elapsed = time.Since(now)
+			fps = 1. / elapsed.Seconds()
+			now = time.Now()
 			ap.WriteAt(ap.W/2-20, ap.H/2+1, "Last frame %v FPS: %.0f Avg %.2f",
 				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			ap.ClearEndOfLine()
+			animate(ap, frames)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
 				return log.FErrf("Error with cursor position request: %v", err)
@@ -138,9 +172,10 @@ func Main() int {
 			entry = append(entry, ap.Data...)
 			ap.WriteCentered(ap.H/2+5, "Entry so far: [%s]", entry)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
-			elapsed = time.Since(now)
-			fps = 1. / elapsed.Seconds()
 			frames++
+			if !hasFPSLimit {
+				sendableTickerChan <- now
+			}
 		}
 	}
 }
