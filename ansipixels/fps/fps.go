@@ -51,6 +51,7 @@ func drawCorners(ap *ansipixels.AnsiPixels) {
 }
 
 func handleWinch(ap *ansipixels.AnsiPixels) {
+	// TODO need lock.
 	_ = ap.GetSize()
 	ap.ClearScreen()
 	drawCorners(ap)
