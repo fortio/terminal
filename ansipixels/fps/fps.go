@@ -4,15 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 	"time"
 
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
-	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -144,12 +141,7 @@ func Main() int {
 	frames := uint(0)
 	var elapsed time.Duration
 	var entry []byte
-	sigchan := make(chan os.Signal, 1)
-	signals := []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
-	if terminal.IsUnix {
-		signals = append(signals, syscall.SIGWINCH)
-	}
-	signal.Notify(sigchan, signals...)
+	ap.SignalChannel()
 	sendableTickerChan := make(chan time.Time, 1)
 	var tickerChan <-chan time.Time
 	startTime := time.Now()
@@ -163,14 +155,12 @@ func Main() int {
 	}
 	for {
 		select {
-		case s := <-sigchan:
-			if terminal.IsUnix {
-				if s == syscall.SIGWINCH {
-					_ = ap.GetSize()
-					ap.ClearScreen()
-					drawCorners(ap)
-					continue
-				}
+		case s := <-ap.C:
+			if ap.IsResizeSignal(s) {
+				_ = ap.GetSize()
+				ap.ClearScreen()
+				drawCorners(ap)
+				continue
 			}
 			return 0
 		case <-tickerChan:

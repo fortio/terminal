@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
 
@@ -23,6 +24,7 @@ type AnsiPixels struct {
 	Data  []byte
 	W, H  int // Width and Height
 	x, y  int // Cursor position
+	C     chan os.Signal
 }
 
 func NewAnsiPixels() *AnsiPixels {
@@ -84,6 +86,11 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 
 func (ap *AnsiPixels) ClearEndOfLine() {
 	_, _ = ap.Out.WriteString("\033[K")
+}
+
+func (ap *AnsiPixels) SignalChannel() {
+	ap.C = make(chan os.Signal, 1)
+	signal.Notify(ap.C, signalList...)
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
