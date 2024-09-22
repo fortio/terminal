@@ -53,7 +53,7 @@ func (ap *AnsiPixels) Restore() {
 func (ap *AnsiPixels) ClearScreen() {
 	_, err := ap.Out.WriteString("\033[2J")
 	if err != nil {
-		log.Fatalf("Error clearing screen: %v", err)
+		log.Errf("Error clearing screen: %v", err)
 	}
 }
 
@@ -61,7 +61,7 @@ func (ap *AnsiPixels) MoveCursor(x, y int) {
 	ap.x, ap.y = x, y
 	_, err := ap.Out.WriteString("\033[" + strconv.Itoa(y+1) + ";" + strconv.Itoa(x+1) + "H")
 	if err != nil {
-		log.Fatalf("Error moving cursor: %v", err)
+		log.Errf("Error moving cursor: %v", err)
 	}
 }
 
