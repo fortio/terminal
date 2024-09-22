@@ -74,11 +74,11 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	x := (ap.W - len(s)) / 2
 	ap.MoveCursor(x, y)
-	ap.Out.WriteString(s)
+	_, _ = ap.Out.WriteString(s)
 }
 
 func (ap *AnsiPixels) ClearEndOfLine() {
-	ap.Out.WriteString("\033[K")
+	_, _ = ap.Out.WriteString("\033[K")
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)

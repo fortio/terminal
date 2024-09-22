@@ -8,6 +8,7 @@ import (
 
 	"fortio.org/cli"
 	"fortio.org/log"
+	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -50,20 +51,32 @@ func drawCorners(ap *ansipixels.AnsiPixels) {
 	ap.WriteCentered(h/2, "Width: %d, Height: %d", ap.W, ap.H)
 }
 
-func handleWinch(ap *ansipixels.AnsiPixels) {
-	// TODO need lock.
-	_ = ap.GetSize()
-	ap.ClearScreen()
-	drawCorners(ap)
+func posToXY(pos int, w, h int) (int, int) {
+	if pos < w {
+		return pos, 0
+	}
+	pos -= w
+	if pos < h {
+		return w - 1, pos
+	}
+	pos -= h
+	if pos < w {
+		return w - 1 - pos, h - 1
+	}
+	return 0, h - 1 - pos + w
 }
 
-func HandleResize(ap *ansipixels.AnsiPixels) {
-	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGWINCH)
-	// Handle resize events
-	for range sigchan {
-		handleWinch(ap) // Call the handler when the terminal is resized
-	}
+func animate(ap *ansipixels.AnsiPixels, frame uint) {
+	w := ap.W
+	h := ap.H
+	w -= 4
+	h -= 4
+	total := 2*w + 2*h
+	pos := safecast.MustConvert[int](frame % safecast.MustConvert[uint](total))
+	x, y := posToXY(pos, w, h)
+	ap.WriteAt(x+2, y+2, " ")
+	x, y = posToXY((pos+1)%total, w, h)
+	ap.WriteAt(x+2, y+2, "█")
 }
 
 func Main() int {
@@ -95,31 +108,39 @@ func Main() int {
 	}
 	ap.HideCursor()
 	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
-	go HandleResize(ap)
-	frames := 0
+	frames := uint(0)
 	startTime := time.Now()
 	var elapsed time.Duration
 	var entry []byte
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGWINCH)
 	for {
-		now := time.Now()
-		ap.WriteAt(ap.W/2-20, ap.H/2+1, "Last frame %v FPS: %.0f Avg %.2f",
-			elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
-		// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
-		ap.ClearEndOfLine()
-		_, _, err = ap.ReadCursorPos()
-		if err != nil {
-			return log.FErrf("Error with cursor position request: %v", err)
+		select {
+		case <-sigchan:
+			_ = ap.GetSize()
+			ap.ClearScreen()
+			drawCorners(ap)
+		default:
+			now := time.Now()
+			animate(ap, frames)
+			ap.WriteAt(ap.W/2-20, ap.H/2+1, "Last frame %v FPS: %.0f Avg %.2f",
+				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
+			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
+			ap.ClearEndOfLine()
+			_, _, err = ap.ReadCursorPos()
+			if err != nil {
+				return log.FErrf("Error with cursor position request: %v", err)
+			}
+			// q, ^C, ^D to exit.
+			if isStopKey(ap) {
+				return 0
+			}
+			entry = append(entry, ap.Data...)
+			ap.WriteCentered(ap.H/2+5, "Entry so far: [%s]", entry)
+			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
+			elapsed = time.Since(now)
+			fps = 1. / elapsed.Seconds()
+			frames++
 		}
-		// q, ^C, ^D to exit.
-		if isStopKey(ap) {
-			break
-		}
-		entry = append(entry, ap.Data...)
-		ap.WriteCentered(ap.H/2+5, "Entry so far: [%s]", entry)
-		ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
-		elapsed = time.Since(now)
-		fps = 1. / elapsed.Seconds()
-		frames++
 	}
-	return 0
 }
