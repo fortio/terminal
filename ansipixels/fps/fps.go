@@ -55,6 +55,11 @@ func drawCorners(ap *ansipixels.AnsiPixels) {
 }
 
 func posToXY(pos int, w, h int) (int, int) {
+	mod := 2*w + 2*h
+	for pos < 0 {
+		pos += mod
+	}
+	pos %= mod
 	if pos < w {
 		return pos, 0
 	}
@@ -69,6 +74,11 @@ func posToXY(pos int, w, h int) (int, int) {
 	return 0, h - 1 - pos + w
 }
 
+func charAt(ap *ansipixels.AnsiPixels, pos, w, h int, what string) {
+	x, y := posToXY(pos, w, h)
+	ap.WriteAt(x+2, y+2, what)
+}
+
 func animate(ap *ansipixels.AnsiPixels, frame uint) {
 	w := ap.W
 	h := ap.H
@@ -76,10 +86,10 @@ func animate(ap *ansipixels.AnsiPixels, frame uint) {
 	h -= 4
 	total := 2*w + 2*h
 	pos := safecast.MustConvert[int](frame % safecast.MustConvert[uint](total))
-	x, y := posToXY(pos, w, h)
-	ap.WriteAt(x+2, y+2, " ")
-	x, y = posToXY((pos+1)%total, w, h)
-	ap.WriteAt(x+2, y+2, "█")
+	charAt(ap, pos+2, w, h, "\033[31m█") // Red
+	charAt(ap, pos+1, w, h, "\033[32m█") // Green
+	charAt(ap, pos, w, h, "\033[34m█")   // Blue
+	charAt(ap, pos-1, w, h, " ")
 }
 
 func Main() int {
