@@ -71,7 +71,12 @@ func Main() int {
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}
-	defer ap.Restore()
+	defer func() {
+		ap.ShowCursor()
+		ap.MoveCursor(0, ap.H-2)
+		ap.Out.Flush()
+		ap.Restore()
+	}()
 	if err := ap.GetSize(); err != nil {
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
@@ -115,8 +120,5 @@ func Main() int {
 		fps = 1. / elapsed.Seconds()
 		frames++
 	}
-	ap.ShowCursor()
-	ap.MoveCursor(0, ap.H-2)
-	ap.Out.Flush()
 	return 0
 }
