@@ -12,6 +12,7 @@ import (
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
+	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -144,7 +145,11 @@ func Main() int {
 	var elapsed time.Duration
 	var entry []byte
 	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGWINCH)
+	signals := []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
+	if terminal.IsUnix {
+		signals = append(signals, syscall.SIGWINCH)
+	}
+	signal.Notify(sigchan, signals...)
 	sendableTickerChan := make(chan time.Time, 1)
 	var tickerChan <-chan time.Time
 	startTime := time.Now()
@@ -158,10 +163,16 @@ func Main() int {
 	}
 	for {
 		select {
-		case <-sigchan:
-			_ = ap.GetSize()
-			ap.ClearScreen()
-			drawCorners(ap)
+		case s := <-sigchan:
+			if terminal.IsUnix {
+				if s == syscall.SIGWINCH {
+					_ = ap.GetSize()
+					ap.ClearScreen()
+					drawCorners(ap)
+					continue
+				}
+			}
+			return 0
 		case <-tickerChan:
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()
