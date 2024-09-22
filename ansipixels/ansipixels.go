@@ -99,12 +99,18 @@ var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 	x := -1
 	y := -1
-	_, err := ap.Out.WriteString("\033[6n")
+	reqPosStr := "\033[6n"
+	n, err := ap.Out.WriteString(reqPosStr)
 	if err != nil {
 		return x, y, err
 	}
-	ap.Out.Flush()
-	n := 0
+	if n != len(reqPosStr) {
+		return x, y, errors.New("short write")
+	}
+	err = ap.Out.Flush()
+	if err != nil {
+		return x, y, err
+	}
 	i := 0
 	for {
 		n, err = ap.In.Read(ap.buf[i:256])
