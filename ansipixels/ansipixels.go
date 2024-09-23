@@ -1,3 +1,4 @@
+// ansipixel provides terminal drawing and key reading abilities. fps/fps.go is an example of how to use it.
 package ansipixels
 
 import (

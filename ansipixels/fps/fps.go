@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	_ "embed"
 	"flag"
 	"fmt"
+	"image"
 	"os"
 	"strconv"
 	"time"
@@ -77,7 +80,11 @@ func animate(ap *ansipixels.AnsiPixels, frame uint) {
 	charAt(ap, pos-1, w, h, "\033[0m ")  // erase and reset color
 }
 
+//go:embed fps.jpg
+var fpsJpg []byte
+
 func Main() int {
+	imgFlag := flag.String("image", "", "Image file to display in monochrome in the background instead of the default one")
 	cli.MinArgs = 0
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "[maxfps]"
@@ -112,6 +119,19 @@ func Main() int {
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
 	ap.ClearScreen()
+	var background *image.RGBA
+	var err error
+	if *imgFlag == "" {
+		background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+	} else {
+		background, err = ap.ReadImage(*imgFlag)
+	}
+	if err != nil {
+		return log.FErrf("Error reading image: %v", err)
+	}
+	if err = ap.ShowImage(background, "\033[34m"); err != nil {
+		return log.FErrf("Error showing image: %v", err)
+	}
 	drawBox(ap)
 	// FPS test
 	fps := 0.0
@@ -119,7 +139,7 @@ func Main() int {
 	// sleep := 1 * time.Second / time.Duration(fps)
 	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... ", fpsStr)
 	ap.Out.Flush()
-	_, err := ap.In.Read(buf[:])
+	_, err = ap.In.Read(buf[:])
 	if err != nil {
 		return log.FErrf("Error reading key: %v", err)
 	}
@@ -146,6 +166,7 @@ func Main() int {
 			if ap.IsResizeSignal(s) {
 				_ = ap.GetSize()
 				ap.ClearScreen()
+				_ = ap.ShowImage(background, "\033[34m")
 				drawBox(ap)
 				continue
 			}
@@ -154,13 +175,15 @@ func Main() int {
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()
 			now = time.Now()
-			ap.WriteAt(ap.W/2-20, ap.H/2, "Last frame %v FPS: %.0f Avg %.2f",
+			ap.WriteAt(ap.W/2-20, ap.H/2, " Last frame %v FPS: %.0f Avg %.2f ",
 				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
-			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
-			ap.ClearEndOfLine()
-			ap.MoveHorizontally(ap.W - 1)
-			_, _ = ap.Out.WriteString(ansipixels.Vertical)
+			/*
+				ap.ClearEndOfLine()
+				ap.MoveHorizontally(ap.W - 1)
+				_, _ = ap.Out.WriteString(ansipixels.Vertical)
+			*/
 			animate(ap, frames)
+			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
 				return log.FErrf("Error with cursor position request: %v", err)
