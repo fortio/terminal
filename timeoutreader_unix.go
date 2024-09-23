@@ -13,6 +13,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const IsUnix = true
+
 func TimeoutToTimeval(timeout time.Duration) *unix.Timeval {
 	tv := unix.NsecToTimeval(timeout.Nanoseconds())
 	return &tv

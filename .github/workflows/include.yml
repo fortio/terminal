@@ -14,3 +14,14 @@ jobs:
         uses: fortio/workflows/.github/workflows/codecov.yml@main
     call-codeql:
         uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
+    call-releaser:
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: fortio/workflows/.github/workflows/releaser.yml@optional_binary_name
+        with:
+            description: "Fortio terminal fps checker"
+            binary_name: "fps"
+            main_path: "./ansipixels/fps"
+        secrets:
+            GH_PAT: ${{ secrets.GH_PAT }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+            DOCKER_USER: ${{ secrets.DOCKER_USER }}

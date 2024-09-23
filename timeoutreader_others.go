@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const IsUnix = false
+
 func TimeoutToTimeval(_ time.Duration) any {
 	return nil
 }
