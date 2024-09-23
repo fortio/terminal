@@ -16,7 +16,7 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 There is also a new [ansipixels](https://pkg.go.dev/fortio.org/terminal/ansipixels) package for drawing on the terminal and the tagged release also include `fps` that uses that package to test your terminal frames per second capabilities.
 See the source [ansipixels/fps/fps.go](ansipixels/fps/fps.go)
 
-You can get the binary from [releases/](releases/)
+You can get the binary from [releases](https://github.com/fortio/terminal/releases)
 
 Or just run
 ```
