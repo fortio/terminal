@@ -15,13 +15,15 @@ import (
 	"fortio.org/term"
 )
 
+const BUFSIZE = 1024
+
 type AnsiPixels struct {
 	fd    int
 	fdOut int
 	Out   *bufio.Writer
 	In    io.Reader
 	state *term.State
-	buf   [256]byte
+	buf   [BUFSIZE]byte
 	Data  []byte
 	W, H  int // Width and Height
 	x, y  int // Cursor position
@@ -119,7 +121,10 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 	}
 	i := 0
 	for {
-		n, err = ap.In.Read(ap.buf[i:256])
+		if i == BUFSIZE {
+			return x, y, errors.New("buffer full, no cursor position found")
+		}
+		n, err = ap.In.Read(ap.buf[i:BUFSIZE])
 		// log.Infof("Last buffer read: %q", buf[0:n])
 		if errors.Is(err, io.EOF) {
 			break
@@ -130,10 +135,10 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		if n == 0 {
 			return x, y, errors.New("no data read from cursor position")
 		}
-		res := cursPosRegexp.FindSubmatch(ap.buf[i:n])
+		res := cursPosRegexp.FindSubmatch(ap.buf[0 : i+n])
 		if res == nil {
-			ap.Data = append(ap.Data, ap.buf[i:n]...)
-			i = 0
+			// must get the whole response.
+			i += n
 			continue
 		}
 		x, err = strconv.Atoi(string(res[2]))
