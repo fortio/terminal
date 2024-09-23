@@ -125,7 +125,10 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 			return x, y, errors.New("buffer full, no cursor position found")
 		}
 		n, err = ap.In.Read(ap.buf[i:BUFSIZE])
-		// log.Infof("Last buffer read: %q", buf[0:n])
+		if log.LogVerbose() {
+			// use go run . -loglevel verbose 2> /tmp/ansipixels.log to capture this
+			log.LogVf("Last buffer read: [%q] -> [%q]", ap.buf[i:i+n], ap.buf[0:i+n])
+		}
 		if errors.Is(err, io.EOF) {
 			break
 		}
