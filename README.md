@@ -40,5 +40,7 @@ Pass an optional `maxfps` as argument.
 
 E.g `fps -image my.jpg 60` will run at 60 fps with `my.jpg` as background.
 
+After hitting any key to start the measurement, you can also resize the window at any time and fps will render with the new size.
+Use `q` to stop.
 
 ![fps screenshot](fps_sshot.png)
