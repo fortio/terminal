@@ -175,13 +175,15 @@ func Main() int {
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()
 			now = time.Now()
-			ap.WriteAt(ap.W/2-20, ap.H/2, "Last frame %v FPS: %.0f Avg %.2f",
+			ap.WriteAt(ap.W/2-20, ap.H/2, " Last frame %v FPS: %.0f Avg %.2f ",
 				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
-			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
-			ap.ClearEndOfLine()
-			ap.MoveHorizontally(ap.W - 1)
-			_, _ = ap.Out.WriteString(ansipixels.Vertical)
+			/*
+				ap.ClearEndOfLine()
+				ap.MoveHorizontally(ap.W - 1)
+				_, _ = ap.Out.WriteString(ansipixels.Vertical)
+			*/
 			animate(ap, frames)
+			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
 				return log.FErrf("Error with cursor position request: %v", err)
