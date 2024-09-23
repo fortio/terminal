@@ -23,6 +23,7 @@ type Terminal struct {
 	Context     context.Context //nolint:containedctx // To avoid Open() returning 4 values.
 	Cancel      context.CancelFunc
 	fd          int
+	fdOut       int
 	oldState    *term.State
 	term        *term.Terminal
 	intrReader  *InterruptReader
@@ -45,6 +46,7 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 	}{intrReader, os.Stderr}
 	t = &Terminal{
 		fd:         safecast.MustConvert[int](os.Stdin.Fd()),
+		fdOut:      safecast.MustConvert[int](os.Stdout.Fd()),
 		intrReader: intrReader,
 		Context:    ctx,
 	}

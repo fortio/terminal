@@ -17,6 +17,7 @@ import (
 
 type AnsiPixels struct {
 	fd    int
+	fdOut int
 	Out   *bufio.Writer
 	In    io.Reader
 	state *term.State
@@ -28,7 +29,12 @@ type AnsiPixels struct {
 }
 
 func NewAnsiPixels() *AnsiPixels {
-	return &AnsiPixels{fd: safecast.MustConvert[int](os.Stdout.Fd()), Out: bufio.NewWriter(os.Stdout), In: os.Stdin}
+	return &AnsiPixels{
+		fd:    safecast.MustConvert[int](os.Stdin.Fd()),
+		fdOut: safecast.MustConvert[int](os.Stdout.Fd()),
+		Out:   bufio.NewWriter(os.Stdout),
+		In:    os.Stdin,
+	}
 }
 
 func (ap *AnsiPixels) Open() (err error) {
@@ -37,7 +43,7 @@ func (ap *AnsiPixels) Open() (err error) {
 }
 
 func (ap *AnsiPixels) GetSize() (err error) {
-	ap.W, ap.H, err = term.GetSize(ap.fd)
+	ap.W, ap.H, err = term.GetSize(ap.fdOut)
 	return
 }
 
