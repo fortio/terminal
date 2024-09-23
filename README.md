@@ -20,7 +20,8 @@ You can get the binary from [releases](https://github.com/fortio/terminal/releas
 
 Or just run
 ```
-CGO_ENABLED=0 go install fortio.org/terminal/ansipixels/fps@latest
+CGO_ENABLED=0 go install fortio.org/terminal/ansipixels/fps@latest  # to install or just
+CGO_ENABLED=0 go run fortio.org/terminal/ansipixels/fps@latest  # to run without install
 ```
 
 or even
@@ -32,5 +33,12 @@ or
 ```
 brew install fortio/tap/fps
 ```
+
+Use the `-image` flag to pass a different image to load as background.
+
+Pass an optional `maxfps` as argument.
+
+E.g `fps -image my.jpg 60` will run at 60 fps with `my.jpg` as background.
+
 
 ![fps screenshot](fps_sshot.png)
