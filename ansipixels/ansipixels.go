@@ -28,7 +28,7 @@ type AnsiPixels struct {
 }
 
 func NewAnsiPixels() *AnsiPixels {
-	return &AnsiPixels{fd: safecast.MustConvert[int](os.Stdin.Fd()), Out: bufio.NewWriter(os.Stdout), In: os.Stdin}
+	return &AnsiPixels{fd: safecast.MustConvert[int](os.Stdout.Fd()), Out: bufio.NewWriter(os.Stdout), In: os.Stdin}
 }
 
 func (ap *AnsiPixels) Open() (err error) {

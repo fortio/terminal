@@ -181,7 +181,7 @@ func Main() int {
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteCentered(ap.H/2+5, "Entry so far: [%s]", entry)
+			ap.WriteCentered(ap.H/2+5, "Entry so far: [%q]", entry)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
