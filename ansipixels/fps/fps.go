@@ -129,7 +129,7 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
 	}
-	if err := ap.ShowImage(background, "\033[34m"); err != nil {
+	if err = ap.ShowImage(background, "\033[34m"); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
 	drawBox(ap)
