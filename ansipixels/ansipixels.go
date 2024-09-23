@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
@@ -72,6 +73,14 @@ func (ap *AnsiPixels) MoveCursor(x, y int) {
 	_, err := ap.Out.WriteString("\033[" + strconv.Itoa(y+1) + ";" + strconv.Itoa(x+1) + "H")
 	if err != nil {
 		log.Errf("Error moving cursor: %v", err)
+	}
+}
+
+func (ap *AnsiPixels) MoveHorizontally(x int) {
+	ap.x = x
+	_, err := ap.Out.WriteString("\033[" + strconv.Itoa(x+1) + "G")
+	if err != nil {
+		log.Errf("Error moving cursor horizontally: %v", err)
 	}
 }
 
@@ -165,4 +174,22 @@ func (ap *AnsiPixels) HideCursor() {
 
 func (ap *AnsiPixels) ShowCursor() {
 	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
+}
+
+func (ap *AnsiPixels) DrawBox(x, y, w, h int) error {
+	ap.MoveCursor(x, y)
+	_, _ = ap.Out.WriteString(SquareTopLeft)
+	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
+	_, _ = ap.Out.WriteString(SquareTopRight)
+	for i := 1; i < h-1; i++ {
+		ap.MoveCursor(x, y+i)
+		_, _ = ap.Out.WriteString(Vertical)
+		ap.MoveHorizontally(x + w - 1)
+		_, _ = ap.Out.WriteString(Vertical)
+	}
+	ap.MoveCursor(x, y+h-1)
+	_, _ = ap.Out.WriteString(SquareBottomLeft)
+	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
+	_, err := ap.Out.WriteString(SquareBottomRight)
+	return err
 }

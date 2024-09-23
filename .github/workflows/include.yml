@@ -15,7 +15,7 @@ jobs:
     call-codeql:
         uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
     call-releaser:
-        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: fortio/workflows/.github/workflows/releaser.yml@optional_binary_name
         with:
             description: "Fortio terminal fps checker"

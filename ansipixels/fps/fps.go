@@ -23,7 +23,7 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 		if key == 12 { // ^L
 			_ = ap.GetSize()
 			ap.ClearScreen()
-			drawCorners(ap)
+			drawBox(ap)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			return false
 		}
@@ -34,22 +34,9 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	return false
 }
 
-func drawCorners(ap *ansipixels.AnsiPixels) {
-	w := ap.W
-	h := ap.H
-	ap.WriteAt(0, 0, "┌")
-	ap.WriteAt(1, 0, "─")
-	ap.WriteAt(w-2, 0, "─")
-	ap.WriteAt(w-1, 0, "┐")
-	ap.WriteAt(0, 1, "|")
-	ap.WriteAt(w-1, 1, "|")
-	ap.WriteAt(0, h-2, "|")
-	ap.WriteAt(w-1, h-2, "|")
-	ap.WriteAt(0, h-1, "└")
-	ap.WriteAt(1, h-1, "─")
-	ap.WriteAt(w-2, h-1, "─")
-	ap.WriteAt(w-1, h-1, "┘")
-	ap.WriteCentered(h/2, "Width: %d, Height: %d", ap.W, ap.H)
+func drawBox(ap *ansipixels.AnsiPixels) {
+	_ = ap.DrawBox(0, 0, ap.W, ap.H)
+	ap.WriteCentered(ap.H/2-2, "Width: %d, Height: %d", ap.W, ap.H)
 }
 
 func posToXY(pos int, w, h int) (int, int) {
@@ -74,20 +61,20 @@ func posToXY(pos int, w, h int) (int, int) {
 
 func charAt(ap *ansipixels.AnsiPixels, pos, w, h int, what string) {
 	x, y := posToXY(pos, w, h)
-	ap.WriteAtStr(x+2, y+2, what)
+	ap.WriteAtStr(x+1, y+1, what)
 }
 
 func animate(ap *ansipixels.AnsiPixels, frame uint) {
 	w := ap.W
 	h := ap.H
-	w -= 4
-	h -= 4
+	w -= 2
+	h -= 2
 	total := 2*w + 2*h
 	pos := safecast.MustConvert[int](frame % safecast.MustConvert[uint](total))
 	charAt(ap, pos+2, w, h, "\033[31m█") // Red
 	charAt(ap, pos+1, w, h, "\033[32m█") // Green
 	charAt(ap, pos, w, h, "\033[34m█")   // Blue
-	charAt(ap, pos-1, w, h, " ")
+	charAt(ap, pos-1, w, h, "\033[0m ")  // erase and reset color
 }
 
 func Main() int {
@@ -125,7 +112,7 @@ func Main() int {
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
 	ap.ClearScreen()
-	drawCorners(ap)
+	drawBox(ap)
 	// FPS test
 	fps := 0.0
 	buf := [256]byte{}
@@ -159,7 +146,7 @@ func Main() int {
 			if ap.IsResizeSignal(s) {
 				_ = ap.GetSize()
 				ap.ClearScreen()
-				drawCorners(ap)
+				drawBox(ap)
 				continue
 			}
 			return 0
@@ -167,10 +154,12 @@ func Main() int {
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()
 			now = time.Now()
-			ap.WriteAt(ap.W/2-20, ap.H/2+1, "Last frame %v FPS: %.0f Avg %.2f",
+			ap.WriteAt(ap.W/2-20, ap.H/2, "Last frame %v FPS: %.0f Avg %.2f",
 				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			ap.ClearEndOfLine()
+			ap.MoveHorizontally(ap.W - 1)
+			_, _ = ap.Out.WriteString(ansipixels.Vertical)
 			animate(ap, frames)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
