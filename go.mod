@@ -7,6 +7,7 @@ require (
 	fortio.org/log v1.16.0
 	fortio.org/safecast v1.0.0
 	fortio.org/term v0.23.0-fortio-6
+	golang.org/x/image v0.20.0
 	golang.org/x/sys v0.25.0
 )
 
