@@ -176,11 +176,19 @@ func (ap *AnsiPixels) ShowCursor() {
 	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int) error {
+func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) error {
+	return ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
+}
+
+func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) error {
+	return ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
+}
+
+func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) error {
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(SquareTopLeft)
+	_, _ = ap.Out.WriteString(topLeft)
 	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, _ = ap.Out.WriteString(SquareTopRight)
+	_, _ = ap.Out.WriteString(topRight)
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
 		_, _ = ap.Out.WriteString(Vertical)
@@ -188,8 +196,16 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int) error {
 		_, _ = ap.Out.WriteString(Vertical)
 	}
 	ap.MoveCursor(x, y+h-1)
-	_, _ = ap.Out.WriteString(SquareBottomLeft)
+	_, _ = ap.Out.WriteString(bottomLeft)
 	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, err := ap.Out.WriteString(SquareBottomRight)
+	_, err := ap.Out.WriteString(bottomRight)
 	return err
+}
+
+func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
+	s := fmt.Sprintf(msg, args...)
+	x := (ap.W - len(s)) / 2
+	ap.MoveCursor(x, y)
+	_, _ = ap.Out.WriteString(s)
+	_ = ap.DrawRoundBox(x-1, y-1, len(s)+2, 3)
 }

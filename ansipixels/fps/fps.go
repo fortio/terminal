@@ -35,8 +35,8 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 }
 
 func drawBox(ap *ansipixels.AnsiPixels) {
-	_ = ap.DrawBox(0, 0, ap.W, ap.H)
-	ap.WriteCentered(ap.H/2-2, "Width: %d, Height: %d", ap.W, ap.H)
+	_ = ap.DrawSquareBox(0, 0, ap.W, ap.H)
+	ap.WriteBoxed(ap.H/2-3, " Width: %d, Height: %d ", ap.W, ap.H)
 }
 
 func posToXY(pos int, w, h int) (int, int) {
