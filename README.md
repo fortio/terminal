@@ -34,7 +34,7 @@ or
 brew install fortio/tap/fps
 ```
 
-Use the `-image` flag to pass a different image to load as background.
+Use the `-image` flag to pass a different image to load as background. Or use `-i` and fps is now just a terminal image viewer.
 
 Pass an optional `maxfps` as argument.
 
@@ -56,6 +56,8 @@ flags:
     	If your terminal supports color, this will load image in (216) colors instead of monochrome (default true)
   -gray
     	Convert the image to grayscale
+  -i string
+        Just show the image, no FPS test (hit any key to exit)
   -image string
     	Image file to display in monochrome in the background instead of the default one
   -nobox

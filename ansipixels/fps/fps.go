@@ -86,7 +86,7 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func Main() int { //nolint:funlen // color if/else are a bit long.
+func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
@@ -101,7 +101,9 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	trueColorFlag := flag.Bool("truecolor", defaultTrueColor,
 		"If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome")
 	grayFlag := flag.Bool("gray", false, "Convert the image to grayscale")
-	noboxFlag := flag.Bool("nobox", false, "Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
+	noboxFlag := flag.Bool("nobox", false,
+		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
+	imageOnly := flag.String("i", "", "Just show the image, no FPS test (hit any key to exit)")
 	cli.MinArgs = 0
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "[maxfps]"
@@ -145,6 +147,9 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	ap.ClearScreen()
 	var background *image.RGBA
 	var err error
+	if *imageOnly != "" {
+		*imgFlag = *imageOnly
+	}
 	if *imgFlag == "" {
 		if *trueColorFlag || *colorFlag {
 			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
@@ -160,14 +165,20 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	if err = ap.ShowImage(background, "\033[34m"); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
+	buf := [256]byte{}
+	if *imageOnly != "" {
+		ap.HideCursor()
+		ap.Out.Flush()
+		_, _ = ap.In.Read(buf[:])
+		return 0
+	}
 	if !*noboxFlag {
 		drawBox(ap)
 	}
 	// FPS test
 	fps := 0.0
-	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... ", fpsStr)
+	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
 	ap.Out.Flush()
 	_, err = ap.In.Read(buf[:])
 	if err != nil {
