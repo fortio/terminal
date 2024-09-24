@@ -236,16 +236,16 @@ func (ap *AnsiPixels) ShowImage(imgRGBA *image.RGBA, colorString string) error {
 	if err != nil {
 		return err
 	}
-	img := resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2)
+	img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin)
 	if ap.Gray {
 		toGrey(img, img)
 	}
 	switch {
 	case ap.TrueColor:
-		return ap.DrawTrueColorImage(1, 1, img)
+		return ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
 	case ap.Color:
-		return ap.Draw216ColorImage(1, 1, img)
+		return ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
 	default:
-		return ap.DrawMonoImage(1, 1, grayScaleImage(img), colorString)
+		return ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), colorString)
 	}
 }

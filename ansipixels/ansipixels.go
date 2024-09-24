@@ -34,6 +34,7 @@ type AnsiPixels struct {
 	TrueColor bool
 	Color     bool // 256 (216) color mode
 	Gray      bool // grayscale mode
+	Margin    int  // Margin around the image (image is smaller by 2*margin)
 }
 
 func NewAnsiPixels() *AnsiPixels {

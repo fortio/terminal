@@ -44,3 +44,22 @@ After hitting any key to start the measurement, you can also resize the window a
 Use `q` to stop.
 
 ![fps screenshot](fps_sshot.png)
+
+Additional flags/usage:
+```
+fps v0.14.0 usage:
+	fps [flags] [maxfps]
+or 1 of the special arguments
+	fps {help|envhelp|version|buildinfo}
+flags:
+  -color
+    	If your terminal supports color, this will load image in (216) colors instead of monochrome (default true)
+  -gray
+    	Convert the image to grayscale
+  -image string
+    	Image file to display in monochrome in the background instead of the default one
+  -nobox
+    	Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
+  -truecolor
+    	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
+```
