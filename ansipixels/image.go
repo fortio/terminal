@@ -115,6 +115,7 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", fgColor))
 				*/
 			default:
+				// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows.
 				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
 			}
 			prevFg = fgColor
