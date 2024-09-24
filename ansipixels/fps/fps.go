@@ -107,6 +107,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			extra = fmt.Sprintf(", %d/%d", i+1, l)
 		}
 		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Width, img.Height, img.Format, extra)
+		ap.ClearScreen()
 	redraw:
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)

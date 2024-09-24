@@ -257,8 +257,8 @@ func (ap *AnsiPixels) DecodeImage(inp io.Reader) (*Image, error) {
 	res.Images = make([]*image.RGBA, 0, len(gifImages.Image))
 	bounds := gifImages.Image[0].Bounds()
 	current := image.NewRGBA(bounds)
-
 	for _, frame := range gifImages.Image {
+		// TODO use Disposal[i] correctly.
 		draw.Draw(current, bounds, frame, image.Point{}, draw.Over) // Composite each frame onto the canvas
 		// make a imgCopy of the current frame
 		imgCopy := image.NewRGBA(bounds)
@@ -291,6 +291,7 @@ func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, colorString string) error {
 		if err != nil {
 			return err
 		}
+		ap.Out.Flush()
 		if i < len(imagesRGBA.Delays)-1 { // maybe read keyboard/signal for stop request in case this is longish.
 			delay := imagesRGBA.Delays[i]
 			log.Debugf("Delay %d", delay)
