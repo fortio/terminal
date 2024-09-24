@@ -86,6 +86,30 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
+	ap.ClearScreen()
+	ap.HideCursor()
+	ap.Data = make([]byte, 1)
+	for _, imageFile := range imageFiles {
+		img, err := ap.ReadImage(imageFile)
+		if err != nil {
+			return log.FErrf("Error reading image: %v", err)
+		}
+		if err = ap.ShowImage(img, "\033[34m"); err != nil {
+			return log.FErrf("Error showing image: %v", err)
+		}
+		ap.Out.Flush()
+		_, err = ap.In.Read(ap.Data)
+		if err != nil {
+			return log.FErrf("Error with cursor position request: %v", err)
+		}
+		if isStopKey(ap) {
+			return 0
+		}
+	}
+	return 0
+}
+
 func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
@@ -103,15 +127,16 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	grayFlag := flag.Bool("gray", false, "Convert the image to grayscale")
 	noboxFlag := flag.Bool("nobox", false,
 		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
-	imageOnly := flag.String("i", "", "Just show the image, no FPS test (hit any key to exit)")
+	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
 	cli.MinArgs = 0
-	cli.MaxArgs = 1
-	cli.ArgsHelp = "[maxfps]"
+	cli.MaxArgs = -1
+	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
 	cli.Main()
+	imagesOnly := *imagesOnlyFlag
 	fpsLimit := -1.0
 	fpsStr := "unlimited"
 	hasFPSLimit := false
-	if len(flag.Args()) > 0 {
+	if !imagesOnly && len(flag.Args()) > 0 {
 		// parse as float64
 		var err error
 		fpsLimit, err = strconv.ParseFloat(flag.Arg(0), 64)
@@ -132,7 +157,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	ap.Color = *colorFlag
 	ap.Gray = *grayFlag
 	ap.Margin = 1
-	if *noboxFlag {
+	if *noboxFlag || imagesOnly {
 		ap.Margin = 0
 	}
 	defer func() {
@@ -145,11 +170,11 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
 	ap.ClearScreen()
+	if imagesOnly && len(flag.Args()) > 0 {
+		return imagesViewer(ap, flag.Args())
+	}
 	var background *image.RGBA
 	var err error
-	if *imageOnly != "" {
-		*imgFlag = *imageOnly
-	}
 	if *imgFlag == "" {
 		if *trueColorFlag || *colorFlag {
 			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
@@ -166,7 +191,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		return log.FErrf("Error showing image: %v", err)
 	}
 	buf := [256]byte{}
-	if *imageOnly != "" {
+	if imagesOnly {
 		ap.HideCursor()
 		ap.Out.Flush()
 		_, _ = ap.In.Read(buf[:])

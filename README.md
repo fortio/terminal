@@ -48,7 +48,7 @@ Use `q` to stop.
 Additional flags/usage:
 ```
 fps v0.14.0 usage:
-	fps [flags] [maxfps]
+	fps [flags] [maxfps] or fps -i imagefiles...
 or 1 of the special arguments
 	fps {help|envhelp|version|buildinfo}
 flags:
@@ -56,8 +56,7 @@ flags:
     	If your terminal supports color, this will load image in (216) colors instead of monochrome (default true)
   -gray
     	Convert the image to grayscale
-  -i string
-        Just show the image, no FPS test (hit any key to exit)
+  -i	Arguments are now images files to show, no FPS test (hit any key to continue)
   -image string
     	Image file to display in monochrome in the background instead of the default one
   -nobox
