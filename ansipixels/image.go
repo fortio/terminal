@@ -31,12 +31,34 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	ap.MoveCursor(sx, sy)
 	var err error
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
+		prev1 := color.RGBA{}
+		prev2 := color.RGBA{}
+		ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
-			_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
-				pixel1.R, pixel1.G, pixel1.B,
-				pixel2.R, pixel2.G, pixel2.B))
+			switch {
+			case pixel1 == pixel2:
+				if pixel1 == prev1 {
+					_, _ = ap.Out.WriteRune('█')
+					continue // we haven't changed color
+				}
+				if pixel2 == prev2 {
+					_, _ = ap.Out.WriteRune(' ')
+					continue // we haven't changed color
+				}
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm█", pixel1.R, pixel1.G, pixel1.B))
+				prev1 = pixel1
+				continue
+			case pixel1 == prev1 && pixel2 == prev2:
+				_, _ = ap.Out.WriteRune('▀')
+			default:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
+					pixel1.R, pixel1.G, pixel1.B,
+					pixel2.R, pixel2.G, pixel2.B))
+			}
+			prev1 = pixel1
+			prev2 = pixel2
 		}
 		sy++
 		ap.MoveCursor(sx, sy)
@@ -61,18 +83,44 @@ func convertColorTo216(pixel color.RGBA) uint8 {
 }
 
 func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
-	ap.MoveCursor(sx, sy)
 	var err error
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
+		prevFg := uint8(0)
+		prevBg := uint8(0)
+		ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
 			fgColor := convertColorTo216(pixel1)
 			bgColor := convertColorTo216(pixel2)
-			_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▀", fgColor, bgColor))
+			switch {
+			case fgColor == prevFg && bgColor == prevBg:
+				_, _ = ap.Out.WriteRune('▄')
+				/*
+					case fgColor == bgColor:
+						if fgColor == prevFg {
+							_, _ = ap.Out.WriteRune('█')
+							continue // we haven't changed bg color
+						}
+						if bgColor == prevBg {
+							_, _ = ap.Out.WriteRune(' ')
+							continue // we haven't changed fg color
+						}
+						_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm█", fgColor))
+						prevFg = fgColor
+						continue
+							case fgColor == prevFg:
+								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", bgColor))
+							case bgColor == prevBg:
+								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", fgColor))
+				*/
+			default:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
+			}
+			prevFg = fgColor
+			prevBg = bgColor
 		}
 		sy++
-		ap.MoveCursor(sx, sy)
 	}
 	_, err = ap.Out.WriteString("\033[0m") // reset color
 	return err
