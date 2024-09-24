@@ -20,7 +20,7 @@ import (
 const BUFSIZE = 1024
 
 type AnsiPixels struct {
-	fd    int
+	FdIn  int
 	fdOut int
 	Out   *bufio.Writer
 	In    io.Reader
@@ -39,7 +39,7 @@ type AnsiPixels struct {
 
 func NewAnsiPixels() *AnsiPixels {
 	return &AnsiPixels{
-		fd:    safecast.MustConvert[int](os.Stdin.Fd()),
+		FdIn:  safecast.MustConvert[int](os.Stdin.Fd()),
 		fdOut: safecast.MustConvert[int](os.Stdout.Fd()),
 		Out:   bufio.NewWriter(os.Stdout),
 		In:    os.Stdin,
@@ -47,7 +47,7 @@ func NewAnsiPixels() *AnsiPixels {
 }
 
 func (ap *AnsiPixels) Open() (err error) {
-	ap.state, err = term.MakeRaw(ap.fd)
+	ap.state, err = term.MakeRaw(ap.FdIn)
 	return
 }
 
@@ -61,7 +61,7 @@ func (ap *AnsiPixels) Restore() {
 	if ap.state == nil {
 		return
 	}
-	err := term.Restore(ap.fd, ap.state)
+	err := term.Restore(ap.FdIn, ap.state)
 	if err != nil {
 		log.Fatalf("Error restoring terminal: %v", err)
 	}
