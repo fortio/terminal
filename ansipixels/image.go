@@ -291,15 +291,10 @@ func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, colorString string) error {
 		if err != nil {
 			return err
 		}
-		/* slow debug:
-		if len(imagesRGBA.Images) > 0 && i < len(imagesRGBA.Images)-1 {
-			time.Sleep(1 * time.Second)
-		}
-		*/
-		if i < len(imagesRGBA.Delays)-1 {
+		if i < len(imagesRGBA.Delays)-1 { // maybe read keyboard/signal for stop request in case this is longish.
 			delay := imagesRGBA.Delays[i]
 			log.Debugf("Delay %d", delay)
-			if 10*delay > 0 {
+			if delay > 0 {
 				time.Sleep(time.Duration(delay) * 10 * time.Millisecond)
 			}
 		}
