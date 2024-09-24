@@ -215,23 +215,23 @@ func convertToRGBA(src image.Image) *image.RGBA {
 	return dst
 }
 
-func (ap *AnsiPixels) ReadImage(path string) (*image.RGBA, error) {
+func (ap *AnsiPixels) ReadImage(path string) (*image.RGBA, string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer file.Close()
 	return ap.DecodeImage(file)
 }
 
-func (ap *AnsiPixels) DecodeImage(data io.Reader) (*image.RGBA, error) {
+func (ap *AnsiPixels) DecodeImage(data io.Reader) (*image.RGBA, string, error) {
 	// Automatically detect and decode the image format
 	img, format, err := image.Decode(data)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	log.Debugf("Image format: %s", format)
-	return convertToRGBA(img), nil
+	return convertToRGBA(img), format, nil
 }
 
 // Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.

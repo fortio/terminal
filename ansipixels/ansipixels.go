@@ -107,6 +107,13 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	_, _ = ap.Out.WriteString(s)
 }
 
+func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
+	s := fmt.Sprintf(msg, args...)
+	x := ap.W - len(s)
+	ap.MoveCursor(x, y)
+	_, _ = ap.Out.WriteString(s)
+}
+
 func (ap *AnsiPixels) ClearEndOfLine() {
 	_, _ = ap.Out.WriteString("\033[K")
 }

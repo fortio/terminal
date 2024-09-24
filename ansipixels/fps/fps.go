@@ -30,7 +30,7 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			return false
 		}
-		if key == 'q' || key == 3 || key == 4 {
+		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
 			return true
 		}
 	}
@@ -92,22 +92,37 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 	ap.Data = make([]byte, 3)
 	i := 0
 	l := len(imageFiles)
+	showInfo := l > 1
 	for {
 		if i >= l {
 			i = 0
 		}
 		imageFile := imageFiles[i]
-		img, err := ap.ReadImage(imageFile)
+		img, format, err := ap.ReadImage(imageFile)
 		if err != nil {
 			return log.FErrf("Error reading image %s: %v", imageFile, err)
 		}
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
 		}
+		if showInfo {
+			ap.WriteRight(ap.H-1, "%s (%s, %d/%d)", imageFile, format, i+1, l)
+			ap.Out.Flush()
+		}
 		ap.Out.Flush()
 		_, err = ap.In.Read(ap.Data[0:1])
 		if err != nil {
 			return log.FErrf("Error with cursor position request: %v", err)
+		}
+		if ap.Data[0] == '?' || ap.Data[0] == 'h' || ap.Data[0] == 'H' {
+			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue,", i+1, l)
+			ap.WriteCentered(ap.H/2, "'q' to exit, left arrow to go back, 'i' to toggle image information")
+			ap.Out.Flush()
+			_, _ = ap.In.Read(ap.Data[0:1])
+		}
+		if ap.Data[0] == 'i' || ap.Data[0] == 'I' {
+			showInfo = !showInfo
+			continue
 		}
 		if ap.Data[0] == 27 {
 			n, _ := ap.In.Read(ap.Data[1:3])
@@ -192,12 +207,12 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	var err error
 	if *imgFlag == "" {
 		if *trueColorFlag || *colorFlag {
-			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
+			background, _, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
 		} else {
-			background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+			background, _, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
 		}
 	} else {
-		background, err = ap.ReadImage(*imgFlag)
+		background, _, err = ap.ReadImage(*imgFlag)
 	}
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
