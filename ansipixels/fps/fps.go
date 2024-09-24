@@ -100,6 +100,7 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 		"If your terminal supports color, this will load image in (216) colors instead of monochrome")
 	trueColorFlag := flag.Bool("truecolor", defaultTrueColor,
 		"If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome")
+	grayFlag := flag.Bool("gray", false, "Convert the image to grayscale")
 	cli.MinArgs = 0
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "[maxfps]"
@@ -126,6 +127,7 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	}
 	ap.TrueColor = *trueColorFlag
 	ap.Color = *colorFlag
+	ap.Gray = *grayFlag
 	defer func() {
 		ap.ShowCursor()
 		ap.MoveCursor(0, ap.H-2)

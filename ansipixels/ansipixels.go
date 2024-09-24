@@ -33,6 +33,7 @@ type AnsiPixels struct {
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
 	Color     bool // 256 (216) color mode
+	Gray      bool // grayscale mode
 }
 
 func NewAnsiPixels() *AnsiPixels {
