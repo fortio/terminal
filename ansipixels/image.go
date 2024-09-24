@@ -69,7 +69,7 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 
 func convertColorTo216(pixel color.RGBA) uint8 {
 	// Check if grayscale
-	shift := 2
+	shift := 4
 	if (pixel.R>>shift) == (pixel.G>>shift) && (pixel.G>>shift) == (pixel.B>>shift) {
 		// Bugged:
 		// lum := safecast.MustConvert[uint8](max(255, math.Round(0.299*float64(pixel.R)+
@@ -96,24 +96,10 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 			switch {
 			case fgColor == prevFg && bgColor == prevBg:
 				_, _ = ap.Out.WriteRune('▄')
-				/*
-					case fgColor == bgColor:
-						if fgColor == prevFg {
-							_, _ = ap.Out.WriteRune('█')
-							continue // we haven't changed bg color
-						}
-						if bgColor == prevBg {
-							_, _ = ap.Out.WriteRune(' ')
-							continue // we haven't changed fg color
-						}
-						_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm█", fgColor))
-						prevFg = fgColor
-						continue
-							case fgColor == prevFg:
-								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", bgColor))
-							case bgColor == prevBg:
-								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", fgColor))
-				*/
+			case fgColor == prevFg:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", bgColor))
+			case bgColor == prevBg:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", fgColor))
 			default:
 				// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows.
 				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
