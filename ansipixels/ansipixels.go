@@ -30,6 +30,8 @@ type AnsiPixels struct {
 	W, H  int // Width and Height
 	x, y  int // Cursor position
 	C     chan os.Signal
+	// Should image be monochrome or true color
+	TrueColor bool
 }
 
 func NewAnsiPixels() *AnsiPixels {

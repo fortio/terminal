@@ -1,6 +1,7 @@
 package ansipixels
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	_ "image/gif"  // Import GIF decoder
@@ -25,13 +26,31 @@ const (
 	BottomHalfPixel = '▄'
 )
 
-func (ap *AnsiPixels) DrawImage(sx, sy int, img *image.Gray, color string) error {
+func (ap *AnsiPixels) DrawColorImage(sx, sy int, img *image.RGBA) error {
+	ap.MoveCursor(sx, sy)
+	var err error
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel1 := img.RGBAAt(x, y)
+			pixel2 := img.RGBAAt(x, y+1)
+			_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
+				pixel1.R, pixel1.G, pixel1.B,
+				pixel2.R, pixel2.G, pixel2.B))
+		}
+		sy++
+		ap.MoveCursor(sx, sy)
+	}
+	_, err = ap.Out.WriteString("\033[0m") // reset color
+	return err
+}
+
+func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) error {
 	ap.WriteAtStr(sx, sy, color)
 	var err error
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			pixel1 := img.GrayAt(x, y).Y > 127
-			pixel2 := img.GrayAt(x, y+1).Y > 127
+			pixel1 := img.GrayAt(x, y).Y > 90
+			pixel2 := img.GrayAt(x, y+1).Y > 90
 			switch {
 			case pixel1 && pixel2:
 				_, _ = ap.Out.WriteRune(FullPixel)
@@ -67,7 +86,7 @@ func grayScaleImage(rgbaImg *image.RGBA) *image.Gray {
 	return grayImg
 }
 
-func resizeAndCenter(img *image.Gray, maxW, maxH int) *image.Gray {
+func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
 	// Get original image dimensions
 	origBounds := img.Bounds()
 	origW := origBounds.Dx()
@@ -82,14 +101,14 @@ func resizeAndCenter(img *image.Gray, maxW, maxH int) *image.Gray {
 	newW := int(float64(origW) * scale)
 	newH := int(float64(origH) * scale)
 
-	canvas := image.NewGray(image.Rect(0, 0, maxW, maxH)) // transparent background (aka black for ANSI)
+	canvas := image.NewRGBA(image.Rect(0, 0, maxW, maxH))
 
 	// Calculate the offset to center the image
 	offsetX := (maxW - newW) / 2
 	offsetY := (maxH - newH) / 2
 
 	// Resize the image
-	resized := image.NewGray(image.Rect(0, 0, newW, newH))
+	resized := image.NewRGBA(image.Rect(0, 0, newW, newH))
 	draw.CatmullRom.Scale(resized, resized.Bounds(), img, origBounds, draw.Over, nil)
 	draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), resized, image.Point{}, draw.Over)
 	return canvas
@@ -124,10 +143,14 @@ func (ap *AnsiPixels) DecodeImage(data io.Reader) (*image.RGBA, error) {
 	return convertToRGBA(img), nil
 }
 
+// Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.
 func (ap *AnsiPixels) ShowImage(imgRGBA *image.RGBA, colorString string) error {
 	err := ap.GetSize()
 	if err != nil {
 		return err
 	}
-	return ap.DrawImage(1, 1, resizeAndCenter(grayScaleImage(imgRGBA), ap.W-2, 2*ap.H-2), colorString)
+	if !ap.TrueColor {
+		return ap.DrawMonoImage(1, 1, grayScaleImage(resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2)), colorString)
+	}
+	return ap.DrawColorImage(1, 1, resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2))
 }
