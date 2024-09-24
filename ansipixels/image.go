@@ -30,10 +30,10 @@ const (
 func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	ap.MoveCursor(sx, sy)
 	var err error
+	prev1 := color.RGBA{}
+	prev2 := color.RGBA{}
+	ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
-		prev1 := color.RGBA{}
-		prev2 := color.RGBA{}
-		ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
@@ -69,13 +69,19 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 
 func convertColorTo216(pixel color.RGBA) uint8 {
 	// Check if grayscale
-	shift := 2
+	shift := 4
 	if (pixel.R>>shift) == (pixel.G>>shift) && (pixel.G>>shift) == (pixel.B>>shift) {
 		// Bugged:
 		// lum := safecast.MustConvert[uint8](max(255, math.Round(0.299*float64(pixel.R)+
 		// 0.587*float64(pixel.G)+0.114*float64(pixel.B))))
 		lum := (uint16(pixel.R) + uint16(pixel.G) + uint16(pixel.B)) / 3
-		return 232 + safecast.MustConvert[uint8](lum*23/255)
+		if lum < 9 { // 0-9.8 but ... 0-8 9 levels
+			return 16 // -> black
+		}
+		if lum > 247 { // 248-255 (incl) 8 levels
+			return 231 // -> white
+		}
+		return safecast.MustConvert[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
 	}
 	// 6x6x6 color cube
 	col := 16 + 36*(pixel.R/51) + 6*(pixel.G/51) + pixel.B/51
@@ -87,7 +93,7 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		prevFg := uint8(0)
 		prevBg := uint8(0)
-		ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
+		ap.WriteAtStr(sx, sy, "\033[0m")
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
@@ -96,24 +102,10 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 			switch {
 			case fgColor == prevFg && bgColor == prevBg:
 				_, _ = ap.Out.WriteRune('▄')
-				/*
-					case fgColor == bgColor:
-						if fgColor == prevFg {
-							_, _ = ap.Out.WriteRune('█')
-							continue // we haven't changed bg color
-						}
-						if bgColor == prevBg {
-							_, _ = ap.Out.WriteRune(' ')
-							continue // we haven't changed fg color
-						}
-						_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm█", fgColor))
-						prevFg = fgColor
-						continue
-							case fgColor == prevFg:
-								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", bgColor))
-							case bgColor == prevBg:
-								_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", fgColor))
-				*/
+			case fgColor == prevFg:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", bgColor))
+			case bgColor == prevBg:
+				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", fgColor))
 			default:
 				// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows.
 				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
@@ -130,10 +122,11 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) error {
 	ap.WriteAtStr(sx, sy, color)
 	var err error
+	threshold := uint8(127)
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			pixel1 := img.GrayAt(x, y).Y > 90
-			pixel2 := img.GrayAt(x, y+1).Y > 90
+			pixel1 := img.GrayAt(x, y).Y > threshold
+			pixel2 := img.GrayAt(x, y+1).Y > threshold
 			switch {
 			case pixel1 && pixel2:
 				_, _ = ap.Out.WriteRune(FullPixel)
@@ -154,6 +147,11 @@ func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) e
 
 func grayScaleImage(rgbaImg *image.RGBA) *image.Gray {
 	grayImg := image.NewGray(rgbaImg.Bounds())
+	toGrey(rgbaImg, grayImg)
+	return grayImg
+}
+
+func toGrey(rgbaImg *image.RGBA, img image.Image) {
 	// Iterate through the pixels of the NRGBA image and convert to grayscale
 	for y := rgbaImg.Bounds().Min.Y; y < rgbaImg.Bounds().Max.Y; y++ {
 		for x := rgbaImg.Bounds().Min.X; x < rgbaImg.Bounds().Max.X; x++ {
@@ -163,10 +161,16 @@ func grayScaleImage(rgbaImg *image.RGBA) *image.Gray {
 			grayValue := uint8(0.299*float64(rgbaColor.R) + 0.587*float64(rgbaColor.G) + 0.114*float64(rgbaColor.B))
 
 			// Set the gray value in the destination Gray image
-			grayImg.SetGray(x, y, color.Gray{Y: grayValue})
+			switch grayImg := img.(type) {
+			case *image.Gray:
+				grayImg.SetGray(x, y, color.Gray{Y: grayValue})
+			case *image.RGBA:
+				grayImg.Set(x, y, color.RGBA{grayValue, grayValue, grayValue, 255})
+			default:
+				log.Fatalf("Unsupported image type %T", img)
+			}
 		}
 	}
-	return grayImg
 }
 
 func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
@@ -192,7 +196,7 @@ func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
 
 	// Resize the image
 	resized := image.NewRGBA(image.Rect(0, 0, newW, newH))
-	draw.CatmullRom.Scale(resized, resized.Bounds(), img, origBounds, draw.Over, nil)
+	draw.BiLinear.Scale(resized, resized.Bounds(), img, origBounds, draw.Over, nil)
 	draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), resized, image.Point{}, draw.Over)
 	return canvas
 }
@@ -232,12 +236,16 @@ func (ap *AnsiPixels) ShowImage(imgRGBA *image.RGBA, colorString string) error {
 	if err != nil {
 		return err
 	}
+	img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin)
+	if ap.Gray {
+		toGrey(img, img)
+	}
 	switch {
 	case ap.TrueColor:
-		return ap.DrawTrueColorImage(1, 1, resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2))
+		return ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
 	case ap.Color:
-		return ap.Draw216ColorImage(1, 1, resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2))
+		return ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
 	default:
-		return ap.DrawMonoImage(1, 1, grayScaleImage(resizeAndCenter(imgRGBA, ap.W-2, 2*ap.H-2)), colorString)
+		return ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), colorString)
 	}
 }

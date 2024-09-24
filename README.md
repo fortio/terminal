@@ -34,7 +34,7 @@ or
 brew install fortio/tap/fps
 ```
 
-Use the `-image` flag to pass a different image to load as background.
+Use the `-image` flag to pass a different image to load as background. Or use `-i` and fps is now just a terminal image viewer.
 
 Pass an optional `maxfps` as argument.
 
@@ -44,3 +44,23 @@ After hitting any key to start the measurement, you can also resize the window a
 Use `q` to stop.
 
 ![fps screenshot](fps_sshot.png)
+
+Additional flags/usage:
+```
+fps v0.14.0 usage:
+	fps [flags] [maxfps] or fps -i imagefiles...
+or 1 of the special arguments
+	fps {help|envhelp|version|buildinfo}
+flags:
+  -color
+    	If your terminal supports color, this will load image in (216) colors instead of monochrome (default true)
+  -gray
+    	Convert the image to grayscale
+  -i	Arguments are now images files to show, no FPS test (hit any key to continue)
+  -image string
+    	Image file to display in monochrome in the background instead of the default one
+  -nobox
+    	Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
+  -truecolor
+    	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
+```

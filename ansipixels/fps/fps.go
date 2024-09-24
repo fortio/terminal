@@ -64,14 +64,14 @@ func posToXY(pos int, w, h int) (int, int) {
 
 func charAt(ap *ansipixels.AnsiPixels, pos, w, h int, what string) {
 	x, y := posToXY(pos, w, h)
-	ap.WriteAtStr(x+1, y+1, what)
+	ap.WriteAtStr(x+ap.Margin, y+ap.Margin, what)
 }
 
 func animate(ap *ansipixels.AnsiPixels, frame uint) {
 	w := ap.W
 	h := ap.H
-	w -= 2
-	h -= 2
+	w -= 2 * ap.Margin
+	h -= 2 * ap.Margin
 	total := 2*w + 2*h
 	pos := safecast.MustConvert[int](frame % safecast.MustConvert[uint](total))
 	charAt(ap, pos+2, w, h, "\033[31m█") // Red
@@ -86,7 +86,31 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func Main() int { //nolint:funlen // color if/else are a bit long.
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
+	ap.ClearScreen()
+	ap.HideCursor()
+	ap.Data = make([]byte, 1)
+	for _, imageFile := range imageFiles {
+		img, err := ap.ReadImage(imageFile)
+		if err != nil {
+			return log.FErrf("Error reading image: %v", err)
+		}
+		if err = ap.ShowImage(img, "\033[34m"); err != nil {
+			return log.FErrf("Error showing image: %v", err)
+		}
+		ap.Out.Flush()
+		_, err = ap.In.Read(ap.Data)
+		if err != nil {
+			return log.FErrf("Error with cursor position request: %v", err)
+		}
+		if isStopKey(ap) {
+			return 0
+		}
+	}
+	return 0
+}
+
+func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
@@ -100,14 +124,19 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 		"If your terminal supports color, this will load image in (216) colors instead of monochrome")
 	trueColorFlag := flag.Bool("truecolor", defaultTrueColor,
 		"If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome")
+	grayFlag := flag.Bool("gray", false, "Convert the image to grayscale")
+	noboxFlag := flag.Bool("nobox", false,
+		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
+	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
 	cli.MinArgs = 0
-	cli.MaxArgs = 1
-	cli.ArgsHelp = "[maxfps]"
+	cli.MaxArgs = -1
+	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
 	cli.Main()
+	imagesOnly := *imagesOnlyFlag
 	fpsLimit := -1.0
 	fpsStr := "unlimited"
 	hasFPSLimit := false
-	if len(flag.Args()) > 0 {
+	if !imagesOnly && len(flag.Args()) > 0 {
 		// parse as float64
 		var err error
 		fpsLimit, err = strconv.ParseFloat(flag.Arg(0), 64)
@@ -126,6 +155,11 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	}
 	ap.TrueColor = *trueColorFlag
 	ap.Color = *colorFlag
+	ap.Gray = *grayFlag
+	ap.Margin = 1
+	if *noboxFlag || imagesOnly {
+		ap.Margin = 0
+	}
 	defer func() {
 		ap.ShowCursor()
 		ap.MoveCursor(0, ap.H-2)
@@ -136,6 +170,9 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
 	ap.ClearScreen()
+	if imagesOnly && len(flag.Args()) > 0 {
+		return imagesViewer(ap, flag.Args())
+	}
 	var background *image.RGBA
 	var err error
 	if *imgFlag == "" {
@@ -153,12 +190,20 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 	if err = ap.ShowImage(background, "\033[34m"); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
-	drawBox(ap)
+	buf := [256]byte{}
+	if imagesOnly {
+		ap.HideCursor()
+		ap.Out.Flush()
+		_, _ = ap.In.Read(buf[:])
+		return 0
+	}
+	if !*noboxFlag {
+		drawBox(ap)
+	}
 	// FPS test
 	fps := 0.0
-	buf := [256]byte{}
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... ", fpsStr)
+	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
 	ap.Out.Flush()
 	_, err = ap.In.Read(buf[:])
 	if err != nil {
@@ -188,7 +233,9 @@ func Main() int { //nolint:funlen // color if/else are a bit long.
 				_ = ap.GetSize()
 				ap.ClearScreen()
 				_ = ap.ShowImage(background, "\033[34m")
-				drawBox(ap)
+				if !*noboxFlag {
+					drawBox(ap)
+				}
 				continue
 			}
 			return 0
