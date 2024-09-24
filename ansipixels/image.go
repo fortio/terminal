@@ -1,14 +1,16 @@
 package ansipixels
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
-	_ "image/gif"  // Import GIF decoder
+	"image/gif"
 	_ "image/jpeg" // Import JPEG decoder
 	_ "image/png"  // Import PNG decoder
 	"io"
 	"os"
+	"time"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
@@ -18,12 +20,6 @@ import (
 	_ "golang.org/x/image/vp8l" // Import VP8L decoder
 	_ "golang.org/x/image/webp" // Import WebP decoder
 )
-
-type Image struct {
-	Width  int
-	Height int
-	Data   []byte
-}
 
 const (
 	FullPixel       = '█'
@@ -215,41 +211,98 @@ func convertToRGBA(src image.Image) *image.RGBA {
 	return dst
 }
 
-func (ap *AnsiPixels) ReadImage(path string) (*image.RGBA, string, error) {
+func (ap *AnsiPixels) ReadImage(path string) (*Image, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer file.Close()
 	return ap.DecodeImage(file)
 }
 
-func (ap *AnsiPixels) DecodeImage(data io.Reader) (*image.RGBA, string, error) {
+type Image struct {
+	Format string
+	Width  int
+	Height int
+	Images []*image.RGBA
+	Delays []int
+}
+
+func (ap *AnsiPixels) DecodeImage(inp io.Reader) (*Image, error) {
 	// Automatically detect and decode the image format
+	all, err := io.ReadAll(inp)
+	if err != nil {
+		return nil, err
+	}
+	data := bytes.NewReader(all)
 	img, format, err := image.Decode(data)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	log.Debugf("Image format: %s", format)
-	return convertToRGBA(img), format, nil
+	res := &Image{
+		Format: format,
+		Width:  img.Bounds().Dx(),
+		Height: img.Bounds().Dy(),
+	}
+	if format != "gif" {
+		res.Images = []*image.RGBA{convertToRGBA(img)}
+		return res, nil
+	}
+	data = bytes.NewReader(all)
+	gifImages, err := gif.DecodeAll(data)
+	if err != nil {
+		return nil, err
+	}
+	res.Images = make([]*image.RGBA, 0, len(gifImages.Image))
+	bounds := gifImages.Image[0].Bounds()
+	current := image.NewRGBA(bounds)
+
+	for _, frame := range gifImages.Image {
+		draw.Draw(current, bounds, frame, image.Point{}, draw.Over) // Composite each frame onto the canvas
+		// make a imgCopy of the current frame
+		imgCopy := image.NewRGBA(bounds)
+		draw.Draw(imgCopy, bounds, current, image.Point{}, draw.Src)
+		res.Images = append(res.Images, imgCopy)
+	}
+	res.Delays = gifImages.Delay
+	return res, nil
 }
 
 // Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.
-func (ap *AnsiPixels) ShowImage(imgRGBA *image.RGBA, colorString string) error {
+func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, colorString string) error {
 	err := ap.GetSize()
 	if err != nil {
 		return err
 	}
-	img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin)
-	if ap.Gray {
-		toGrey(img, img)
+	for i, imgRGBA := range imagesRGBA.Images {
+		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin)
+		if ap.Gray {
+			toGrey(img, img)
+		}
+		switch {
+		case ap.TrueColor:
+			err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
+		case ap.Color:
+			err = ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
+		default:
+			err = ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), colorString)
+		}
+		if err != nil {
+			return err
+		}
+		/* slow debug:
+		if len(imagesRGBA.Images) > 0 && i < len(imagesRGBA.Images)-1 {
+			time.Sleep(1 * time.Second)
+		}
+		*/
+		if i < len(imagesRGBA.Delays)-1 {
+			delay := imagesRGBA.Delays[i]
+			log.Debugf("Delay %d", delay)
+			if 10*delay > 0 {
+				time.Sleep(time.Duration(delay) * 10 * time.Millisecond)
+			}
+		}
 	}
-	switch {
-	case ap.TrueColor:
-		return ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
-	case ap.Color:
-		return ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
-	default:
-		return ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), colorString)
-	}
+	return nil
 }

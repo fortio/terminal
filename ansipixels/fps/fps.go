@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"image"
 	"os"
 	"strconv"
 	"time"
@@ -101,15 +100,15 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			i = 0
 		}
 		imageFile := imageFiles[i]
-		img, format, err := ap.ReadImage(imageFile)
+		img, err := ap.ReadImage(imageFile)
+		if err != nil {
+			return log.FErrf("Error reading image %s: %v", imageFile, err)
+		}
 		extra := ""
 		if l > 1 {
 			extra = fmt.Sprintf(", %d/%d", i+1, l)
 		}
-		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Bounds().Dx(), img.Bounds().Dy(), format, extra)
-		if err != nil {
-			return log.FErrf("Error reading image %s: %v", imageFile, err)
-		}
+		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Width, img.Height, img.Format, extra)
 	redraw:
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
@@ -229,16 +228,16 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	if imagesOnly && len(flag.Args()) > 0 {
 		return imagesViewer(ap, flag.Args())
 	}
-	var background *image.RGBA
+	var background *ansipixels.Image
 	var err error
 	if *imgFlag == "" {
 		if *trueColorFlag || *colorFlag {
-			background, _, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
+			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
 		} else {
-			background, _, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+			background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
 		}
 	} else {
-		background, _, err = ap.ReadImage(*imgFlag)
+		background, err = ap.ReadImage(*imgFlag)
 	}
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
