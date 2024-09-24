@@ -93,7 +93,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 	for _, imageFile := range imageFiles {
 		img, err := ap.ReadImage(imageFile)
 		if err != nil {
-			return log.FErrf("Error reading image: %v", err)
+			return log.FErrf("Error reading image %s: %v", imageFile, err)
 		}
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
