@@ -13,6 +13,7 @@ import (
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
+	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -93,6 +94,8 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 	i := 0
 	l := len(imageFiles)
 	showInfo := l > 1
+	ap.SignalChannel()
+	tv := terminal.TimeoutToTimeval(100 * time.Millisecond)
 	for {
 		if i >= l {
 			i = 0
@@ -102,6 +105,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 		if err != nil {
 			return log.FErrf("Error reading image %s: %v", imageFile, err)
 		}
+	redraw:
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
 		}
@@ -109,20 +113,36 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 			ap.WriteRight(ap.H-1, "%s (%s, %d/%d)", imageFile, format, i+1, l)
 			ap.Out.Flush()
 		}
+	wait:
 		ap.Out.Flush()
-		_, err = ap.In.Read(ap.Data[0:1])
-		if err != nil {
-			return log.FErrf("Error with cursor position request: %v", err)
+		var n int
+		for {
+			select {
+			case s := <-ap.C:
+				if ap.IsResizeSignal(s) {
+					_ = ap.GetSize()
+					goto redraw
+				}
+				return 0
+			default:
+				n, err = terminal.TimeoutReader(ap.FdIn, tv, ap.Data[0:1])
+				if err != nil {
+					return log.FErrf("Error reading key: %v", err)
+				}
+			}
+			if n != 0 {
+				break
+			}
 		}
+		ap.Data = ap.Data[0:n]
 		if ap.Data[0] == '?' || ap.Data[0] == 'h' || ap.Data[0] == 'H' {
 			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue,", i+1, l)
 			ap.WriteCentered(ap.H/2, "'q' to exit, left arrow to go back, 'i' to toggle image information")
-			ap.Out.Flush()
-			_, _ = ap.In.Read(ap.Data[0:1])
+			goto wait
 		}
 		if ap.Data[0] == 'i' || ap.Data[0] == 'I' {
 			showInfo = !showInfo
-			continue
+			goto redraw
 		}
 		if ap.Data[0] == 27 {
 			n, _ := ap.In.Read(ap.Data[1:3])
