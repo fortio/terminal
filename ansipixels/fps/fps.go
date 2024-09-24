@@ -87,7 +87,7 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit // yeah well...
 	ap.ClearScreen()
 	ap.HideCursor()
 	ap.Data = make([]byte, 3)
@@ -102,6 +102,11 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 		}
 		imageFile := imageFiles[i]
 		img, format, err := ap.ReadImage(imageFile)
+		extra := ""
+		if l > 1 {
+			extra = fmt.Sprintf(", %d/%d", i+1, l)
+		}
+		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Bounds().Dx(), img.Bounds().Dy(), format, extra)
 		if err != nil {
 			return log.FErrf("Error reading image %s: %v", imageFile, err)
 		}
@@ -110,7 +115,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 			return log.FErrf("Error showing image: %v", err)
 		}
 		if showInfo {
-			ap.WriteRight(ap.H-1, "%s (%s, %d/%d)", imageFile, format, i+1, l)
+			ap.WriteRight(ap.H-1, "%s", info)
 			ap.Out.Flush()
 		}
 	wait:
@@ -131,6 +136,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 				}
 			}
 			if n != 0 {
+				ap.WriteRight(ap.H-1, "%s", info)
 				break
 			}
 		}
@@ -212,7 +218,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	}
 	defer func() {
 		ap.ShowCursor()
-		ap.MoveCursor(0, ap.H-2)
+		ap.MoveCursor(0, ap.H-1)
 		ap.Out.Flush()
 		ap.Restore()
 	}()
