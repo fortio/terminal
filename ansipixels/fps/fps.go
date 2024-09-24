@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"image"
 	"os"
 	"strconv"
 	"time"
@@ -88,8 +87,6 @@ var fpsJpg []byte
 var fpsColorsJpg []byte
 
 func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit // yeah well...
-	ap.ClearScreen()
-	ap.HideCursor()
 	ap.Data = make([]byte, 3)
 	i := 0
 	l := len(imageFiles)
@@ -101,15 +98,16 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			i = 0
 		}
 		imageFile := imageFiles[i]
-		img, format, err := ap.ReadImage(imageFile)
+		img, err := ap.ReadImage(imageFile)
+		if err != nil {
+			return log.FErrf("Error reading image %s: %v", imageFile, err)
+		}
 		extra := ""
 		if l > 1 {
 			extra = fmt.Sprintf(", %d/%d", i+1, l)
 		}
-		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Bounds().Dx(), img.Bounds().Dy(), format, extra)
-		if err != nil {
-			return log.FErrf("Error reading image %s: %v", imageFile, err)
-		}
+		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Width, img.Height, img.Format, extra)
+		ap.ClearScreen()
 	redraw:
 		if err = ap.ShowImage(img, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
@@ -225,20 +223,21 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	if err := ap.GetSize(); err != nil {
 		return log.FErrf("Error getting terminal size: %v", err)
 	}
+	ap.HideCursor()
 	ap.ClearScreen()
 	if imagesOnly && len(flag.Args()) > 0 {
 		return imagesViewer(ap, flag.Args())
 	}
-	var background *image.RGBA
+	var background *ansipixels.Image
 	var err error
 	if *imgFlag == "" {
 		if *trueColorFlag || *colorFlag {
-			background, _, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
+			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
 		} else {
-			background, _, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+			background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
 		}
 	} else {
-		background, _, err = ap.ReadImage(*imgFlag)
+		background, err = ap.ReadImage(*imgFlag)
 	}
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
@@ -248,7 +247,6 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	}
 	buf := [256]byte{}
 	if imagesOnly {
-		ap.HideCursor()
 		ap.Out.Flush()
 		_, _ = ap.In.Read(buf[:])
 		return 0
@@ -260,6 +258,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	fps := 0.0
 	// sleep := 1 * time.Second / time.Duration(fps)
 	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
+	ap.ShowCursor()
 	ap.Out.Flush()
 	_, err = ap.In.Read(buf[:])
 	if err != nil {
@@ -301,11 +300,6 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 			now = time.Now()
 			ap.WriteAt(ap.W/2-20, ap.H/2, " Last frame %v FPS: %.0f Avg %.2f ",
 				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
-			/*
-				ap.ClearEndOfLine()
-				ap.MoveHorizontally(ap.W - 1)
-				_, _ = ap.Out.WriteString(ansipixels.Vertical)
-			*/
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
