@@ -87,7 +87,7 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit // yeah well...
 	ap.ClearScreen()
 	ap.HideCursor()
 	ap.Data = make([]byte, 3)
