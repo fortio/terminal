@@ -89,8 +89,14 @@ var fpsColorsJpg []byte
 func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 	ap.ClearScreen()
 	ap.HideCursor()
-	ap.Data = make([]byte, 1)
-	for _, imageFile := range imageFiles {
+	ap.Data = make([]byte, 3)
+	i := 0
+	l := len(imageFiles)
+	for {
+		if i >= l {
+			i = 0
+		}
+		imageFile := imageFiles[i]
 		img, err := ap.ReadImage(imageFile)
 		if err != nil {
 			return log.FErrf("Error reading image %s: %v", imageFile, err)
@@ -99,15 +105,24 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int {
 			return log.FErrf("Error showing image: %v", err)
 		}
 		ap.Out.Flush()
-		_, err = ap.In.Read(ap.Data)
+		_, err = ap.In.Read(ap.Data[0:1])
 		if err != nil {
 			return log.FErrf("Error with cursor position request: %v", err)
 		}
-		if isStopKey(ap) {
+		if ap.Data[0] == 27 {
+			n, _ := ap.In.Read(ap.Data[1:3])
+			ap.Data = ap.Data[:1+n]
+		}
+		// check for left/right arrow to go to next/previous image
+		if len(ap.Data) >= 3 && ap.Data[0] == 27 && ap.Data[1] == '[' && ap.Data[2] == 'D' {
+			i = (i + l - 1) % l
+			continue
+		}
+		if isStopKey(ap) || l == 1 {
 			return 0
 		}
+		i++
 	}
-	return 0
 }
 
 func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
