@@ -83,8 +83,23 @@ func animate(ap *ansipixels.AnsiPixels, frame uint) {
 //go:embed fps.jpg
 var fpsJpg []byte
 
-func Main() int {
+//go:embed fps_colors.jpg
+var fpsColorsJpg []byte
+
+func Main() int { //nolint:funlen // color if/else are a bit long.
+	defaultTrueColor := false
+	if os.Getenv("COLORTERM") != "" {
+		defaultTrueColor = true
+	}
+	defaultColor := false
+	if os.Getenv("TERM") == "xterm-256color" {
+		defaultColor = true
+	}
 	imgFlag := flag.String("image", "", "Image file to display in monochrome in the background instead of the default one")
+	colorFlag := flag.Bool("color", defaultColor,
+		"If your terminal supports color, this will load image in (216) colors instead of monochrome")
+	trueColorFlag := flag.Bool("truecolor", defaultTrueColor,
+		"If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome")
 	cli.MinArgs = 0
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "[maxfps]"
@@ -109,6 +124,8 @@ func Main() int {
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}
+	ap.TrueColor = *trueColorFlag
+	ap.Color = *colorFlag
 	defer func() {
 		ap.ShowCursor()
 		ap.MoveCursor(0, ap.H-2)
@@ -122,7 +139,11 @@ func Main() int {
 	var background *image.RGBA
 	var err error
 	if *imgFlag == "" {
-		background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+		if *trueColorFlag || *colorFlag {
+			background, err = ap.DecodeImage(bytes.NewReader(fpsColorsJpg))
+		} else {
+			background, err = ap.DecodeImage(bytes.NewReader(fpsJpg))
+		}
 	} else {
 		background, err = ap.ReadImage(*imgFlag)
 	}
