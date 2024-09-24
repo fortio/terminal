@@ -13,6 +13,10 @@ import (
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"golang.org/x/image/draw"
+	_ "golang.org/x/image/tiff" // Import tiff decoder
+	_ "golang.org/x/image/vp8"  // Import VP8 decoder
+	_ "golang.org/x/image/vp8l" // Import VP8L decoder
+	_ "golang.org/x/image/webp" // Import WebP decoder
 )
 
 type Image struct {
