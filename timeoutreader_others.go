@@ -10,10 +10,19 @@ import (
 
 const IsUnix = false
 
-func TimeoutToTimeval(_ time.Duration) any {
-	return nil
+type TimeoutReader struct {
+	file *os.File
 }
 
-func TimeoutReader(_ int, _ any, buf []byte) (int, error) {
-	return os.Stdin.Read(buf)
+func NewTimeoutReader(stream *os.File, _ time.Duration) *TimeoutReader {
+	return &TimeoutReader{
+		file: stream,
+	}
+}
+
+func (tr *TimeoutReader) Read(buf []byte) (int, error) {
+	return tr.file.Read(buf)
+}
+
+func (tr *TimeoutReader) ChangeTimeout(_ time.Duration) {
 }

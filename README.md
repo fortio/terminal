@@ -45,9 +45,13 @@ Use `q` to stop.
 
 ![fps screenshot](fps_sshot.png)
 
+Image viewer screenshot:
+
+![fps image viewer](fps_image_viewer.png)
+
 Additional flags/usage:
 ```
-fps v0.14.0 usage:
+fps v0.17.0 usage:
 	fps [flags] [maxfps] or fps -i imagefiles...
 or 1 of the special arguments
 	fps {help|envhelp|version|buildinfo}

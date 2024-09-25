@@ -11,44 +11,111 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/term"
+	"fortio.org/terminal"
 )
 
 const BUFSIZE = 1024
 
 type AnsiPixels struct {
-	FdIn  int
-	fdOut int
-	Out   *bufio.Writer
-	In    io.Reader
-	state *term.State
-	buf   [BUFSIZE]byte
-	Data  []byte
-	W, H  int // Width and Height
-	x, y  int // Cursor position
-	C     chan os.Signal
+	FdIn          int
+	fdOut         int
+	Out           *bufio.Writer
+	In            *os.File
+	InWithTimeout *terminal.TimeoutReader
+	state         *term.State
+	buf           [BUFSIZE]byte
+	Data          []byte
+	W, H          int // Width and Height
+	x, y          int // Cursor last set position
+	C             chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
-	Color     bool // 256 (216) color mode
-	Gray      bool // grayscale mode
-	Margin    int  // Margin around the image (image is smaller by 2*margin)
+	Color     bool         // 256 (216) color mode
+	Gray      bool         // grayscale mode
+	Margin    int          // Margin around the image (image is smaller by 2*margin)
+	FPS       float64      // (Target) Frames per second used for Reading with timeout
+	OnResize  func() error // Callback when terminal is resized
 }
 
-func NewAnsiPixels() *AnsiPixels {
-	return &AnsiPixels{
-		FdIn:  safecast.MustConvert[int](os.Stdin.Fd()),
-		fdOut: safecast.MustConvert[int](os.Stdout.Fd()),
-		Out:   bufio.NewWriter(os.Stdout),
-		In:    os.Stdin,
+func NewAnsiPixels(fps float64) *AnsiPixels {
+	ap := &AnsiPixels{
+		FdIn:          safecast.MustConvert[int](os.Stdin.Fd()),
+		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
+		Out:           bufio.NewWriter(os.Stdout),
+		In:            os.Stdin,
+		FPS:           fps,
+		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, 1*time.Second/time.Duration(fps)),
+		C:             make(chan os.Signal, 1),
 	}
+	signal.Notify(ap.C, signalList...)
+	return ap
+}
+
+func (ap *AnsiPixels) ChangeFPS(fps float64) {
+	ap.InWithTimeout.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
 func (ap *AnsiPixels) Open() (err error) {
 	ap.state, err = term.MakeRaw(ap.FdIn)
+	if err == nil {
+		err = ap.GetSize()
+	}
 	return
+}
+
+func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
+	if !ap.IsResizeSignal(s) {
+		return terminal.ErrSignal
+	}
+	err := ap.GetSize()
+	if err != nil {
+		return err
+	}
+	if ap.OnResize != nil {
+		return ap.OnResize()
+	}
+	return nil
+}
+
+// Read something or return terminal.ErrSignal if signal is received (normal exit requested case),
+// will automatically call OnResize if set and if a resize signal is received and continue trying
+// to read.
+func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
+	var n int
+	var err error
+	for {
+		select {
+		case s := <-ap.C:
+			err = ap.HandleSignal(s)
+			if err != nil {
+				return err
+			}
+		default:
+			n, err = ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
+			if err != nil {
+				return err
+			}
+		}
+		if n != 0 {
+			ap.Data = ap.buf[0:n]
+			return nil
+		}
+	}
+}
+
+func (ap *AnsiPixels) StartSyncMode() {
+	_, _ = ap.Out.WriteString("\033[?2026h")
+}
+
+// End sync (and flush).
+func (ap *AnsiPixels) EndSyncMode() {
+	_, _ = ap.Out.WriteString("\033[?2026l")
+	_ = ap.Out.Flush()
 }
 
 func (ap *AnsiPixels) GetSize() (err error) {
@@ -109,18 +176,13 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - len(s)
+	x := ap.W - len(s) - ap.Margin
 	ap.MoveCursor(x, y)
 	_, _ = ap.Out.WriteString(s)
 }
 
 func (ap *AnsiPixels) ClearEndOfLine() {
 	_, _ = ap.Out.WriteString("\033[K")
-}
-
-func (ap *AnsiPixels) SignalChannel() {
-	ap.C = make(chan os.Signal, 1)
-	signal.Notify(ap.C, signalList...)
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
@@ -142,6 +204,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		return x, y, err
 	}
 	i := 0
+	ap.Data = nil
 	for {
 		if i == BUFSIZE {
 			return x, y, errors.New("buffer full, no cursor position found")

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,12 +11,10 @@ import (
 	"time"
 
 	"fortio.org/log"
-	"fortio.org/safecast"
 )
 
 type InterruptReader struct {
-	reader  io.Reader // stdin typically
-	fd      int
+	reader  *os.File // stdin typically
 	buf     []byte
 	reset   []byte // original buffer start
 	bufSize int
@@ -31,6 +28,7 @@ type InterruptReader struct {
 var (
 	ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
 	ErrStopped       = NewErrInterrupted("interrupt reader stopped") // not really an error more of a marker.
+	ErrSignal        = NewErrInterrupted("signal received")
 )
 
 type InterruptedError struct {
@@ -65,7 +63,6 @@ func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
 		reader:  reader,
 		bufSize: bufSize,
 		buf:     make([]byte, 0, bufSize),
-		fd:      safecast.MustConvert[int](reader.Fd()),
 	}
 	ir.reset = ir.buf
 	ir.cond = *sync.NewCond(&ir.mu)
@@ -135,13 +132,13 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	// Check for signal and context every 250ms, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tv := TimeoutToTimeval(250 * time.Millisecond)
+	tr := NewTimeoutReader(ir.reader, 250*time.Millisecond)
 	defer ir.cond.Signal()
 	for {
 		// log.Debugf("InterruptReader loop")
 		select {
 		case <-sigc:
-			ir.setError(NewErrInterrupted("signal received"))
+			ir.setError(ErrSignal)
 			ir.cancel()
 			return
 		case <-ctx.Done():
@@ -153,7 +150,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			}
 			return
 		default:
-			n, err := TimeoutReader(ir.fd, tv, localBuf)
+			n, err := tr.Read(localBuf)
 			if err != nil {
 				ir.setError(err)
 				return
