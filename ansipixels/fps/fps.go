@@ -37,7 +37,9 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 }
 
 func drawBox(ap *ansipixels.AnsiPixels) {
-	_ = ap.DrawSquareBox(0, 0, ap.W, ap.H)
+	if ap.Margin != 0 {
+		_ = ap.DrawSquareBox(0, 0, ap.W, ap.H)
+	}
 	ap.WriteBoxed(ap.H/2-3, " Width: %d, Height: %d ", ap.W, ap.H)
 }
 
@@ -85,12 +87,11 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit,gocyclo,funlen // yeah well...
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:funlen // yeah well...
 	ap.Data = make([]byte, 3)
 	i := 0
 	l := len(imageFiles)
 	showInfo := l > 1
-	ap.SignalChannel()
 	for {
 		zoom := 1.0
 		offsetX := 0
@@ -108,37 +109,26 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			extra = fmt.Sprintf(", %d/%d", i+1, l)
 		}
 		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Width, img.Height, img.Format, extra)
-		ap.ClearScreen()
+		ap.OnResize = func() error {
+			ap.StartSyncMode()
+			ap.ClearScreen()
+			e := ap.ShowImage(img, zoom, offsetX, offsetY, "\033[34m")
+			if showInfo {
+				ap.WriteRight(ap.H-1, "%s", info)
+			}
+			ap.EndSyncMode()
+			return e
+		}
 	redraw:
-		if err = ap.ShowImage(img, zoom, offsetX, offsetY, "\033[34m"); err != nil {
+		if err = ap.OnResize(); err != nil {
 			return log.FErrf("Error showing image: %v", err)
 		}
-		if showInfo {
-			ap.WriteRight(ap.H-1, "%s", info)
-			ap.Out.Flush()
-		}
 	wait:
-		ap.Out.Flush()
-		var n int
-		for {
-			select {
-			case s := <-ap.C:
-				if ap.IsResizeSignal(s) {
-					_ = ap.GetSize()
-					goto redraw
-				}
-				return 0
-			default:
-				n, err = ap.InWithTimeout.Read(ap.Data[0:1])
-				if err != nil {
-					return log.FErrf("Error reading key: %v", err)
-				}
-			}
-			if n != 0 { // actually read something
-				break
-			}
+		// read a key or resize signal
+		ap.Data, err = ap.ReadOrResizeOrSignal()
+		if err != nil {
+			return log.FErrf("Error reading key: %v", err)
 		}
-		ap.Data = ap.Data[0:n]
 		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
 		switch c {
@@ -173,9 +163,6 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		case 'd':
 			offsetX++
 			goto redraw
-		case 27:
-			n, _ := ap.InWithTimeout.Read(ap.Data[1:3])
-			ap.Data = ap.Data[:1+n]
 		}
 		// check for left arrow to go to next/previous image
 		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' {
@@ -199,7 +186,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	}
 }
 
-func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
+func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
@@ -238,7 +225,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
 	}
-	ap := ansipixels.NewAnsiPixels(60) // initial fps for the start screen and/or the image viewer.
+	ap := ansipixels.NewAnsiPixels(max(25, fpsLimit)) // initial fps for the start screen and/or the image viewer.
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}
@@ -277,25 +264,34 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
 	}
-	if err = ap.ShowImage(background, 1.0, 0, 0, "\033[34m"); err != nil {
+	ap.OnResize = func() error {
+		ap.HideCursor()
+		ap.StartSyncMode()
+		ap.ClearScreen()
+		e := ap.ShowImage(background, 1.0, 0, 0, "\033[34m")
+		if !imagesOnly {
+			drawBox(ap)
+			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
+			ap.ShowCursor()
+		}
+		ap.EndSyncMode()
+		return e
+	}
+	if err = ap.OnResize(); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
-	buf := [256]byte{}
 	if imagesOnly {
 		ap.Out.Flush()
-		_, _ = ap.In.Read(buf[:])
+		_, err = ap.ReadOrResizeOrSignal()
+		if err != nil {
+			return log.FErrf("Error reading key: %v", err)
+		}
 		return 0
-	}
-	if !*noboxFlag {
-		drawBox(ap)
 	}
 	// FPS test
 	fps := 0.0
 	// sleep := 1 * time.Second / time.Duration(fps)
-	ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
-	ap.ShowCursor()
-	ap.Out.Flush()
-	_, err = ap.In.Read(buf[:])
+	_, err = ap.ReadOrResizeOrSignal()
 	if err != nil {
 		return log.FErrf("Error reading key: %v", err)
 	}
@@ -304,7 +300,6 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	frames := uint(0)
 	var elapsed time.Duration
 	var entry []byte
-	ap.SignalChannel()
 	sendableTickerChan := make(chan time.Time, 1)
 	var tickerChan <-chan time.Time
 	startTime := time.Now()
@@ -321,11 +316,13 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		case s := <-ap.C:
 			if ap.IsResizeSignal(s) {
 				_ = ap.GetSize()
+				ap.StartSyncMode()
 				ap.ClearScreen()
 				_ = ap.ShowImage(background, 1.0, 0, 0, "\033[34m")
 				if !*noboxFlag {
 					drawBox(ap)
 				}
+				ap.EndSyncMode()
 				continue
 			}
 			return 0

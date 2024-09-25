@@ -26,7 +26,7 @@ type AnsiPixels struct {
 	fdOut         int
 	Out           *bufio.Writer
 	In            *os.File
-	InWithTimeout io.Reader // TimeoutReader
+	InWithTimeout *terminal.TimeoutReader
 	state         *term.State
 	buf           [BUFSIZE]byte
 	Data          []byte
@@ -35,26 +35,77 @@ type AnsiPixels struct {
 	C             chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
-	Color     bool    // 256 (216) color mode
-	Gray      bool    // grayscale mode
-	Margin    int     // Margin around the image (image is smaller by 2*margin)
-	FPS       float64 // (Target) Frames per second used for Reading with timeout
+	Color     bool         // 256 (216) color mode
+	Gray      bool         // grayscale mode
+	Margin    int          // Margin around the image (image is smaller by 2*margin)
+	FPS       float64      // (Target) Frames per second used for Reading with timeout
+	OnResize  func() error // Callback when terminal is resized
 }
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
-	return &AnsiPixels{
+	ap := &AnsiPixels{
 		FdIn:          safecast.MustConvert[int](os.Stdin.Fd()),
 		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
 		Out:           bufio.NewWriter(os.Stdout),
 		In:            os.Stdin,
 		FPS:           fps,
-		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
+		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, 1*time.Second/time.Duration(fps)),
+		C:             make(chan os.Signal, 1),
 	}
+	signal.Notify(ap.C, signalList...)
+	return ap
+}
+
+func (ap *AnsiPixels) ChangeFPS(fps float64) {
+	ap.InWithTimeout.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
 func (ap *AnsiPixels) Open() (err error) {
 	ap.state, err = term.MakeRaw(ap.FdIn)
 	return
+}
+
+// Read something or return nil if signal is received (normal exit requested case),
+// will automatically call OnResize if set and if a resize signal is received.
+func (ap *AnsiPixels) ReadOrResizeOrSignal() ([]byte, error) {
+	var n int
+	var err error
+	for {
+		select {
+		case s := <-ap.C:
+			if !ap.IsResizeSignal(s) {
+				return nil, nil
+			}
+			err = ap.GetSize()
+			if err != nil {
+				return nil, err
+			}
+			if ap.OnResize != nil {
+				err = ap.OnResize()
+				if err != nil {
+					return nil, err
+				}
+			}
+		default:
+			n, err = ap.InWithTimeout.Read(ap.buf[:])
+			if err != nil {
+				return nil, err
+			}
+		}
+		if n != 0 {
+			return ap.buf[0:n], nil
+		}
+	}
+}
+
+func (ap *AnsiPixels) StartSyncMode() {
+	_, _ = ap.Out.WriteString("\033[?2026h")
+}
+
+// End sync (and flush).
+func (ap *AnsiPixels) EndSyncMode() {
+	_, _ = ap.Out.WriteString("\033[?2026l")
+	_ = ap.Out.Flush()
 }
 
 func (ap *AnsiPixels) GetSize() (err error) {
@@ -122,11 +173,6 @@ func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 
 func (ap *AnsiPixels) ClearEndOfLine() {
 	_, _ = ap.Out.WriteString("\033[K")
-}
-
-func (ap *AnsiPixels) SignalChannel() {
-	ap.C = make(chan os.Signal, 1)
-	signal.Notify(ap.C, signalList...)
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)

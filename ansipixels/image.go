@@ -277,7 +277,7 @@ func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, zoom float64, offsetX, offset
 		return err
 	}
 	for i, imgRGBA := range imagesRGBA.Images {
-		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin, zoom, offsetX, offsetY)
+		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-4*ap.Margin, zoom, offsetX, offsetY)
 		if ap.Gray {
 			toGrey(img, img)
 		}

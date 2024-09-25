@@ -59,3 +59,7 @@ func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
 }
+
+func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
+	tr.tv = TimeoutToTimeval(timeout)
+}
