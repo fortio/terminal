@@ -62,6 +62,9 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 
 func (ap *AnsiPixels) Open() (err error) {
 	ap.state, err = term.MakeRaw(ap.FdIn)
+	if err == nil {
+		err = ap.GetSize()
+	}
 	return
 }
 

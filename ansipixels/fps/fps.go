@@ -22,13 +22,6 @@ func main() {
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	// q, ^C, ^D to exit.
 	for _, key := range ap.Data {
-		if key == 12 { // ^L
-			_ = ap.GetSize()
-			ap.ClearScreen()
-			drawBox(ap)
-			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
-			return false
-		}
 		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
 			return true
 		}
@@ -92,6 +85,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	i := 0
 	l := len(imageFiles)
 	showInfo := l > 1
+	changedInfo := false
 	for {
 		zoom := 1.0
 		offsetX := 0
@@ -131,38 +125,35 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		}
 		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
+		justRedraw := true
 		switch c {
 		case '?', 'h', 'H':
 			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue, up/down for zoom,", i+1, l)
 			ap.WriteCentered(ap.H/2, "WSAD to pan, 'q' to exit, left arrow to go back, 'i' to toggle image information")
+			ap.Out.Flush()
 			goto wait
 		case 'i', 'I':
+			changedInfo = true
 			showInfo = !showInfo
-			goto redraw
 		case 'W':
 			offsetY -= largeSteps
-			goto redraw
 		case 'S':
 			offsetY += largeSteps
-			goto redraw
 		case 'A':
 			offsetX -= largeSteps
-			goto redraw
 		case 'D':
 			offsetX += largeSteps
-			goto redraw
 		case 'w':
 			offsetY--
-			goto redraw
 		case 's':
 			offsetY++
-			goto redraw
 		case 'a':
 			offsetX--
-			goto redraw
 		case 'd':
 			offsetX++
-			goto redraw
+		case 12: // ^L, refresh
+		default:
+			justRedraw = false
 		}
 		// check for left arrow to go to next/previous image
 		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' {
@@ -173,20 +164,29 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 				continue
 			case 'A': // up arrow
 				zoom *= 1.25
-				goto redraw
+				justRedraw = true
 			case 'B': // down arrow
 				zoom /= 1.25
-				goto redraw
+				justRedraw = true
 			}
 		}
-		if isStopKey(ap) || l == 1 {
+		if justRedraw {
+			goto redraw
+		}
+		if l == 1 {
+			if !changedInfo {
+				ap.WriteRight(0, "%s", info)
+			}
+			return 0
+		}
+		if isStopKey(ap) {
 			return 0
 		}
 		i++
 	}
 }
 
-func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are a bit long.
+func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
@@ -242,9 +242,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		ap.Out.Flush()
 		ap.Restore()
 	}()
-	if err := ap.GetSize(); err != nil {
-		return log.FErrf("Error getting terminal size: %v", err)
-	}
+	// GetSize done in Open (and resize signal handler).
 	ap.HideCursor()
 	ap.ClearScreen()
 	if imagesOnly && len(flag.Args()) > 0 {

@@ -272,15 +272,13 @@ func (ap *AnsiPixels) DecodeImage(inp io.Reader) (*Image, error) {
 
 // Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.
 func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, zoom float64, offsetX, offsetY int, colorString string) error {
-	err := ap.GetSize()
-	if err != nil {
-		return err
-	}
+	// GetSize done in Open and Resize handler.
 	for i, imgRGBA := range imagesRGBA.Images {
 		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-4*ap.Margin, zoom, offsetX, offsetY)
 		if ap.Gray {
 			toGrey(img, img)
 		}
+		var err error
 		switch {
 		case ap.TrueColor:
 			err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
