@@ -96,13 +96,13 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 				return err
 			}
 		default:
-			n, err = ap.InWithTimeout.Read(ap.buf[:])
+			n, err = ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
 			if err != nil {
 				return err
 			}
 		}
 		if n != 0 {
-			ap.Data = append(ap.Data, ap.buf[0:n]...)
+			ap.Data = ap.buf[0:n]
 			return nil
 		}
 	}
