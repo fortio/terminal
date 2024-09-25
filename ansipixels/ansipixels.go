@@ -176,7 +176,7 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - len(s)
+	x := ap.W - len(s) - ap.Margin
 	ap.MoveCursor(x, y)
 	_, _ = ap.Out.WriteString(s)
 }
@@ -204,6 +204,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		return x, y, err
 	}
 	i := 0
+	ap.Data = nil
 	for {
 		if i == BUFSIZE {
 			return x, y, errors.New("buffer full, no cursor position found")

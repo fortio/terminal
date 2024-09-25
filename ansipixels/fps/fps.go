@@ -33,11 +33,13 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	return false
 }
 
-func drawBox(ap *ansipixels.AnsiPixels) {
+func drawBox(ap *ansipixels.AnsiPixels, withText bool) {
 	if ap.Margin != 0 {
 		_ = ap.DrawSquareBox(0, 0, ap.W, ap.H)
 	}
-	ap.WriteBoxed(ap.H/2-3, " Width: %d, Height: %d ", ap.W, ap.H)
+	if withText {
+		ap.WriteBoxed(ap.H/2-3, " Width: %d, Height: %d ", ap.W, ap.H)
+	}
 }
 
 func posToXY(pos int, w, h int) (int, int) {
@@ -276,7 +278,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		ap.ClearScreen()
 		e := ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
 		if !imagesOnly {
-			drawBox(ap)
+			drawBox(ap, true)
 			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
 			ap.ShowCursor()
 		}
@@ -302,7 +304,19 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		return log.FErrf("Error reading initial key: %v", err)
 	}
 	ap.HideCursor()
-	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
+	ap.OnResize = func() error {
+		ap.StartSyncMode()
+		ap.ClearScreen()
+		e := ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
+		if !imagesOnly {
+			drawBox(ap, false) // no boxed Width x Height in pure fps mode, keeping it simple.
+		}
+		ap.EndSyncMode()
+		return e
+	}
+	if err = ap.OnResize(); err != nil {
+		return log.FErrf("Error showing image: %v", err)
+	}
 	frames := uint(0)
 	var elapsed time.Duration
 	var entry []byte
@@ -332,8 +346,10 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()
 			now = time.Now()
-			ap.WriteAt(ap.W/2-20, ap.H/2, " Last frame %v FPS: %.0f Avg %.2f ",
-				elapsed.Round(10*time.Microsecond), fps, float64(frames)/now.Sub(startTime).Seconds())
+			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
+				log.ANSIColors.Green, elapsed.Round(10*time.Microsecond), log.ANSIColors.Reset,
+				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
+				log.ANSIColors.Cyan, float64(frames)/now.Sub(startTime).Seconds(), log.ANSIColors.Reset)
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
@@ -345,7 +361,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteCentered(ap.H/2+5, "Entry so far: [%q]", entry)
+			ap.WriteRight(ap.H-1-ap.Margin, "Target FPS %s, typed so far: [%q]", fpsStr, entry)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
