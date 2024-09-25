@@ -361,7 +361,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, "Target FPS %s, typed so far: [%q]", fpsStr, entry)
+			ap.WriteRight(ap.H-1-ap.Margin, "Target FPS %s, %dx%d, typed so far: [%q]", fpsStr, ap.W, ap.H, entry)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
