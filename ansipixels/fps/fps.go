@@ -142,65 +142,58 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			}
 		}
 		ap.Data = ap.Data[0:n]
+		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
-		if c == '?' || c == 'h' || c == 'H' {
+		switch c {
+		case '?', 'h', 'H':
 			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue, up/down for zoom,", i+1, l)
 			ap.WriteCentered(ap.H/2, "WSAD to pan, 'q' to exit, left arrow to go back, 'i' to toggle image information")
 			goto wait
-		}
-		if c == 'i' || c == 'I' {
+		case 'i', 'I':
 			showInfo = !showInfo
 			goto redraw
-		}
-		largeSteps := int(10. * zoom)
-		if c == 'W' {
+		case 'W':
 			offsetY -= largeSteps
 			goto redraw
-		}
-		if c == 'w' {
-			offsetY--
-			goto redraw
-		}
-		if c == 'S' {
+		case 'S':
 			offsetY += largeSteps
 			goto redraw
-		}
-		if c == 's' {
-			offsetY++
-			goto redraw
-		}
-		if c == 'A' {
+		case 'A':
 			offsetX -= largeSteps
 			goto redraw
-		}
-		if c == 'a' {
-			offsetX--
-			goto redraw
-		}
-		if c == 'D' {
+		case 'D':
 			offsetX += largeSteps
 			goto redraw
-		}
-		if c == 'd' {
+		case 'w':
+			offsetY--
+			goto redraw
+		case 's':
+			offsetY++
+			goto redraw
+		case 'a':
+			offsetX--
+			goto redraw
+		case 'd':
 			offsetX++
 			goto redraw
-		}
-		if c == 27 {
+		case 27:
 			n, _ := ap.In.Read(ap.Data[1:3])
 			ap.Data = ap.Data[:1+n]
 		}
 		// check for left arrow to go to next/previous image
-		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'D' {
-			i = (i + l - 1) % l
-			continue
-		}
-		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'A' {
-			zoom *= 1.25
-			goto redraw
-		}
-		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'B' {
-			zoom /= 1.25
-			goto redraw
+		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' {
+			// Arrow key
+			switch ap.Data[2] {
+			case 'D': // left arrow
+				i = (i + l - 1) % l
+				continue
+			case 'A': // up arrow
+				zoom *= 1.25
+				goto redraw
+			case 'B': // down arrow
+				zoom /= 1.25
+				goto redraw
+			}
 		}
 		if isStopKey(ap) || l == 1 {
 			return 0
