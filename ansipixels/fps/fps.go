@@ -194,7 +194,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	}
 }
 
-func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit long.
+func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
