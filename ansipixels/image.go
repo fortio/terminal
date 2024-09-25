@@ -173,7 +173,7 @@ func toGrey(rgbaImg *image.RGBA, img image.Image) {
 	}
 }
 
-func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
+func resizeAndCenter(img *image.RGBA, maxW, maxH int, zoom float64, offsetX, offsetY int) *image.RGBA {
 	// Get original image dimensions
 	origBounds := img.Bounds()
 	origW := origBounds.Dx()
@@ -183,6 +183,7 @@ func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
 	scaleW := float64(maxW) / float64(origW)
 	scaleH := float64(maxH) / float64(origH)
 	scale := min(scaleW, scaleH) // Choose the smallest scale to fit within bounds
+	scale *= zoom
 
 	// Calculate new dimensions while preserving aspect ratio
 	newW := int(float64(origW) * scale)
@@ -191,8 +192,8 @@ func resizeAndCenter(img *image.RGBA, maxW, maxH int) *image.RGBA {
 	canvas := image.NewRGBA(image.Rect(0, 0, maxW, maxH))
 
 	// Calculate the offset to center the image
-	offsetX := (maxW - newW) / 2
-	offsetY := (maxH - newH) / 2
+	offsetX += (maxW - newW) / 2
+	offsetY += (maxH - newH) / 2
 
 	// Resize the image
 	resized := image.NewRGBA(image.Rect(0, 0, newW, newH))
@@ -270,13 +271,13 @@ func (ap *AnsiPixels) DecodeImage(inp io.Reader) (*Image, error) {
 }
 
 // Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.
-func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, colorString string) error {
+func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, zoom float64, offsetX, offsetY int, colorString string) error {
 	err := ap.GetSize()
 	if err != nil {
 		return err
 	}
 	for i, imgRGBA := range imagesRGBA.Images {
-		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin)
+		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-2*ap.Margin, zoom, offsetX, offsetY)
 		if ap.Gray {
 			toGrey(img, img)
 		}
