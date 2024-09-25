@@ -12,7 +12,6 @@ import (
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
-	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -92,7 +91,6 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	l := len(imageFiles)
 	showInfo := l > 1
 	ap.SignalChannel()
-	tr := terminal.NewTimeoutReader(ap.In, 100*time.Millisecond)
 	for {
 		zoom := 1.0
 		offsetX := 0
@@ -131,13 +129,12 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 				}
 				return 0
 			default:
-				n, err = tr.Read(ap.Data[0:1])
+				n, err = ap.InWithTimeout.Read(ap.Data[0:1])
 				if err != nil {
 					return log.FErrf("Error reading key: %v", err)
 				}
 			}
-			if n != 0 {
-				ap.WriteRight(ap.H-1, "%s", info)
+			if n != 0 { // actually read something
 				break
 			}
 		}
@@ -177,7 +174,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			offsetX++
 			goto redraw
 		case 27:
-			n, _ := ap.In.Read(ap.Data[1:3])
+			n, _ := ap.InWithTimeout.Read(ap.Data[1:3])
 			ap.Data = ap.Data[:1+n]
 		}
 		// check for left arrow to go to next/previous image
@@ -241,7 +238,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
 	}
-	ap := ansipixels.NewAnsiPixels()
+	ap := ansipixels.NewAnsiPixels(60) // initial fps for the start screen and/or the image viewer.
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}

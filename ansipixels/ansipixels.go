@@ -11,25 +11,28 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/term"
+	"fortio.org/terminal"
 )
 
 const BUFSIZE = 1024
 
 type AnsiPixels struct {
-	FdIn  int
-	fdOut int
-	Out   *bufio.Writer
-	In    *os.File
-	state *term.State
-	buf   [BUFSIZE]byte
-	Data  []byte
-	W, H  int // Width and Height
-	x, y  int // Cursor last set position
-	C     chan os.Signal
+	FdIn          int
+	fdOut         int
+	Out           *bufio.Writer
+	In            *os.File
+	InWithTimeout io.Reader // TimeoutReader
+	state         *term.State
+	buf           [BUFSIZE]byte
+	Data          []byte
+	W, H          int // Width and Height
+	x, y          int // Cursor last set position
+	C             chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
 	Color     bool    // 256 (216) color mode
@@ -38,12 +41,14 @@ type AnsiPixels struct {
 	FPS       float64 // (Target) Frames per second used for Reading with timeout
 }
 
-func NewAnsiPixels() *AnsiPixels {
+func NewAnsiPixels(fps float64) *AnsiPixels {
 	return &AnsiPixels{
-		FdIn:  safecast.MustConvert[int](os.Stdin.Fd()),
-		fdOut: safecast.MustConvert[int](os.Stdout.Fd()),
-		Out:   bufio.NewWriter(os.Stdout),
-		In:    os.Stdin,
+		FdIn:          safecast.MustConvert[int](os.Stdin.Fd()),
+		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
+		Out:           bufio.NewWriter(os.Stdout),
+		In:            os.Stdin,
+		FPS:           fps,
+		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
 	}
 }
 
