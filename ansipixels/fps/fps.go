@@ -15,6 +15,8 @@ import (
 	"fortio.org/terminal/ansipixels"
 )
 
+const defaultMonoImageColor = "\033[34m" // ansi blue-ish
+
 func main() {
 	os.Exit(Main())
 }
@@ -106,7 +108,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		ap.OnResize = func() error {
 			ap.StartSyncMode()
 			ap.ClearScreen()
-			e := ap.ShowImage(img, zoom, offsetX, offsetY, "\033[34m")
+			e := ap.ShowImage(img, zoom, offsetX, offsetY, defaultMonoImageColor)
 			if showInfo {
 				ap.WriteRight(ap.H-1, "%s", info)
 			}
@@ -269,7 +271,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 		ap.HideCursor()
 		ap.StartSyncMode()
 		ap.ClearScreen()
-		e := ap.ShowImage(background, 1.0, 0, 0, "\033[34m")
+		e := ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
 		if !imagesOnly {
 			drawBox(ap)
 			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
@@ -319,7 +321,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 				_ = ap.GetSize()
 				ap.StartSyncMode()
 				ap.ClearScreen()
-				_ = ap.ShowImage(background, 1.0, 0, 0, "\033[34m")
+				_ = ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
 				if !*noboxFlag {
 					drawBox(ap)
 				}
