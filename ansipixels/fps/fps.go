@@ -86,7 +86,7 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit // yeah well...
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:gocognit,gocyclo,funlen // yeah well...
 	ap.Data = make([]byte, 3)
 	i := 0
 	l := len(imageFiles)
@@ -94,6 +94,9 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	ap.SignalChannel()
 	tv := terminal.TimeoutToTimeval(100 * time.Millisecond)
 	for {
+		zoom := 1.0
+		offsetX := 0
+		offsetY := 0
 		if i >= l {
 			i = 0
 		}
@@ -109,7 +112,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		info := fmt.Sprintf("%s (%dx%d %s%s)", imageFile, img.Width, img.Height, img.Format, extra)
 		ap.ClearScreen()
 	redraw:
-		if err = ap.ShowImage(img, "\033[34m"); err != nil {
+		if err = ap.ShowImage(img, zoom, offsetX, offsetY, "\033[34m"); err != nil {
 			return log.FErrf("Error showing image: %v", err)
 		}
 		if showInfo {
@@ -139,23 +142,65 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			}
 		}
 		ap.Data = ap.Data[0:n]
-		if ap.Data[0] == '?' || ap.Data[0] == 'h' || ap.Data[0] == 'H' {
-			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue,", i+1, l)
-			ap.WriteCentered(ap.H/2, "'q' to exit, left arrow to go back, 'i' to toggle image information")
+		c := ap.Data[0]
+		if c == '?' || c == 'h' || c == 'H' {
+			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue, up/down for zoom,", i+1, l)
+			ap.WriteCentered(ap.H/2, "WSAD to pan, 'q' to exit, left arrow to go back, 'i' to toggle image information")
 			goto wait
 		}
-		if ap.Data[0] == 'i' || ap.Data[0] == 'I' {
+		if c == 'i' || c == 'I' {
 			showInfo = !showInfo
 			goto redraw
 		}
-		if ap.Data[0] == 27 {
+		largeSteps := int(10. * zoom)
+		if c == 'W' {
+			offsetY -= largeSteps
+			goto redraw
+		}
+		if c == 'w' {
+			offsetY--
+			goto redraw
+		}
+		if c == 'S' {
+			offsetY += largeSteps
+			goto redraw
+		}
+		if c == 's' {
+			offsetY++
+			goto redraw
+		}
+		if c == 'A' {
+			offsetX -= largeSteps
+			goto redraw
+		}
+		if c == 'a' {
+			offsetX--
+			goto redraw
+		}
+		if c == 'D' {
+			offsetX += largeSteps
+			goto redraw
+		}
+		if c == 'd' {
+			offsetX++
+			goto redraw
+		}
+		if c == 27 {
 			n, _ := ap.In.Read(ap.Data[1:3])
 			ap.Data = ap.Data[:1+n]
 		}
-		// check for left/right arrow to go to next/previous image
-		if len(ap.Data) >= 3 && ap.Data[0] == 27 && ap.Data[1] == '[' && ap.Data[2] == 'D' {
+		// check for left arrow to go to next/previous image
+		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'D' {
 			i = (i + l - 1) % l
 			continue
+		}
+		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'A' {
+			zoom *= 1.25
+			goto redraw
+		}
+		if len(ap.Data) >= 3 && c == 27 && ap.Data[1] == '[' && ap.Data[2] == 'B' {
+			zoom /= 1.25
+			goto redraw
 		}
 		if isStopKey(ap) || l == 1 {
 			return 0
@@ -242,7 +287,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	if err != nil {
 		return log.FErrf("Error reading image: %v", err)
 	}
-	if err = ap.ShowImage(background, "\033[34m"); err != nil {
+	if err = ap.ShowImage(background, 1.0, 0, 0, "\033[34m"); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
 	buf := [256]byte{}
@@ -287,7 +332,7 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 			if ap.IsResizeSignal(s) {
 				_ = ap.GetSize()
 				ap.ClearScreen()
-				_ = ap.ShowImage(background, "\033[34m")
+				_ = ap.ShowImage(background, 1.0, 0, 0, "\033[34m")
 				if !*noboxFlag {
 					drawBox(ap)
 				}
