@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/safecast"
+	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -121,13 +123,14 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		}
 	wait:
 		// read a key or resize signal or stop signal
-		ap.Data, err = ap.ReadOrResizeOrSignal()
+		err = ap.ReadOrResizeOrSignal()
+		if errors.Is(err, terminal.ErrSignal) {
+			return 0
+		}
 		if err != nil {
 			return log.FErrf("Error reading key: %v", err)
 		}
-		if len(ap.Data) == 0 { // signal to stop
-			return 0
-		}
+		// ap.Data is set by ReadOrResizeOrSignal and can't be empty if no error was returned
 		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
 		justRedraw := true
@@ -285,8 +288,8 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	}
 	if imagesOnly {
 		ap.Out.Flush()
-		_, err = ap.ReadOrResizeOrSignal()
-		if err != nil {
+		err = ap.ReadOrResizeOrSignal()
+		if err != nil && !errors.Is(err, terminal.ErrSignal) {
 			return log.FErrf("Error reading key: %v", err)
 		}
 		return 0
@@ -294,9 +297,9 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	// FPS test
 	fps := 0.0
 	// sleep := 1 * time.Second / time.Duration(fps)
-	_, err = ap.ReadOrResizeOrSignal()
+	err = ap.ReadOrResizeOrSignal()
 	if err != nil {
-		return log.FErrf("Error reading key: %v", err)
+		return log.FErrf("Error reading initial key: %v", err)
 	}
 	ap.HideCursor()
 	// _, _ = ap.Out.WriteString("\033[?2026h") // sync mode // doesn't seem to do anything
@@ -317,18 +320,14 @@ func Main() int { //nolint:funlen,gocognit // color and mode if/else are a bit l
 	for {
 		select {
 		case s := <-ap.C:
-			if ap.IsResizeSignal(s) {
-				_ = ap.GetSize()
-				ap.StartSyncMode()
-				ap.ClearScreen()
-				_ = ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
-				if !*noboxFlag {
-					drawBox(ap)
-				}
-				ap.EndSyncMode()
-				continue
+			err = ap.HandleSignal(s)
+			if errors.Is(err, terminal.ErrSignal) {
+				return 0
 			}
-			return 0
+			if err != nil {
+				return log.FErrf("Error handling signal/resize: %v", err)
+			}
+			continue // was a resize without error, get back to the fps loop.
 		case <-tickerChan:
 			elapsed = time.Since(now)
 			fps = 1. / elapsed.Seconds()

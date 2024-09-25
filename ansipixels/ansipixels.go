@@ -68,35 +68,42 @@ func (ap *AnsiPixels) Open() (err error) {
 	return
 }
 
-// Read something or return nil if signal is received (normal exit requested case),
-// will automatically call OnResize if set and if a resize signal is received.
-func (ap *AnsiPixels) ReadOrResizeOrSignal() ([]byte, error) {
+func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
+	if !ap.IsResizeSignal(s) {
+		return terminal.ErrSignal
+	}
+	err := ap.GetSize()
+	if err != nil {
+		return err
+	}
+	if ap.OnResize != nil {
+		return ap.OnResize()
+	}
+	return nil
+}
+
+// Read something or return terminal.ErrSignal if signal is received (normal exit requested case),
+// will automatically call OnResize if set and if a resize signal is received and continue trying
+// to read.
+func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 	var n int
 	var err error
 	for {
 		select {
 		case s := <-ap.C:
-			if !ap.IsResizeSignal(s) {
-				return nil, nil
-			}
-			err = ap.GetSize()
+			err = ap.HandleSignal(s)
 			if err != nil {
-				return nil, err
-			}
-			if ap.OnResize != nil {
-				err = ap.OnResize()
-				if err != nil {
-					return nil, err
-				}
+				return err
 			}
 		default:
 			n, err = ap.InWithTimeout.Read(ap.buf[:])
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if n != 0 {
-			return ap.buf[0:n], nil
+			ap.Data = append(ap.Data, ap.buf[0:n]...)
+			return nil
 		}
 	}
 }

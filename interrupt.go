@@ -28,6 +28,7 @@ type InterruptReader struct {
 var (
 	ErrUserInterrupt = NewErrInterrupted("terminal interrupted by user")
 	ErrStopped       = NewErrInterrupted("interrupt reader stopped") // not really an error more of a marker.
+	ErrSignal        = NewErrInterrupted("signal received")
 )
 
 type InterruptedError struct {
@@ -137,7 +138,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 		// log.Debugf("InterruptReader loop")
 		select {
 		case <-sigc:
-			ir.setError(NewErrInterrupted("signal received"))
+			ir.setError(ErrSignal)
 			ir.cancel()
 			return
 		case <-ctx.Done():
