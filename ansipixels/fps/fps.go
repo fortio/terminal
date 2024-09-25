@@ -118,10 +118,13 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			return log.FErrf("Error showing image: %v", err)
 		}
 	wait:
-		// read a key or resize signal
+		// read a key or resize signal or stop signal
 		ap.Data, err = ap.ReadOrResizeOrSignal()
 		if err != nil {
 			return log.FErrf("Error reading key: %v", err)
+		}
+		if len(ap.Data) == 0 { // signal to stop
+			return 0
 		}
 		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
