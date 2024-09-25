@@ -92,7 +92,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	l := len(imageFiles)
 	showInfo := l > 1
 	ap.SignalChannel()
-	tv := terminal.TimeoutToTimeval(100 * time.Millisecond)
+	tr := terminal.NewTimeoutReader(ap.In, 100*time.Millisecond)
 	for {
 		zoom := 1.0
 		offsetX := 0
@@ -131,7 +131,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 				}
 				return 0
 			default:
-				n, err = terminal.TimeoutReader(ap.FdIn, tv, ap.Data[0:1])
+				n, err = tr.Read(ap.Data[0:1])
 				if err != nil {
 					return log.FErrf("Error reading key: %v", err)
 				}

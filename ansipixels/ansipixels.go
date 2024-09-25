@@ -23,18 +23,19 @@ type AnsiPixels struct {
 	FdIn  int
 	fdOut int
 	Out   *bufio.Writer
-	In    io.Reader
+	In    *os.File
 	state *term.State
 	buf   [BUFSIZE]byte
 	Data  []byte
 	W, H  int // Width and Height
-	x, y  int // Cursor position
+	x, y  int // Cursor last set position
 	C     chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
-	Color     bool // 256 (216) color mode
-	Gray      bool // grayscale mode
-	Margin    int  // Margin around the image (image is smaller by 2*margin)
+	Color     bool    // 256 (216) color mode
+	Gray      bool    // grayscale mode
+	Margin    int     // Margin around the image (image is smaller by 2*margin)
+	FPS       float64 // (Target) Frames per second used for Reading with timeout
 }
 
 func NewAnsiPixels() *AnsiPixels {
