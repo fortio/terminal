@@ -15,6 +15,7 @@ import (
 	"fortio.org/safecast"
 	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
+	"github.com/loov/hrtime"
 )
 
 const defaultMonoImageColor = "\033[34m" // ansi blue-ish
@@ -322,14 +323,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 	var entry []byte
 	sendableTickerChan := make(chan time.Time, 1)
 	var tickerChan <-chan time.Time
-	startTime := time.Now()
+	startTime := hrtime.Now()
 	now := startTime
 	if hasFPSLimit {
 		ticker := time.NewTicker(time.Second / time.Duration(fpsLimit))
 		tickerChan = ticker.C
 	} else {
 		tickerChan = sendableTickerChan
-		sendableTickerChan <- now
+		sendableTickerChan <- time.Now()
 	}
 	for {
 		select {
@@ -342,14 +343,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 				return log.FErrf("Error handling signal/resize: %v", err)
 			}
 			continue // was a resize without error, get back to the fps loop.
-		case <-tickerChan:
-			elapsed = time.Since(now)
+		case v := <-tickerChan:
+			elapsed = hrtime.Since(now)
 			fps = 1. / elapsed.Seconds()
-			now = time.Now()
+			now = hrtime.Now()
 			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
 				log.ANSIColors.Green, elapsed.Round(10*time.Microsecond), log.ANSIColors.Reset,
 				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
-				log.ANSIColors.Cyan, float64(frames)/now.Sub(startTime).Seconds(), log.ANSIColors.Reset)
+				log.ANSIColors.Cyan, float64(frames)/(now-startTime).Seconds(), log.ANSIColors.Reset)
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
@@ -365,7 +366,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
-				sendableTickerChan <- now
+				sendableTickerChan <- v // shove it back (to always be readable channel in max FPS mode)
 			}
 		}
 	}
