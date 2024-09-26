@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"fortio.org/cli"
+	"fortio.org/fortio/periodic"
 	"fortio.org/fortio/stats"
 	"fortio.org/log"
 	"fortio.org/safecast"
@@ -23,10 +25,41 @@ const defaultMonoImageColor = "\033[34m" // ansi blue-ish
 
 var hist *stats.Histogram
 
+func jsonOutput(jsonFileName string, data any) {
+	var j []byte
+	j, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Fatalf("Unable to json serialize result: %v", err)
+	}
+	var f *os.File
+	f, err = os.Create(jsonFileName)
+	if err != nil {
+		log.Fatalf("Unable to create %s: %v", jsonFileName, err)
+	}
+	n, err := f.Write(append(j, '\n'))
+	if err != nil {
+		log.Fatalf("Unable to write json to %s: %v", jsonFileName, err)
+	}
+	err = f.Close()
+	if err != nil {
+		log.Fatalf("Close error for %s: %v", jsonFileName, err)
+	}
+	fmt.Printf("Successfully wrote %d bytes of Json data to %s\n", n, jsonFileName)
+}
+
+type Results struct {
+	periodic.RunnerResults
+	RetCodes map[string]int64
+}
+
 func main() {
 	ret := Main()
 	if hist != nil && hist.Count > 0 {
-		hist.Print(os.Stdout, "Frame durations milliseconds", []float64{50, 90, 99})
+		res := Results{}
+		res.DurationHistogram = hist.Export().CalcPercentiles([]float64{50, 90, 99})
+		res.RetCodes = make(map[string]int64)
+		res.RetCodes["OK"] = hist.Count
+		jsonOutput("histogram.json", res)
 	}
 	os.Exit(ret)
 }
@@ -242,10 +275,10 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		}
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
-		hist = stats.NewHistogram(0, 10/fpsLimit)
+		hist = stats.NewHistogram(0, .01/fpsLimit)
 	} else {
 		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
-		hist = stats.NewHistogram(0, 0.0001)
+		hist = stats.NewHistogram(0, 0.0000001)
 	}
 	ap := ansipixels.NewAnsiPixels(max(25, fpsLimit)) // initial fps for the start screen and/or the image viewer.
 	if err := ap.Open(); err != nil {
@@ -358,7 +391,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			elapsed = hrtime.Since(now)
 			sec := elapsed.Seconds()
 			if frames > 0 {
-				hist.Record(sec * 1000) // record in milliseconds
+				hist.Record(sec) // record in milliseconds
 			}
 			fps = 1. / sec
 			now = hrtime.Now()
@@ -368,7 +401,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
 				log.ANSIColors.Cyan, float64(frames)/(now-startTime).Seconds(), log.ANSIColors.Reset)
 			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
-				1000/hist.Min, 1000/hist.Max, 1000/hist.Avg(), 1000/hist.StdDev())
+				1/hist.Min, 1/hist.Max, 1/hist.Avg(), 1/hist.StdDev())
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
