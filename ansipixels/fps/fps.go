@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fortio.org/cli"
+	"fortio.org/fortio/stats"
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal"
@@ -20,8 +21,14 @@ import (
 
 const defaultMonoImageColor = "\033[34m" // ansi blue-ish
 
+var hist *stats.Histogram
+
 func main() {
-	os.Exit(Main())
+	ret := Main()
+	if hist != nil && hist.Count > 0 {
+		hist.Print(os.Stdout, "Frame durations milliseconds", []float64{50, 90, 99})
+	}
+	os.Exit(ret)
 }
 
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
@@ -235,6 +242,10 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		}
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
+		hist = stats.NewHistogram(0, 1/fpsLimit)
+	} else {
+		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
+		hist = stats.NewHistogram(0, 0.0001)
 	}
 	ap := ansipixels.NewAnsiPixels(max(25, fpsLimit)) // initial fps for the start screen and/or the image viewer.
 	if err := ap.Open(); err != nil {
@@ -345,12 +356,19 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 			continue // was a resize without error, get back to the fps loop.
 		case v := <-tickerChan:
 			elapsed = hrtime.Since(now)
-			fps = 1. / elapsed.Seconds()
+			sec := elapsed.Seconds()
+			if frames > 0 {
+				hist.Record(sec * 1000) // record in milliseconds
+			}
+			fps = 1. / sec
 			now = hrtime.Now()
+			// stats.Record("fps", fps)
 			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
 				log.ANSIColors.Green, elapsed.Round(10*time.Microsecond), log.ANSIColors.Reset,
 				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
 				log.ANSIColors.Cyan, float64(frames)/(now-startTime).Seconds(), log.ANSIColors.Reset)
+			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
+				1000/hist.Min, 1000/hist.Max, 1000/hist.Avg(), 1000/hist.StdDev())
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
