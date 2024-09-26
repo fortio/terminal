@@ -73,6 +73,8 @@ flags:
     	Start immediately an FPS test with the specified number of frames (default is interactive)
   -nobox
     	Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
+  -nojson
+        Don't output json file with results that otherwise get produced and can be visualized with fortio report
   -truecolor
     	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
 ```
