@@ -204,7 +204,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	}
 }
 
-func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are a bit long.
+func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
@@ -242,7 +242,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		}
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
-		hist = stats.NewHistogram(0, 1/fpsLimit)
+		hist = stats.NewHistogram(0, 10/fpsLimit)
 	} else {
 		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
 		hist = stats.NewHistogram(0, 0.0001)
