@@ -49,22 +49,26 @@ func jsonOutput(jsonFileName string, data any) {
 
 type Results struct {
 	periodic.RunnerResults
-	RetCodes    map[string]int64
-	Destination string // shows up in fortio graph title
-	StartTime   time.Time
+	RetCodes      map[string]int64
+	Destination   string // shows up in fortio graph title
+	StartTime     time.Time
+	QPSLabel      string
+	ResponseLabel string
 }
 
 func main() {
 	ret := Main()
 	if hist != nil && hist.Count > 0 {
 		res := Results{}
-		res.DurationHistogram = hist.Export().CalcPercentiles([]float64{50, 90, 99})
+		res.DurationHistogram = hist.Export().CalcPercentiles([]float64{50, 75, 90, 99, 99.9})
 		res.RetCodes = make(map[string]int64)
 		res.RetCodes["OK"] = hist.Count
-		res.Labels = "Frame duration" // replace by dimensions, etc
-		res.Destination = "terminal"  // replace by actual
-		res.StartTime = time.Now()    // replace by actual
-		res.RequestedQPS = "Max FPS"  // replace by actual
+		res.QPSLabel = "FPS"
+		res.ResponseLabel = "Frame duration"
+		res.Labels = "Frame duration"  // replace by dimensions, etc
+		res.Destination = "terminal"   // replace by actual
+		res.StartTime = time.Now()     // replace by actual
+		res.RequestedQPS = "unlimited" // replace by actual
 		jsonOutput("histogram.json", res)
 	}
 	os.Exit(ret)
