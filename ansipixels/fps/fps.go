@@ -3,14 +3,18 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"fortio.org/cli"
+	"fortio.org/fortio/periodic"
+	"fortio.org/fortio/stats"
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal"
@@ -20,8 +24,65 @@ import (
 
 const defaultMonoImageColor = "\033[34m" // ansi blue-ish
 
+func jsonOutput(jsonFileName string, data any) {
+	var j []byte
+	j, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Fatalf("Unable to json serialize result: %v", err)
+	}
+	var f *os.File
+	f, err = os.Create(jsonFileName)
+	if err != nil {
+		log.Fatalf("Unable to create %s: %v", jsonFileName, err)
+	}
+	n, err := f.Write(append(j, '\n'))
+	if err != nil {
+		log.Fatalf("Unable to write json to %s: %v", jsonFileName, err)
+	}
+	err = f.Close()
+	if err != nil {
+		log.Fatalf("Close error for %s: %v", jsonFileName, err)
+	}
+	fmt.Printf("Successfully wrote %d bytes of Json data (visualize with %sfortio report%s):\n%s\n",
+		n, log.ANSIColors.Cyan, log.ANSIColors.Reset, jsonFileName)
+}
+
+var (
+	perfResults = &Results{
+		QPSLabel:      "FPS",
+		ResponseLabel: "Frame duration",
+		RetCodes:      make(map[string]int64),
+	}
+	noJSON = flag.Bool("nojson", false,
+		"Don't output json file with results that otherwise get produced and can be visualized with fortio report")
+)
+
+type Results struct {
+	periodic.RunnerResults
+	RetCodes      map[string]int64
+	Destination   string // shows up in fortio graph title
+	StartTime     time.Time
+	QPSLabel      string
+	ResponseLabel string
+	hist          *stats.Histogram
+}
+
 func main() {
-	os.Exit(Main())
+	ret := Main()
+	if !*noJSON && perfResults.hist != nil && perfResults.hist.Count > 0 {
+		perfResults.DurationHistogram = perfResults.hist.Export().CalcPercentiles([]float64{50, 75, 90, 99, 99.9})
+		perfResults.RetCodes["OK"] = perfResults.hist.Count
+		perfResults.RunType = "FPS"
+		ro := &periodic.RunnerOptions{
+			Labels:  perfResults.Labels,
+			RunType: perfResults.RunType,
+		}
+		ro.GenID()
+		perfResults.ID = ro.ID
+		fname := ro.ID + ".json"
+		jsonOutput(fname, perfResults)
+	}
+	os.Exit(ret)
 }
 
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
@@ -68,13 +129,13 @@ func charAt(ap *ansipixels.AnsiPixels, pos, w, h int, what string) {
 	ap.WriteAtStr(x+ap.Margin, y+ap.Margin, what)
 }
 
-func animate(ap *ansipixels.AnsiPixels, frame uint) {
+func animate(ap *ansipixels.AnsiPixels, frame int64) {
 	w := ap.W
 	h := ap.H
 	w -= 2 * ap.Margin
 	h -= 2 * ap.Margin
 	total := 2*w + 2*h
-	pos := safecast.MustConvert[int](frame % safecast.MustConvert[uint](total))
+	pos := safecast.MustConvert[int](frame % safecast.MustConvert[int64](total))
 	charAt(ap, pos+2, w, h, "\033[31m█") // Red
 	charAt(ap, pos+1, w, h, "\033[32m█") // Green
 	charAt(ap, pos, w, h, "\033[34m█")   // Blue
@@ -197,15 +258,24 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 	}
 }
 
-func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are a bit long.
+func setLabels(labels ...string) {
+	perfResults.Labels = strings.Join(labels, ", ")
+}
+
+func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if/else are a bit long.
 	defaultTrueColor := false
 	if os.Getenv("COLORTERM") != "" {
 		defaultTrueColor = true
 	}
 	defaultColor := false
-	if os.Getenv("TERM") == "xterm-256color" {
+	tenv := os.Getenv("TERM")
+	switch tenv {
+	case "xterm-256color":
 		defaultColor = true
+	case "":
+		tenv = "TERM not set"
 	}
+	perfResults.Destination = tenv
 	imgFlag := flag.String("image", "", "Image file to display in monochrome in the background instead of the default one")
 	colorFlag := flag.Bool("color", defaultColor,
 		"If your terminal supports color, this will load image in (216) colors instead of monochrome")
@@ -215,6 +285,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 	noboxFlag := flag.Bool("nobox", false,
 		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
 	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
+	exactlyFlag := flag.Int64("n", 0, "Start immediately an FPS test with the specified `number of frames` (default is interactive)")
 	cli.MinArgs = 0
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
@@ -235,7 +306,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		}
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
+		perfResults.hist = stats.NewHistogram(0, .01/fpsLimit)
+	} else {
+		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
+		perfResults.hist = stats.NewHistogram(0, 0.0000001)
 	}
+	perfResults.Exactly = *exactlyFlag
+	perfResults.RequestedQPS = fpsStr
+	perfResults.Version = "fps " + cli.LongVersion
 	ap := ansipixels.NewAnsiPixels(max(25, fpsLimit)) // initial fps for the start screen and/or the image viewer.
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
@@ -300,7 +378,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 	// FPS test
 	fps := 0.0
 	// sleep := 1 * time.Second / time.Duration(fps)
-	err = ap.ReadOrResizeOrSignal()
+	if perfResults.Exactly <= 0 {
+		err = ap.ReadOrResizeOrSignal()
+	}
 	if err != nil {
 		return log.FErrf("Error reading initial key: %v", err)
 	}
@@ -318,11 +398,12 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 	if err = ap.OnResize(); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
-	frames := uint(0)
+	frames := int64(0)
 	var elapsed time.Duration
 	var entry []byte
 	sendableTickerChan := make(chan time.Time, 1)
 	var tickerChan <-chan time.Time
+	perfResults.StartTime = time.Now()
 	startTime := hrtime.Now()
 	now := startTime
 	if hasFPSLimit {
@@ -330,8 +411,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 		tickerChan = ticker.C
 	} else {
 		tickerChan = sendableTickerChan
-		sendableTickerChan <- time.Now()
+		sendableTickerChan <- perfResults.StartTime
 	}
+	setLabels("fps "+strings.TrimSuffix(fpsStr, ".0"), tenv, fmt.Sprintf("%dx%d", ap.W, ap.H))
 	for {
 		select {
 		case s := <-ap.C:
@@ -345,12 +427,24 @@ func Main() int { //nolint:funlen,gocognit,gocyclo // color and mode if/else are
 			continue // was a resize without error, get back to the fps loop.
 		case v := <-tickerChan:
 			elapsed = hrtime.Since(now)
-			fps = 1. / elapsed.Seconds()
+			sec := elapsed.Seconds()
+			if frames > 0 {
+				perfResults.hist.Record(sec) // record in milliseconds
+			}
+			fps = 1. / sec
 			now = hrtime.Now()
+			perfResults.ActualDuration = (now - startTime)
+			perfResults.ActualQPS = float64(frames) / perfResults.ActualDuration.Seconds()
+			// stats.Record("fps", fps)
 			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
 				log.ANSIColors.Green, elapsed.Round(10*time.Microsecond), log.ANSIColors.Reset,
 				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
-				log.ANSIColors.Cyan, float64(frames)/(now-startTime).Seconds(), log.ANSIColors.Reset)
+				log.ANSIColors.Cyan, perfResults.ActualQPS, log.ANSIColors.Reset)
+			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
+				1/perfResults.hist.Min, 1/perfResults.hist.Max, 1/perfResults.hist.Avg(), 1/perfResults.hist.StdDev())
+			if perfResults.Exactly > 0 && frames >= perfResults.Exactly {
+				return 0
+			}
 			animate(ap, frames)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()

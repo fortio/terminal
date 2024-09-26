@@ -1,3 +1,4 @@
+*.json
 .history
 .golangci.yml
 .DS_Store

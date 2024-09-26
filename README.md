@@ -49,9 +49,15 @@ Image viewer screenshot:
 
 ![fps image viewer](fps_image_viewer.png)
 
-Additional flags/usage:
+Detailed statistics are saved in a JSON files and can be visualized or compared by running [fortio report](https://github.com/fortio/fortio#installation)
+
+![fps fortio histogram](histogram.png)
+
+### Usage
+
+Additional flags/command help:
 ```
-fps v0.17.0 usage:
+fps v0.18.0 usage:
 	fps [flags] [maxfps] or fps -i imagefiles...
 or 1 of the special arguments
 	fps {help|envhelp|version|buildinfo}
@@ -63,6 +69,8 @@ flags:
   -i	Arguments are now images files to show, no FPS test (hit any key to continue)
   -image string
     	Image file to display in monochrome in the background instead of the default one
+  -n number of frames
+    	Start immediately an FPS test with the specified number of frames (default is interactive)
   -nobox
     	Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
   -truecolor
