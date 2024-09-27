@@ -16,13 +16,26 @@ jobs:
         uses: fortio/workflows/.github/workflows/codecov.yml@main
     call-codeql:
         uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
-    call-releaser:
+    releaser-fps:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: fortio/workflows/.github/workflows/releaser.yml@main
         with:
             description: "Fortio terminal fps checker"
             binary_name: "fps"
-            main_path: "./ansipixels/fps"
+            main_path: "./fps"
+            dockerfile: "./Dockerfile.fps"
+        secrets:
+            GH_PAT: ${{ secrets.GH_PAT }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+            DOCKER_USER: ${{ secrets.DOCKER_USER }}
+    releaser-life:
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
+        with:
+            description: "Fortio terminal Conway's game of life demo"
+            binary_name: "life"
+            main_path: "./life"
+            dockerfile: "./Dockerfile.life"
         secrets:
             GH_PAT: ${{ secrets.GH_PAT }}
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

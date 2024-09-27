@@ -14,14 +14,14 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 ## FPS
 
 There is also a new [ansipixels](https://pkg.go.dev/fortio.org/terminal/ansipixels) package for drawing on the terminal and the tagged release also include `fps` that uses that package to test your terminal frames per second capabilities.
-See the source [ansipixels/fps/fps.go](ansipixels/fps/fps.go)
+See the source [fps/fps.go](fps/fps.go)
 
 You can get the binary from [releases](https://github.com/fortio/terminal/releases)
 
 Or just run
 ```
-CGO_ENABLED=0 go install fortio.org/terminal/ansipixels/fps@latest  # to install or just
-CGO_ENABLED=0 go run fortio.org/terminal/ansipixels/fps@latest  # to run without install
+CGO_ENABLED=0 go install fortio.org/terminal/fps@latest  # to install or just
+CGO_ENABLED=0 go run fortio.org/terminal/fps@latest  # to run without install
 ```
 
 or even
@@ -78,3 +78,11 @@ flags:
   -truecolor
     	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
 ```
+
+## Game of life
+
+See [life/](life/) for a classic Conway's game of life black and white demo (with resizing supported etc...).
+
+Same installation as above, just replace `fps` by `life`.
+
+![life screenshot](life/life.png)

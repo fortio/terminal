@@ -1,0 +1,3 @@
+FROM scratch
+COPY life /usr/bin/life
+ENTRYPOINT ["/usr/bin/life"]
