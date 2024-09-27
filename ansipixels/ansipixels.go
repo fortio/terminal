@@ -132,16 +132,16 @@ func (ap *AnsiPixels) GetSize() (err error) {
 }
 
 func (ap *AnsiPixels) Restore() {
-	ap.ShowCursor()
-	ap.EndSyncMode()
-	ap.Out.Flush()
 	if ap.state == nil {
 		return
 	}
+	ap.ShowCursor()
+	ap.EndSyncMode()
 	err := term.Restore(ap.FdIn, ap.state)
 	if err != nil {
 		log.Fatalf("Error restoring terminal: %v", err)
 	}
+	ap.state = nil
 }
 
 func (ap *AnsiPixels) ClearScreen() {
