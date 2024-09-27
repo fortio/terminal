@@ -153,10 +153,13 @@ func Main() int {
 		return nil
 	}
 	_ = ap.OnResize()
+	showInfo := true
 	for {
 		ap.StartSyncMode()
 		ap.ClearScreen()
-		ap.WriteRight(ap.H-1, "FPS %.0f Generation: %d ", ap.FPS, generation)
+		if showInfo {
+			ap.WriteRight(ap.H-1, "FPS %.0f Generation: %d ", ap.FPS, generation)
+		}
 		Draw(ap, c)
 		generation++
 		ap.EndSyncMode()
@@ -164,8 +167,14 @@ func Main() int {
 		if err != nil {
 			return log.FErrf("Error reading: %v", err)
 		}
-		if n > 0 && (ap.Data[0] == 'q' || ap.Data[0] == 'Q' || ap.Data[0] == 3) {
-			return 0
+		if n > 0 {
+			switch ap.Data[0] {
+			case 'q', 'Q', 3:
+				ap.MoveCursor(0, 0)
+				return 0
+			case 'i', 'I':
+				showInfo = !showInfo
+			}
 		}
 		c.Next()
 	}
