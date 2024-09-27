@@ -39,7 +39,6 @@ func (c *Conway) At(x, y int) Cell {
 }
 
 func (c *Conway) Set(x, y int) {
-	log.Debugf("Setting %d, %d (%d on %d)", x, y, y*c.Width+x, 1-c.Current)
 	c.Cells[1-c.Current][y*c.Width+x] = 1
 }
 
@@ -85,8 +84,21 @@ func (c *Conway) Randomize(fillFactor float32) {
 	}
 }
 
+// Handles negative and out of bounds coordinates.
+func (c *Conway) SafeSet(x, y int) {
+	c.Set((x+c.Width)%c.Width, (y+c.Height)%c.Height)
+}
+
+func (c *Conway) Glider(x, y int) {
+	// Glider
+	c.SafeSet(x, y-1)   // Middle cell of the top row
+	c.SafeSet(x+1, y)   // Right cell of the middle row
+	c.SafeSet(x-1, y+1) // Left cell of the bottom row
+	c.SafeSet(x, y+1)   // Middle cell of the bottom row
+	c.SafeSet(x+1, y+1) // Right cell of the bottom row
+}
+
 func Draw(ap *ansipixels.AnsiPixels, c *Conway) {
-	ap.ClearScreen()
 	for y := 0; y < c.Height; y += 2 {
 		ap.MoveCursor(0, y/2)
 		adjacent := true // we just moved.
@@ -129,16 +141,9 @@ func Main() int {
 	var c *Conway
 	fillFactor := float32(*flagRandomFill)
 	ap.OnResize = func() error {
-		c = NewConway(ap.W, 2*ap.H)
-		centerX := ap.W / 2
-		centerY := ap.H
+		c = NewConway(ap.W, 2*ap.H) // half pixels vertically.
 		if *flagGlider {
-			// Glider
-			c.Set(centerX, centerY-1)   // Middle cell of the top row
-			c.Set(centerX+1, centerY)   // Right cell of the middle row
-			c.Set(centerX-1, centerY+1) // Left cell of the bottom row
-			c.Set(centerX, centerY+1)   // Middle cell of the bottom row
-			c.Set(centerX+1, centerY+1) // Right cell of the bottom row
+			c.Glider(ap.W/3, 2*ap.H/3) // first third of the screen
 		} else {
 			// Random
 			c.Randomize(fillFactor)
@@ -149,11 +154,11 @@ func Main() int {
 	}
 	_ = ap.OnResize()
 	for {
-		log.Debugf("Initial Cells: %d, %d, %d", c.At(ap.W/2-1, ap.H), c.At(ap.W/2, ap.H), c.At(ap.W/2+1, ap.H))
 		ap.StartSyncMode()
+		ap.ClearScreen()
+		ap.WriteRight(ap.H-1, "FPS %.0f Generation: %d ", ap.FPS, generation)
 		Draw(ap, c)
 		generation++
-		ap.WriteRight(ap.H-1, "FPS %.0f Generation: %d ", ap.FPS, generation)
 		ap.EndSyncMode()
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
