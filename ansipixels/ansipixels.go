@@ -86,26 +86,34 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // will automatically call OnResize if set and if a resize signal is received and continue trying
 // to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
-	var n int
-	var err error
 	for {
-		select {
-		case s := <-ap.C:
-			err = ap.HandleSignal(s)
-			if err != nil {
-				return err
-			}
-		default:
-			n, err = ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
-			if err != nil {
-				return err
-			}
+		n, err := ap.ReadOrResizeOrSignalOnce()
+		if err != nil {
+			return err
 		}
 		if n != 0 {
-			ap.Data = ap.buf[0:n]
 			return nil
 		}
 	}
+}
+
+// This will return either because of signal, or something read or the timeout (fps) passed.
+// ap.Data is (re)set to the read data.
+func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
+	select {
+	case s := <-ap.C:
+		err := ap.HandleSignal(s)
+		if err != nil {
+			return 0, err
+		}
+	default:
+		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
+		if n != 0 {
+			ap.Data = ap.buf[0:n]
+		}
+		return n, err
+	}
+	return 0, nil
 }
 
 func (ap *AnsiPixels) StartSyncMode() {
@@ -124,6 +132,8 @@ func (ap *AnsiPixels) GetSize() (err error) {
 }
 
 func (ap *AnsiPixels) Restore() {
+	ap.ShowCursor()
+	ap.EndSyncMode()
 	ap.Out.Flush()
 	if ap.state == nil {
 		return

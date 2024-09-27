@@ -326,10 +326,8 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		ap.Margin = 0
 	}
 	defer func() {
-		ap.ShowCursor()
 		ap.MoveCursor(0, ap.H-1)
-		ap.Out.Flush()
-		ap.Restore()
+		ap.Restore() // flushes and shows cursor and resets terminal back to original state.
 	}()
 	// GetSize done in Open (and resize signal handler).
 	ap.HideCursor()
