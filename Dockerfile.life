@@ -1,0 +1,3 @@
+FROM scratch
+COPY fps /usr/bin/life
+ENTRYPOINT ["/usr/bin/life"]
