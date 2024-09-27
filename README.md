@@ -78,3 +78,11 @@ flags:
   -truecolor
     	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
 ```
+
+## Game of life
+
+See [life/](life/) for a classic Conway's game of life black and white demo (with resizing supported etc...).
+
+Same installation as above, just replace `fps` by `life`.
+
+![life screenshot](life/life.png)

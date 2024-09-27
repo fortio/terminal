@@ -5,6 +5,8 @@ Game of life demo using Ansipixels.
 ![screenshot](life.png)
 
 ## Install/run
+Binary releases or tap or
+
 ```
 go run fortio.org/terminal/life@latest
 ```
