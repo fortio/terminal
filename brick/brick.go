@@ -21,6 +21,8 @@ type Brick struct {
 	PaddlePos       int
 	PaddleDirection int
 	State           []bool
+	BallX           int
+	BallY           int
 }
 
 /*
@@ -42,6 +44,7 @@ const (
 	OneBrick = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
 	Empty    = "      " // 6 spaces
 	BrickLen = 6
+	Ball     = "⬤" // or "◯" or "⚫"
 )
 
 func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
@@ -52,12 +55,14 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 	log.Debugf("Width %d Height %d NumW %d Padding %d, SpaceNeeded %d", width, height, numW, padding, spaceNeeded)
 	b := &Brick{
 		Width:  width,
-		Height: height,
+		Height: height - 2,
 		// border on each side plus spaces in between bricks
 		NumW:      numW,
 		Padding:   padding,
 		PaddlePos: width / 2,
 		State:     make([]bool, numW*8),
+		BallX:     width / 2,
+		BallY:     2 * height / 3,
 	}
 	b.Initial()
 	return b
@@ -94,6 +99,7 @@ func (b *Brick) Initial() {
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	_, _ = ap.Out.WriteString(log.ANSIColors.Reset)
 	_ = ap.DrawRoundBox(0, 0, ap.W, ap.H)
+	ap.WriteAtStr(1+b.BallX, 1+b.BallY, Ball)
 	for y := range 8 {
 		switch y {
 		case 0, 1:
