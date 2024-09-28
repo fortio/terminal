@@ -20,6 +20,7 @@ type Brick struct {
 	Padding         int
 	PaddlePos       int
 	PaddleDirection int
+	State           []bool
 }
 
 /*
@@ -39,13 +40,15 @@ or 2585:
 
 const (
 	OneBrick = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
+	Empty    = "      " // 6 spaces
 	BrickLen = 6
 )
 
 func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
 	numW := (width - 1) / (BrickLen + 1) // 6 + 1 space but only in between bricks so -1 in numerator despite -2 border.
 	spaceNeeded := numW*BrickLen + (numW - 1)
-	padding := (width - 2 - spaceNeeded) / 2
+	width -= 2 // border
+	padding := (width - spaceNeeded) / 2
 	log.Debugf("Width %d Height %d NumW %d Padding %d, SpaceNeeded %d", width, height, numW, padding, spaceNeeded)
 	b := &Brick{
 		Width:  width,
@@ -53,12 +56,15 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 		// border on each side plus spaces in between bricks
 		NumW:      numW,
 		Padding:   padding,
-		PaddlePos: (width - 2) / 2,
-		// State:   make([]Cell, width*height),
+		PaddlePos: width / 2,
+		State:     make([]bool, numW*8),
 	}
-	// how many bricks fit horizontally in the screen width
-
+	b.Initial()
 	return b
+}
+
+func (b *Brick) Has(x, y int) bool {
+	return b.State[y*b.NumW+x]
 }
 
 func (b *Brick) Next() {
@@ -67,9 +73,21 @@ func (b *Brick) Next() {
 		b.PaddlePos = 3
 		b.PaddleDirection = 0
 	}
-	if b.PaddlePos+3 >= b.Width-2 {
-		b.PaddlePos = b.Width - 2 - 3
+	if b.PaddlePos+3 >= b.Width {
+		b.PaddlePos = b.Width - 3
 		b.PaddleDirection = 0
+	}
+}
+
+func (b *Brick) Set(x, y int) {
+	b.State[y*b.NumW+x] = true
+}
+
+func (b *Brick) Initial() {
+	for y := range 8 {
+		for x := range b.NumW {
+			b.Set(x, y)
+		}
 	}
 }
 
@@ -91,7 +109,11 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 			if n > 0 {
 				_, _ = ap.Out.WriteRune(' ')
 			}
-			_, _ = ap.Out.WriteString(OneBrick)
+			if b.Has(n, y) {
+				_, _ = ap.Out.WriteString(OneBrick)
+			} else {
+				_, _ = ap.Out.WriteString(Empty)
+			}
 		}
 	}
 	_, _ = ap.Out.WriteString(log.ANSIColors.Cyan)
