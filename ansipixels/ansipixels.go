@@ -78,7 +78,9 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 		return err
 	}
 	if ap.OnResize != nil {
-		return ap.OnResize()
+		err := ap.OnResize()
+		ap.EndSyncMode()
+		return err
 	}
 	return nil
 }

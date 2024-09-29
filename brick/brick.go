@@ -44,6 +44,7 @@ type Brick struct {
 	PaddleDirection int8
 	CheckLives      bool
 	ShowInfo        bool
+	Replay          bool
 	MoveRecords     []MoveRecord
 }
 
@@ -124,6 +125,10 @@ func (b *Brick) Clear(x, y int) {
 }
 
 func (b *Brick) Next() {
+	if b.Replay && (len(b.MoveRecords) > 0) && (b.MoveRecords[0].Frame == b.Frames) {
+		b.PaddleDirection = b.MoveRecords[0].Direction
+		b.MoveRecords = b.MoveRecords[1:]
+	}
 	b.Frames++
 	// move paddle
 	b.PaddlePos += int(b.PaddleDirection)
@@ -187,6 +192,9 @@ func (b *Brick) Initial() {
 }
 
 func (b *Brick) recordMove(direction int8) {
+	if b.Replay {
+		return
+	}
 	b.MoveRecords = append(b.MoveRecords, MoveRecord{Frame: b.Frames, Direction: direction})
 	b.PaddleDirection = direction
 }
@@ -296,20 +304,24 @@ func Main() int {
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
 	noSave := flag.Bool("nosave", false, "Don't save the game as JSON (default is to save)")
-	seed := flag.Uint64("seed", 0, "Seed for random number generator - 0 is time based")
+	seed := flag.Uint64("seed", 0, "Random number generator `seed`, default (0) is time based")
+	replay := flag.String("replay", "", "Replay a `game` from a JSON file")
 	cli.Main()
-	seedV := *seed
-	if seedV == 0 {
-		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
-	}
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
 	defer ap.Restore()
-	ap.Margin = 1
 	ap.HideCursor()
+	ap.Margin = 1
+	if *replay != "" {
+		return ReplayGame(ap, *replay)
+	}
+	seedV := *seed
+	if seedV == 0 {
+		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
+	}
 	var b *Brick
 	restarted := false
 	ap.OnResize = func() error {
