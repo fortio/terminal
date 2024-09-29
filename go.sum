@@ -28,6 +28,8 @@ github.com/kortschak/goroutine v1.1.2 h1:lhllcCuERxMIK5cYr8yohZZScL1na+JM5JYPRcl
 github.com/kortschak/goroutine v1.1.2/go.mod h1:zKpXs1FWN/6mXasDQzfl7g0LrGFIOiA6cLs9eXKyaMY=
 github.com/loov/hrtime v1.0.3 h1:LiWKU3B9skJwRPUf0Urs9+0+OE3TxdMuiRPOTwR0gcU=
 github.com/loov/hrtime v1.0.3/go.mod h1:yDY3Pwv2izeY4sq7YcPX/dtLwzg5NU1AxWuWxKwd0p0=
+github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 golang.org/x/crypto/x509roots/fallback v0.0.0-20240916204253-42ee18b96377 h1:aDWu69N3Si4isYMY1ppnuoGEFypX/E5l4MWA//GPClw=
 golang.org/x/crypto/x509roots/fallback v0.0.0-20240916204253-42ee18b96377/go.mod h1:kNa9WdvYnzFwC79zRpLRMJbdEFlhyM5RPFBBZp/wWH8=
 golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e h1:I88y4caeGeuDQxgdoFPUq097j7kNfw6uvuiNxUBfcBk=

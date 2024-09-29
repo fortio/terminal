@@ -25,12 +25,14 @@ type Brick struct {
 	PaddleDirection int
 	PaddleY         int
 	Score           int
+	Lives           int
 	State           []bool
 	BallX           float64
 	BallY           float64
 	BallAngle       float64
 	BallHeight      float64
 	BallSpeed       float64
+	CheckLives      bool
 }
 
 /*
@@ -47,16 +49,20 @@ or 2585:
 const (
 	OneBrick     = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
 	Empty        = "      " // 6 spaces
-	BrickLen     = 6
-	PaddleYDelta = 4
+	BrickWidth   = 6
+	PaddleYDelta = 2
 	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
+	PaddleWidth  = 7
 	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
 )
 
-func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
+func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height and width in full height blocks (unlike images/life)
+	if numLives == 0 || !checkLives {
+		numLives = -1
+	}
 	paddleY := height - PaddleYDelta
-	numW := (width - 1) / (BrickLen + 1) // 6 + 1 space but only in between bricks so -1 in numerator despite -2 border.
-	spaceNeeded := numW*BrickLen + (numW - 1)
+	numW := (width - 1) / (BrickWidth + 1) // 6 + 1 space but only in between bricks so -1 in numerator despite -2 border.
+	spaceNeeded := numW*BrickWidth + (numW - 1)
 	width -= 2 // border
 	padding := (width - spaceNeeded) / 2
 	height -= 2 // border
@@ -71,10 +77,12 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 		State:      make([]bool, numW*8),
 		BallX:      float64(width) / 2.,
 		BallHeight: 2. * float64(height),
-		BallY:      2. * float64(height) / 3,
+		BallY:      2 * (8 + 3), // just below the bricks.
 		PaddleY:    paddleY,
 		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
 		BallSpeed:  1,
+		Lives:      numLives,
+		CheckLives: checkLives,
 	}
 	b.Initial()
 	return b
@@ -155,7 +163,15 @@ func (b *Brick) Initial() {
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteString(log.ANSIColors.Reset)
 	ap.DrawRoundBox(0, 0, ap.W, ap.H)
-	ap.WriteBoxed(0, " Score: %d ", b.Score)
+	ap.WriteBoxed(0, "Score %d", b.Score)
+	switch b.Lives {
+	case 0:
+		ap.WriteRightBoxed(0, "☠️")
+	case -1:
+		ap.WriteRightBoxed(0, "∞❤️")
+	default:
+		ap.WriteRightBoxed(0, "%d❤️", b.Lives)
+	}
 	for y := range 8 {
 		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
@@ -187,7 +203,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	by2 := by / 2
 	if by2-1 < 8 {
 		// probably should calculate this exactly right instead of this anti oob.
-		bxx := max(0, min(b.NumW-1, (bx-b.Padding)/(BrickLen+1)))
+		bxx := max(0, min(b.NumW-1, (bx-b.Padding)/(BrickWidth+1)))
 		byy := max(0, min(7, by2-1))
 		if b.Has(bxx, byy) {
 			b.BallAngle = -b.BallAngle
@@ -204,7 +220,9 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 }
 
 func Main() int {
-	fpsFlag := flag.Float64("fps", 60, "Frames per second")
+	fpsFlag := flag.Float64("fps", 30, "Frames per second")
+	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
+	noDeath := flag.Bool("nodeath", false, "No death mode")
 	cli.Main()
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
@@ -215,42 +233,60 @@ func Main() int {
 	ap.HideCursor()
 	var generation uint64
 	var b *Brick
+	inStartScreen := true
 	ap.OnResize = func() error {
-		ap.Out.Flush()
-		b = NewBrick(ap.W, ap.H) // half pixels vertically.
+		ap.ClearScreen()
+		ap.StartSyncMode()
+		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath) // half pixels vertically.
+		Draw(ap, b)
 		generation = 0
+		if inStartScreen {
+			ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
+			ap.WriteCentered(ap.H/2+2, "Left A, Stop: S, Right: D - Quit: ^C or Q")
+		}
+		ap.EndSyncMode()
 		return nil
 	}
 	_ = ap.OnResize()
-	showInfo := true
+	err = ap.ReadOrResizeOrSignal()
+	if err != nil {
+		return log.FErrf("Error reading: %v", err)
+	}
+	if handleKeys(ap, b) {
+		return 0
+	}
 	for {
 		ap.StartSyncMode()
 		ap.ClearScreen()
-		if showInfo {
-			ap.WriteRight(ap.H-2, "Left: a, Stop: s, Right: d - FPS %.0f Frame %d ", ap.FPS, generation)
-		}
 		Draw(ap, b)
 		generation++
 		ap.EndSyncMode()
-		n, err := ap.ReadOrResizeOrSignalOnce()
+		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
 			return log.FErrf("Error reading: %v", err)
 		}
-		if n > 0 {
-			switch ap.Data[0] {
-			case 'a':
-				b.PaddleDirection = -1
-			case 's':
-				b.PaddleDirection = 0
-			case 'd':
-				b.PaddleDirection = 1
-			case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
-				ap.MoveCursor(0, 0)
-				return 0
-			case 'i', 'I':
-				showInfo = !showInfo
-			}
+		if handleKeys(ap, b) {
+			return 0
 		}
 		b.Next()
 	}
+}
+
+// returns true if should exit.
+func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
+	if len(ap.Data) == 0 {
+		return false
+	}
+	switch ap.Data[0] {
+	case 'a':
+		b.PaddleDirection = -1
+	case 's':
+		b.PaddleDirection = 0
+	case 'd':
+		b.PaddleDirection = 1
+	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
+		ap.MoveCursor(0, 0)
+		return true
+	}
+	return false
 }

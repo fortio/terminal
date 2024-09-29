@@ -17,6 +17,7 @@ import (
 	"fortio.org/safecast"
 	"fortio.org/term"
 	"fortio.org/terminal"
+	"github.com/rivo/uniseg"
 )
 
 const BUFSIZE = 1024
@@ -86,6 +87,7 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // will automatically call OnResize if set and if a resize signal is received and continue trying
 // to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
+	ap.EndSyncMode()
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -185,16 +187,20 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
+func (ap *AnsiPixels) ScreenWidth(str string) int {
+	return uniseg.StringWidth(str)
+}
+
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := (ap.W - len(s)) / 2
+	x := (ap.W - ap.ScreenWidth(s)) / 2
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
 }
 
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - len(s) - ap.Margin
+	x := ap.W - ap.ScreenWidth(s) - ap.Margin
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
 }
@@ -288,9 +294,11 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bot
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
 		if y+i == 0 {
-			ap.WriteString(RoundTopRight)
-			ap.MoveHorizontally(x + w - 1)
-			ap.WriteString(RoundTopLeft)
+			ap.WriteString(topRight)
+			if x+w < ap.W {
+				ap.MoveHorizontally(x + w - 1)
+				ap.WriteString(topLeft)
+			}
 		} else {
 			ap.WriteString(Vertical)
 			ap.MoveHorizontally(x + w - 1)
@@ -299,14 +307,28 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bot
 	}
 	ap.MoveCursor(x, y+h-1)
 	ap.WriteString(bottomLeft)
-	ap.WriteString(strings.Repeat(Horizontal, w-2))
-	ap.WriteString(bottomRight)
+	ap.WriteString(strings.Repeat(Horizontal, w-3))
+	if x+w <= ap.W {
+		ap.WriteString(Horizontal + bottomRight)
+	} else {
+		ap.WriteString(topRight)
+	}
 }
 
 func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := (ap.W - len(s)) / 2
+	w := ap.ScreenWidth(s)
+	x := (ap.W - w) / 2
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
-	ap.DrawRoundBox(x-1, y-1, len(s)+2, 3)
+	ap.DrawRoundBox(x-1, y-1, w+2, 3)
+}
+
+func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
+	s := fmt.Sprintf(msg, args...)
+	w := ap.ScreenWidth(s)
+	x := (ap.W - w - ap.Margin)
+	ap.MoveCursor(x, y)
+	ap.WriteString(s)
+	ap.DrawRoundBox(x-1, y-1, w+2, 3)
 }
