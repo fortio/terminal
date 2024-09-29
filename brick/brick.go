@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"math"
+	"math/rand/v2"
 	"os"
 
 	"fortio.org/cli"
 	"fortio.org/log"
+	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -21,8 +24,11 @@ type Brick struct {
 	PaddlePos       int
 	PaddleDirection int
 	State           []bool
-	BallX           int
-	BallY           int
+	BallX           float64
+	BallY           float64
+	BallAngle       float64
+	BallHeight      float64
+	BallSpeed       float64
 }
 
 /*
@@ -44,7 +50,7 @@ const (
 	OneBrick = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
 	Empty    = "      " // 6 spaces
 	BrickLen = 6
-	Ball     = "⬤" // or "◯" or "⚫"
+	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead
 )
 
 func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
@@ -52,17 +58,21 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 	spaceNeeded := numW*BrickLen + (numW - 1)
 	width -= 2 // border
 	padding := (width - spaceNeeded) / 2
+	height -= 2 // border
 	log.Debugf("Width %d Height %d NumW %d Padding %d, SpaceNeeded %d", width, height, numW, padding, spaceNeeded)
 	b := &Brick{
 		Width:  width,
-		Height: height - 2,
+		Height: height,
 		// border on each side plus spaces in between bricks
-		NumW:      numW,
-		Padding:   padding,
-		PaddlePos: width / 2,
-		State:     make([]bool, numW*8),
-		BallX:     width / 2,
-		BallY:     2 * height / 3,
+		NumW:       numW,
+		Padding:    padding,
+		PaddlePos:  width / 2,
+		State:      make([]bool, numW*8),
+		BallX:      float64(width) / 2.,
+		BallHeight: 2 * float64(height),
+		BallY:      2. * float64(height) / 3,
+		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
+		BallSpeed:  1,
 	}
 	b.Initial()
 	return b
@@ -70,6 +80,10 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 
 func (b *Brick) Has(x, y int) bool {
 	return b.State[y*b.NumW+x]
+}
+
+func (b *Brick) Clear(x, y int) {
+	b.State[y*b.NumW+x] = false
 }
 
 func (b *Brick) Next() {
@@ -82,6 +96,15 @@ func (b *Brick) Next() {
 		b.PaddlePos = b.Width - 3
 		b.PaddleDirection = 0
 	}
+	// bounce on walls
+	if b.BallX <= 0 || b.BallX >= float64(b.Width)-1 {
+		b.BallAngle = math.Pi - b.BallAngle
+	}
+	if b.BallY < 0 || b.BallY >= b.BallHeight-1 {
+		b.BallAngle = -b.BallAngle
+	}
+	b.BallX += b.BallSpeed * math.Cos(b.BallAngle)
+	b.BallY -= b.BallSpeed * math.Sin(b.BallAngle)
 }
 
 func (b *Brick) Set(x, y int) {
@@ -99,7 +122,6 @@ func (b *Brick) Initial() {
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	_, _ = ap.Out.WriteString(log.ANSIColors.Reset)
 	_ = ap.DrawRoundBox(0, 0, ap.W, ap.H)
-	ap.WriteAtStr(1+b.BallX, 1+b.BallY, Ball)
 	for y := range 8 {
 		switch y {
 		case 0, 1:
@@ -124,6 +146,25 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	}
 	_, _ = ap.Out.WriteString(log.ANSIColors.Cyan)
 	ap.WriteAtStr(1+b.PaddlePos-3, ap.H-4, OneBrick)
+	_, _ = ap.Out.WriteString(log.ANSIColors.Reset)
+	bx := safecast.MustRound[int](b.BallX)
+	by := safecast.MustRound[int](b.BallY)
+	by2 := by / 2
+	if by2-1 < 8 {
+		// probably should calculate this exactly right instead of this anti oob.
+		bxx := max(0, min(b.NumW-1, (bx-b.Padding)/(BrickLen+1)))
+		byy := max(0, min(7, by2-1))
+		if b.Has(bxx, byy) {
+			b.BallAngle = -b.BallAngle
+		}
+		b.Clear(bxx, byy)
+	}
+	ap.MoveCursor(1+bx, 1+by2)
+	if by%2 == 0 {
+		_, _ = ap.Out.WriteRune(ansipixels.TopHalfPixel)
+	} else {
+		_, _ = ap.Out.WriteRune(ansipixels.BottomHalfPixel)
+	}
 }
 
 func Main() int {
