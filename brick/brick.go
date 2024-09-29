@@ -155,7 +155,7 @@ func (b *Brick) Initial() {
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteString(log.ANSIColors.Reset)
 	ap.DrawRoundBox(0, 0, ap.W, ap.H)
-	ap.WriteCentered(0, "Score: %d", b.Score)
+	ap.WriteBoxed(0, " Score: %d ", b.Score)
 	for y := range 8 {
 		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
@@ -244,7 +244,7 @@ func Main() int {
 				b.PaddleDirection = 0
 			case 'd':
 				b.PaddleDirection = 1
-			case 3 /* ^C */, 'Q': // Not lower case q, two near the A,S,D keys
+			case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
 				ap.MoveCursor(0, 0)
 				return 0
 			case 'i', 'I':

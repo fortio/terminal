@@ -279,15 +279,23 @@ func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
 }
 
 func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) {
-	ap.MoveCursor(x, y)
-	ap.WriteString(topLeft)
-	ap.WriteString(strings.Repeat(Horizontal, w-2))
-	ap.WriteString(topRight)
+	if y >= 0 {
+		ap.MoveCursor(x, y)
+		ap.WriteString(topLeft)
+		ap.WriteString(strings.Repeat(Horizontal, w-2))
+		ap.WriteString(topRight)
+	}
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
-		ap.WriteString(Vertical)
-		ap.MoveHorizontally(x + w - 1)
-		ap.WriteString(Vertical)
+		if y+i == 0 {
+			ap.WriteString(RoundTopRight)
+			ap.MoveHorizontally(x + w - 1)
+			ap.WriteString(RoundTopLeft)
+		} else {
+			ap.WriteString(Vertical)
+			ap.MoveHorizontally(x + w - 1)
+			ap.WriteString(Vertical)
+		}
 	}
 	ap.MoveCursor(x, y+h-1)
 	ap.WriteString(bottomLeft)
