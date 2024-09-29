@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"math"
 	"math/rand/v2"
@@ -18,13 +19,17 @@ func main() {
 	os.Exit(Main())
 }
 
+type MoveRecord struct {
+	Frame     uint64
+	Direction int8
+}
+
 type Brick struct {
 	Width           int
 	Height          int
 	NumW            int
 	Padding         int
 	PaddlePos       int
-	PaddleDirection int
 	PaddleY         int
 	Score           int
 	Lives           int
@@ -36,8 +41,10 @@ type Brick struct {
 	BallSpeed       float64
 	Seed            uint64
 	Frames          uint64
+	PaddleDirection int8
 	CheckLives      bool
 	ShowInfo        bool
+	MoveRecords     []MoveRecord
 }
 
 /*
@@ -119,7 +126,7 @@ func (b *Brick) Clear(x, y int) {
 func (b *Brick) Next() {
 	b.Frames++
 	// move paddle
-	b.PaddlePos += b.PaddleDirection
+	b.PaddlePos += int(b.PaddleDirection)
 	halfWidth := PaddleWidth / 2 // 7 so 3.5
 	if b.PaddlePos-halfWidth <= 0 {
 		b.PaddlePos = halfWidth
@@ -177,6 +184,23 @@ func (b *Brick) Initial() {
 			b.Set(x, y)
 		}
 	}
+}
+
+func (b *Brick) recordMove(direction int8) {
+	b.MoveRecords = append(b.MoveRecords, MoveRecord{Frame: b.Frames, Direction: direction})
+	b.PaddleDirection = direction
+}
+
+func (b *Brick) Left() {
+	b.recordMove(-1)
+}
+
+func (b *Brick) Center() {
+	b.recordMove(0)
+}
+
+func (b *Brick) Right() {
+	b.recordMove(1)
 }
 
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -239,10 +263,39 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	}
 }
 
+type GameSave struct {
+	Version string
+	*Brick
+}
+
+func (b *Brick) SaveGame() int {
+	now := time.Now()
+	fname := "brick_" + ansipixels.FormatDate(&now) + ".json"
+	f, err := os.Create(fname)
+	if err != nil {
+		return log.FErrf("Error creating %s: %v", fname, err)
+	}
+	buf, err := json.MarshalIndent(GameSave{Version: "brick " + cli.LongVersion, Brick: b}, "", "  ")
+	if err != nil {
+		return log.FErrf("Error marshaling %s: %v", fname, err)
+	}
+	_, err = f.Write(buf)
+	if err != nil {
+		return log.FErrf("Error writing %s: %v", fname, err)
+	}
+	err = f.Close()
+	if err != nil {
+		return log.FErrf("Error closing %s: %v", fname, err)
+	}
+	log.Infof("Saved to %s\r", fname)
+	return 0
+}
+
 func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
+	noSave := flag.Bool("nosave", false, "Don't save the game as JSON (default is to save)")
 	seed := flag.Uint64("seed", 0, "Seed for random number generator - 0 is time based")
 	cli.Main()
 	seedV := *seed
@@ -299,6 +352,9 @@ func Main() int {
 			_ = ap.ReadOrResizeOrSignal()
 		}
 		if handleKeys(ap, b, restarted /* handle pauses */) {
+			if !*noSave {
+				return b.SaveGame()
+			}
 			return 0
 		}
 		b.Next()
@@ -320,17 +376,18 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 	}
 	switch ap.Data[0] {
 	case 'a':
-		b.PaddleDirection = -1
+		b.Left()
 	case 's':
-		b.PaddleDirection = 0
+		b.Center()
 	case 'd':
-		b.PaddleDirection = 1
+		b.Right()
 	case 'i':
 		b.ShowInfo = !b.ShowInfo
 	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
 		b.ShowInfo = true
 		showInfo(ap, b)
-		ap.MoveCursor(0, 0)
+		ap.MoveCursor(0, 1)
+		ap.Out.Flush()
 		return true
 	case ' ':
 		if noPause {
