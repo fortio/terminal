@@ -23,6 +23,7 @@ type Brick struct {
 	Padding         int
 	PaddlePos       int
 	PaddleDirection int
+	PaddleY         int
 	State           []bool
 	BallX           float64
 	BallY           float64
@@ -32,9 +33,7 @@ type Brick struct {
 }
 
 /*
-grol -c 'print((("\u2586" * 6 + " ") * 5 + "\n") * 5)'
-▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆
-▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆
+grol -c 'print((("\u2586" * 6 + " ") * 5 + "\n") * 3)'
 ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆
 ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆
 ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆ ▆▆▆▆▆▆
@@ -42,18 +41,19 @@ or 2585:
 ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅
 ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅
 ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅
-▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅
-▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅ ▅▅▅▅▅▅
 */
 
 const (
-	OneBrick = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
-	Empty    = "      " // 6 spaces
-	BrickLen = 6
+	OneBrick     = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
+	Empty        = "      " // 6 spaces
+	BrickLen     = 6
+	PaddleYDelta = 4
+	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
 	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
 )
 
 func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
+	paddleY := height - PaddleYDelta
 	numW := (width - 1) / (BrickLen + 1) // 6 + 1 space but only in between bricks so -1 in numerator despite -2 border.
 	spaceNeeded := numW*BrickLen + (numW - 1)
 	width -= 2 // border
@@ -69,8 +69,9 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 		PaddlePos:  width / 2,
 		State:      make([]bool, numW*8),
 		BallX:      float64(width) / 2.,
-		BallHeight: 2 * float64(height),
+		BallHeight: 2. * float64(height),
 		BallY:      2. * float64(height) / 3,
+		PaddleY:    paddleY,
 		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
 		BallSpeed:  1,
 	}
@@ -87,21 +88,33 @@ func (b *Brick) Clear(x, y int) {
 }
 
 func (b *Brick) Next() {
+	// move paddle
 	b.PaddlePos += b.PaddleDirection
 	if b.PaddlePos-3 <= 0 {
 		b.PaddlePos = 3
 		b.PaddleDirection = 0
 	}
-	if b.PaddlePos+3 >= b.Width {
-		b.PaddlePos = b.Width - 3
+	if b.PaddlePos+4 >= b.Width {
+		b.PaddlePos = b.Width - 4
 		b.PaddleDirection = 0
 	}
-	// bounce on walls
-	if b.BallX <= 0 || b.BallX >= float64(b.Width)-1 {
-		b.BallAngle = math.Pi - b.BallAngle
-	}
-	if b.BallY < 0 || b.BallY >= b.BallHeight-1 {
+	b.BallX += b.BallSpeed * math.Cos(b.BallAngle)
+	b.BallY -= b.BallSpeed * math.Sin(b.BallAngle)
+
+	by := safecast.MustRound[int](b.BallY)
+	by2 := by / 2
+
+	switch {
+	// bounce on paddle
+	case (1+by2 == b.PaddleY) && (by%2 == 0) && math.Abs(b.BallX-float64(b.PaddlePos)) <= 3:
 		b.BallAngle = -b.BallAngle
+	// bounce on walls
+	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
+		b.BallAngle = math.Pi - b.BallAngle
+	case b.BallY < 0 || b.BallY >= b.BallHeight-1:
+		b.BallAngle = -b.BallAngle
+	default:
+		return
 	}
 	b.BallX += b.BallSpeed * math.Cos(b.BallAngle)
 	b.BallY -= b.BallSpeed * math.Sin(b.BallAngle)
@@ -146,7 +159,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		}
 	}
 	ap.WriteString(log.ANSIColors.Cyan)
-	ap.WriteAtStr(1+b.PaddlePos-3, ap.H-4, OneBrick)
+	ap.WriteAtStr(1+b.PaddlePos-3, ap.H-PaddleYDelta, Paddle)
 	ap.WriteString(log.ANSIColors.Reset)
 	bx := safecast.MustRound[int](b.BallX)
 	by := safecast.MustRound[int](b.BallY)
