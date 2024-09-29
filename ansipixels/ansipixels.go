@@ -110,9 +110,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 		}
 	default:
 		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
-		if n != 0 {
-			ap.Data = ap.buf[0:n]
-		}
+		ap.Data = ap.buf[0:n]
 		return n, err
 	}
 	return 0, nil
@@ -327,7 +325,7 @@ func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	w := ap.ScreenWidth(s)
-	x := (ap.W - w - ap.Margin)
+	x := ap.W - w // not using margin as we assume we want to join lines in the corner
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
 	ap.DrawRoundBox(x-1, y-1, w+2, 3)

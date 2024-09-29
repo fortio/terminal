@@ -33,6 +33,7 @@ type Brick struct {
 	BallHeight      float64
 	BallSpeed       float64
 	CheckLives      bool
+	ShowInfo        bool
 }
 
 /*
@@ -54,6 +55,7 @@ const (
 	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
 	PaddleWidth  = 7
 	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
+	PaddleSpinFactor = 0.7
 )
 
 func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height and width in full height blocks (unlike images/life)
@@ -80,7 +82,7 @@ func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height a
 		BallY:      2 * (8 + 3), // just below the bricks.
 		PaddleY:    paddleY,
 		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
-		BallSpeed:  1,
+		BallSpeed:  1.1,
 		Lives:      numLives,
 		CheckLives: checkLives,
 	}
@@ -109,24 +111,32 @@ func (b *Brick) Clear(x, y int) {
 func (b *Brick) Next() {
 	// move paddle
 	b.PaddlePos += b.PaddleDirection
-	if b.PaddlePos-3 <= 0 {
-		b.PaddlePos = 3
+	halfWidth := PaddleWidth / 2 // 7 so 3.5
+	if b.PaddlePos-halfWidth <= 0 {
+		b.PaddlePos = halfWidth
 		b.PaddleDirection = 0
 	}
-	if b.PaddlePos+4 >= b.Width {
-		b.PaddlePos = b.Width - 4
+	if b.PaddlePos+halfWidth >= b.Width-1 {
+		b.PaddlePos = b.Width - 1 - halfWidth
 		b.PaddleDirection = 0
 	}
-	b.BallX += b.BallSpeed * math.Cos(b.BallAngle)
-	b.BallY -= b.BallSpeed * math.Sin(b.BallAngle)
+	vx := b.BallSpeed * math.Cos(b.BallAngle)
+	vy := b.BallSpeed * math.Sin(b.BallAngle)
+	b.BallX += vx
+	b.BallY -= vy
 
 	by := safecast.MustRound[int](b.BallY)
 	by2 := by / 2
 
+	paddleXdistance := math.Abs(b.BallX - float64(b.PaddlePos))
 	switch {
 	// bounce on paddle
-	case (1+by2 == b.PaddleY) && (by%2 == 0) && math.Abs(b.BallX-float64(b.PaddlePos)) <= 3:
-		b.BallAngle = -b.BallAngle
+	case (1+by2 == b.PaddleY) && (by%2 == 0) && paddleXdistance <= float64(PaddleWidth)/2.:
+		vx += PaddleSpinFactor * float64(b.PaddleDirection)
+		vy = -vy
+		b.BallAngle = math.Atan2(vy, vx)
+		b.BallSpeed = min(1.5, max(0.5, math.Sqrt(vx*vx+vy*vy)))
+		return
 	// bounce on walls
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
 		b.BallAngle = math.Pi - b.BallAngle
@@ -212,6 +222,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	}
 	ap.MoveCursor(1+bx, 1+by2)
 	// TODO Antialias http://members.chello.at/easyfilter/bresenham.html
+	// https://www.youtube.com/watch?v=f3Rs20k-hcI
 	if by%2 == 0 {
 		ap.WriteRune(ansipixels.TopHalfPixel)
 	} else {
@@ -230,6 +241,7 @@ func Main() int {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
 	defer ap.Restore()
+	ap.Margin = 1
 	ap.HideCursor()
 	var generation uint64
 	var b *Brick
@@ -260,6 +272,10 @@ func Main() int {
 		ap.ClearScreen()
 		Draw(ap, b)
 		generation++
+		if b.ShowInfo {
+			ap.WriteRight(ap.H-2, "Ball speed %.2f angle %.1f Target FPS %.0f Frame %d",
+				b.BallSpeed, b.BallAngle*180/math.Pi, ap.FPS, generation)
+		}
 		ap.EndSyncMode()
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -284,6 +300,8 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 		b.PaddleDirection = 0
 	case 'd':
 		b.PaddleDirection = 1
+	case 'i':
+		b.ShowInfo = !b.ShowInfo
 	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
 		ap.MoveCursor(0, 0)
 		return true
