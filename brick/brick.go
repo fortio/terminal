@@ -50,7 +50,7 @@ const (
 	OneBrick = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
 	Empty    = "      " // 6 spaces
 	BrickLen = 6
-	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead
+	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
 )
 
 func NewBrick(width, height int) *Brick { // height and width in full height blocks (unlike images/life)
