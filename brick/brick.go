@@ -130,7 +130,7 @@ func (b *Brick) Next() {
 	// bounce on walls
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
 		b.BallAngle = math.Pi - b.BallAngle
-	case b.BallY < 0 || b.BallY >= b.BallHeight-1:
+	case b.BallY < 0 || b.BallY >= b.BallHeight:
 		b.BallAngle = -b.BallAngle
 	default:
 		return
