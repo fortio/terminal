@@ -264,7 +264,7 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("Error reading: %v", err)
 	}
-	if handleKeys(ap, b) {
+	if handleKeys(ap, b, true /* no pauses just at the start */) {
 		return 0
 	}
 	for {
@@ -281,7 +281,7 @@ func Main() int {
 		if err != nil {
 			return log.FErrf("Error reading: %v", err)
 		}
-		if handleKeys(ap, b) {
+		if handleKeys(ap, b, false /* handle pauses */) {
 			return 0
 		}
 		b.Next()
@@ -289,7 +289,7 @@ func Main() int {
 }
 
 // returns true if should exit.
-func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
+func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 	if len(ap.Data) == 0 {
 		return false
 	}
@@ -306,9 +306,24 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 		ap.MoveCursor(0, 0)
 		return true
 	case ' ':
-		ap.WriteCentered(ap.H/2, "\033[5mPaused, any key to resume...\033[0m")
-		_ = ap.ReadOrResizeOrSignal()
-		return false
+		if noPause {
+			return false
+		}
+		n := 0
+		for {
+			switch n % 20 {
+			case 0:
+				ap.WriteCentered(ap.H/2, "⏱️ Paused, any key to resume... ⏱️")
+			case 10:
+				ap.WriteCentered(ap.H/2, "  Paused, any key to resume...  ")
+			}
+			ap.EndSyncMode()
+			r, _ := ap.ReadOrResizeOrSignalOnce()
+			if r != 0 {
+				return handleKeys(ap, b, false)
+			}
+			n++
+		}
 	}
 	return false
 }
