@@ -51,7 +51,7 @@ const (
 	OneBrick     = "▅▅▅▅▅▅" // 6 \u2585 (3/4 height blocks)
 	Empty        = "      " // 6 spaces
 	BrickWidth   = 6
-	PaddleYDelta = 2
+	PaddleYDelta = 3
 	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
 	PaddleWidth  = 7
 	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
@@ -305,6 +305,10 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
 		ap.MoveCursor(0, 0)
 		return true
+	case ' ':
+		ap.WriteCentered(ap.H/2, "\033[5mPaused, any key to resume...\033[0m")
+		_ = ap.ReadOrResizeOrSignal()
+		return false
 	}
 	return false
 }
