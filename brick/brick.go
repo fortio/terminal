@@ -73,7 +73,7 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 		BallHeight: 2. * float64(height),
 		BallY:      2. * float64(height) / 3,
 		PaddleY:    paddleY,
-		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
+		BallAngle:  -math.Pi / 2, // + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
 		BallSpeed:  1,
 	}
 	b.Initial()
@@ -121,20 +121,23 @@ func (b *Brick) Next() {
 		b.BallAngle = -b.BallAngle
 	// bounce on walls
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
-		if math.Abs(b.BallAngle) < math.Pi/10 {
-			b.BallAngle += math.Pi / 10
-		}
 		b.BallAngle = math.Pi - b.BallAngle
 	case b.BallY < 0 || b.BallY >= b.BallHeight-1:
-		if math.Abs(b.BallAngle) < math.Pi/10 {
-			b.BallAngle -= math.Pi / 10
-		}
 		b.BallAngle = -b.BallAngle
 	default:
 		return
 	}
-	b.BallX += b.BallSpeed * math.Cos(b.BallAngle)
-	b.BallY -= b.BallSpeed * math.Sin(b.BallAngle)
+	// avoid vertical or horizontal movement
+	dx := math.Cos(b.BallAngle)
+	if math.Abs(dx) < 0.2 {
+		b.BallAngle += (rand.Float64() - 0.5) * math.Pi / 7 //nolint:gosec // not crypto
+	}
+	dy := math.Sin(b.BallAngle)
+	if math.Abs(dy) < 0.2 {
+		b.BallAngle += (rand.Float64() - 0.5) * math.Pi / 7 //nolint:gosec // not crypto
+	}
+	b.BallX += b.BallSpeed * dx
+	b.BallY -= b.BallSpeed * dy
 }
 
 func (b *Brick) Set(x, y int) {
