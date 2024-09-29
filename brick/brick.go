@@ -120,33 +120,34 @@ func (b *Brick) Initial() {
 }
 
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
-	_, _ = ap.Out.WriteString(log.ANSIColors.Reset)
-	_ = ap.DrawRoundBox(0, 0, ap.W, ap.H)
+	ap.WriteString(log.ANSIColors.Reset)
+	ap.DrawRoundBox(0, 0, ap.W, ap.H)
 	for y := range 8 {
+		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
-		case 0, 1:
+		case 0:
 			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.BrightRed)
-		case 2, 3:
+		case 2:
 			ap.WriteAtStr(b.Padding+1, 3+y, "\033[38;5;214m") // orange
-		case 4, 5:
+		case 4:
 			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.Green)
-		case 6, 7:
+		case 6:
 			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.Yellow)
 		}
 		for n := range b.NumW {
 			if n > 0 {
-				_, _ = ap.Out.WriteRune(' ')
+				ap.WriteRune(' ')
 			}
 			if b.Has(n, y) {
-				_, _ = ap.Out.WriteString(OneBrick)
+				ap.WriteString(OneBrick)
 			} else {
-				_, _ = ap.Out.WriteString(Empty)
+				ap.WriteString(Empty)
 			}
 		}
 	}
-	_, _ = ap.Out.WriteString(log.ANSIColors.Cyan)
+	ap.WriteString(log.ANSIColors.Cyan)
 	ap.WriteAtStr(1+b.PaddlePos-3, ap.H-4, OneBrick)
-	_, _ = ap.Out.WriteString(log.ANSIColors.Reset)
+	ap.WriteString(log.ANSIColors.Reset)
 	bx := safecast.MustRound[int](b.BallX)
 	by := safecast.MustRound[int](b.BallY)
 	by2 := by / 2
@@ -160,10 +161,11 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		b.Clear(bxx, byy)
 	}
 	ap.MoveCursor(1+bx, 1+by2)
+	// TODO Antialias http://members.chello.at/easyfilter/bresenham.html
 	if by%2 == 0 {
-		_, _ = ap.Out.WriteRune(ansipixels.TopHalfPixel)
+		ap.WriteRune(ansipixels.TopHalfPixel)
 	} else {
-		_, _ = ap.Out.WriteRune(ansipixels.BottomHalfPixel)
+		ap.WriteRune(ansipixels.BottomHalfPixel)
 	}
 }
 

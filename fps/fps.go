@@ -97,7 +97,7 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 
 func drawBox(ap *ansipixels.AnsiPixels, withText bool) {
 	if ap.Margin != 0 {
-		_ = ap.DrawSquareBox(0, 0, ap.W, ap.H)
+		ap.DrawSquareBox(0, 0, ap.W, ap.H)
 	}
 	if withText {
 		ap.WriteBoxed(ap.H/2-3, " Width: %d, Height: %d ", ap.W, ap.H)

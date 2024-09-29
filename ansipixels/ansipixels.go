@@ -117,12 +117,12 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 }
 
 func (ap *AnsiPixels) StartSyncMode() {
-	_, _ = ap.Out.WriteString("\033[?2026h")
+	ap.WriteString("\033[?2026h")
 }
 
 // End sync (and flush).
 func (ap *AnsiPixels) EndSyncMode() {
-	_, _ = ap.Out.WriteString("\033[?2026l")
+	ap.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
 }
 
@@ -167,9 +167,17 @@ func (ap *AnsiPixels) MoveHorizontally(x int) {
 	}
 }
 
+func (ap *AnsiPixels) WriteString(msg string) {
+	_, _ = ap.Out.WriteString(msg)
+}
+
+func (ap *AnsiPixels) WriteRune(r rune) {
+	_, _ = ap.Out.WriteRune(r)
+}
+
 func (ap *AnsiPixels) WriteAtStr(x, y int, msg string) {
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(msg)
+	ap.WriteString(msg)
 }
 
 func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
@@ -181,18 +189,18 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	x := (ap.W - len(s)) / 2
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
+	ap.WriteString(s)
 }
 
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	x := ap.W - len(s) - ap.Margin
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
+	ap.WriteString(s)
 }
 
 func (ap *AnsiPixels) ClearEndOfLine() {
-	_, _ = ap.Out.WriteString("\033[K")
+	ap.WriteString("\033[K")
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
@@ -255,43 +263,42 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 }
 
 func (ap *AnsiPixels) HideCursor() {
-	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
+	ap.WriteString("\033[?25l") // hide cursor
 }
 
 func (ap *AnsiPixels) ShowCursor() {
-	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
+	ap.WriteString("\033[?25h") // show cursor
 }
 
-func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) error {
-	return ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
+func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) {
+	ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
 }
 
-func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) error {
-	return ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
+func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
+	ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) error {
+func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) {
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(topLeft)
-	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, _ = ap.Out.WriteString(topRight)
+	ap.WriteString(topLeft)
+	ap.WriteString(strings.Repeat(Horizontal, w-2))
+	ap.WriteString(topRight)
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
-		_, _ = ap.Out.WriteString(Vertical)
+		ap.WriteString(Vertical)
 		ap.MoveHorizontally(x + w - 1)
-		_, _ = ap.Out.WriteString(Vertical)
+		ap.WriteString(Vertical)
 	}
 	ap.MoveCursor(x, y+h-1)
-	_, _ = ap.Out.WriteString(bottomLeft)
-	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, err := ap.Out.WriteString(bottomRight)
-	return err
+	ap.WriteString(bottomLeft)
+	ap.WriteString(strings.Repeat(Horizontal, w-2))
+	ap.WriteString(bottomRight)
 }
 
 func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	x := (ap.W - len(s)) / 2
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
-	_ = ap.DrawRoundBox(x-1, y-1, len(s)+2, 3)
+	ap.WriteString(s)
+	ap.DrawRoundBox(x-1, y-1, len(s)+2, 3)
 }
