@@ -73,7 +73,7 @@ func NewBrick(width, height int) *Brick { // height and width in full height blo
 		BallHeight: 2. * float64(height),
 		BallY:      2. * float64(height) / 3,
 		PaddleY:    paddleY,
-		BallAngle:  -math.Pi / 2, // + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
+		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
 		BallSpeed:  1,
 	}
 	b.Initial()
