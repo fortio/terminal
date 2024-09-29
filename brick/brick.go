@@ -24,6 +24,7 @@ type Brick struct {
 	PaddlePos       int
 	PaddleDirection int
 	PaddleY         int
+	Score           int
 	State           []bool
 	BallX           float64
 	BallY           float64
@@ -85,6 +86,16 @@ func (b *Brick) Has(x, y int) bool {
 
 func (b *Brick) Clear(x, y int) {
 	b.State[y*b.NumW+x] = false
+	switch y {
+	case 0, 1:
+		b.Score += 7
+	case 2, 3:
+		b.Score += 5
+	case 4, 5:
+		b.Score += 3
+	case 6, 7:
+		b.Score++
+	}
 }
 
 func (b *Brick) Next() {
@@ -110,8 +121,14 @@ func (b *Brick) Next() {
 		b.BallAngle = -b.BallAngle
 	// bounce on walls
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
+		if math.Abs(b.BallAngle) < math.Pi/10 {
+			b.BallAngle += math.Pi / 10
+		}
 		b.BallAngle = math.Pi - b.BallAngle
 	case b.BallY < 0 || b.BallY >= b.BallHeight-1:
+		if math.Abs(b.BallAngle) < math.Pi/10 {
+			b.BallAngle -= math.Pi / 10
+		}
 		b.BallAngle = -b.BallAngle
 	default:
 		return
@@ -135,6 +152,7 @@ func (b *Brick) Initial() {
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteString(log.ANSIColors.Reset)
 	ap.DrawRoundBox(0, 0, ap.W, ap.H)
+	ap.WriteCentered(0, "Score: %d", b.Score)
 	for y := range 8 {
 		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
@@ -170,8 +188,8 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		byy := max(0, min(7, by2-1))
 		if b.Has(bxx, byy) {
 			b.BallAngle = -b.BallAngle
+			b.Clear(bxx, byy)
 		}
-		b.Clear(bxx, byy)
 	}
 	ap.MoveCursor(1+bx, 1+by2)
 	// TODO Antialias http://members.chello.at/easyfilter/bresenham.html
