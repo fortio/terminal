@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"os"
+	"strings"
+	"time"
 
 	"fortio.org/cli"
 	"fortio.org/log"
@@ -32,6 +34,8 @@ type Brick struct {
 	BallAngle       float64
 	BallHeight      float64
 	BallSpeed       float64
+	Seed            uint64
+	Frames          uint64
 	CheckLives      bool
 	ShowInfo        bool
 }
@@ -58,7 +62,8 @@ const (
 	PaddleSpinFactor = 0.7
 )
 
-func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height and width in full height blocks (unlike images/life)
+// height and width in full height blocks (unlike images/life) for most but the ball.
+func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick {
 	if numLives == 0 || !checkLives {
 		numLives = -1
 	}
@@ -69,6 +74,7 @@ func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height a
 	padding := (width - spaceNeeded) / 2
 	height -= 2 // border
 	log.Debugf("Width %d Height %d NumW %d Padding %d, SpaceNeeded %d", width, height, numW, padding, spaceNeeded)
+	rnd := rand.New(rand.NewPCG(0, seed)) //nolint:gosec // not crypto, starting in a cone up.
 	b := &Brick{
 		Width:  width,
 		Height: height,
@@ -81,10 +87,12 @@ func NewBrick(width, height, numLives int, checkLives bool) *Brick { // height a
 		BallHeight: 2. * float64(height),
 		BallY:      2 * (8 + 3), // just below the bricks.
 		PaddleY:    paddleY,
-		BallAngle:  -math.Pi/2 + (rand.Float64()-0.5)*math.Pi/2., //nolint:gosec // not crypto, starting in a cone up.
+		BallAngle:  -math.Pi/2 + (rnd.Float64()-0.5)*math.Pi/2.,
 		BallSpeed:  1.1,
 		Lives:      numLives,
 		CheckLives: checkLives,
+		Seed:       seed,
+		Frames:     1,
 	}
 	b.Initial()
 	return b
@@ -109,6 +117,7 @@ func (b *Brick) Clear(x, y int) {
 }
 
 func (b *Brick) Next() {
+	b.Frames++
 	// move paddle
 	b.PaddlePos += b.PaddleDirection
 	halfWidth := PaddleWidth / 2 // 7 so 3.5
@@ -234,7 +243,12 @@ func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
+	seed := flag.Uint64("seed", 0, "Seed for random number generator - 0 is time based")
 	cli.Main()
+	seedV := *seed
+	if seedV == 0 {
+		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
+	}
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
 	if err != nil {
@@ -243,20 +257,23 @@ func Main() int {
 	defer ap.Restore()
 	ap.Margin = 1
 	ap.HideCursor()
-	var generation uint64
 	var b *Brick
-	inStartScreen := true
+	restarted := false
 	ap.OnResize = func() error {
 		ap.ClearScreen()
 		ap.StartSyncMode()
-		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath) // half pixels vertically.
-		Draw(ap, b)
-		generation = 0
-		if inStartScreen {
-			ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
-			ap.WriteCentered(ap.H/2+2, "Left A, Stop: S, Right: D - Quit: ^C or Q")
+		prevInfo := false
+		if b != nil {
+			prevInfo = b.ShowInfo
 		}
+		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath, seedV) // half pixels vertically.
+		b.ShowInfo = prevInfo
+		Draw(ap, b)
+		ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
+		ap.WriteCentered(ap.H/2+2, "Left A, Stop: S, Right: D - Quit: ^C or Q")
+		showInfo(ap, b)
 		ap.EndSyncMode()
+		restarted = true
 		return nil
 	}
 	_ = ap.OnResize()
@@ -268,24 +285,32 @@ func Main() int {
 		return 0
 	}
 	for {
+		restarted = false
 		ap.StartSyncMode()
 		ap.ClearScreen()
 		Draw(ap, b)
-		generation++
-		if b.ShowInfo {
-			ap.WriteRight(ap.H-2, "Ball speed %.2f angle %.1f Target FPS %.0f Frame %d",
-				b.BallSpeed, b.BallAngle*180/math.Pi, ap.FPS, generation)
-		}
+		showInfo(ap, b)
 		ap.EndSyncMode()
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
 			return log.FErrf("Error reading: %v", err)
 		}
-		if handleKeys(ap, b, false /* handle pauses */) {
+		if restarted {
+			_ = ap.ReadOrResizeOrSignal()
+		}
+		if handleKeys(ap, b, restarted /* handle pauses */) {
 			return 0
 		}
 		b.Next()
 	}
+}
+
+func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
+	if !b.ShowInfo {
+		return
+	}
+	ap.WriteRight(ap.H-2, "Ball speed %.2f angle %.1f Target FPS %.0f Frame %d Seed %d",
+		b.BallSpeed, b.BallAngle*180/math.Pi, ap.FPS, b.Frames, b.Seed)
 }
 
 // returns true if should exit.
@@ -303,6 +328,8 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 	case 'i':
 		b.ShowInfo = !b.ShowInfo
 	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
+		b.ShowInfo = true
+		showInfo(ap, b)
 		ap.MoveCursor(0, 0)
 		return true
 	case ' ':
@@ -311,16 +338,23 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 		}
 		n := 0
 		for {
+			msg := "⏱️ Paused, any key to resume... ⏱️"
+			mlen := ap.ScreenWidth(msg)
+			erase := strings.Repeat(" ", mlen)
+			x := (ap.W - mlen) / 2
+			y := ap.H/2 - 1
 			switch n % 20 {
 			case 0:
-				ap.WriteCentered(ap.H/2, "⏱️ Paused, any key to resume... ⏱️")
+				ap.MoveCursor(x, y)
+				ap.WriteString(msg)
 			case 10:
-				ap.WriteCentered(ap.H/2, "  Paused, any key to resume...  ")
+				ap.MoveCursor(x, y)
+				ap.WriteString(erase)
 			}
 			ap.EndSyncMode()
 			r, _ := ap.ReadOrResizeOrSignalOnce()
 			if r != 0 {
-				return handleKeys(ap, b, false)
+				return handleKeys(ap, b, true) // no pause loop.
 			}
 			n++
 		}

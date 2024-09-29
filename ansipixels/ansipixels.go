@@ -50,7 +50,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		Out:           bufio.NewWriter(os.Stdout),
 		In:            os.Stdin,
 		FPS:           fps,
-		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, 1*time.Second/time.Duration(fps)),
+		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
 		C:             make(chan os.Signal, 1),
 	}
 	signal.Notify(ap.C, signalList...)
