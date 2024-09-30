@@ -97,7 +97,7 @@ func replayGame(ap *ansipixels.AnsiPixels, b *Brick, numFrames uint64) int {
 		} else {
 			ap.WriteCentered(ap.H/2, "%s🔂 Replay done... any key to exit...", log.ANSIColors.Reset)
 			ap.MoveCursor(0, 1)
-			ap.ReadOrResizeOrSignal()
+			_ = ap.ReadOrResizeOrSignal()
 			return 0
 		}
 	}
