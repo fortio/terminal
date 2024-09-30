@@ -17,6 +17,7 @@ import (
 	"fortio.org/safecast"
 	"fortio.org/term"
 	"fortio.org/terminal"
+	"github.com/rivo/uniseg"
 )
 
 const BUFSIZE = 1024
@@ -49,7 +50,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		Out:           bufio.NewWriter(os.Stdout),
 		In:            os.Stdin,
 		FPS:           fps,
-		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, 1*time.Second/time.Duration(fps)),
+		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
 		C:             make(chan os.Signal, 1),
 	}
 	signal.Notify(ap.C, signalList...)
@@ -77,7 +78,9 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 		return err
 	}
 	if ap.OnResize != nil {
-		return ap.OnResize()
+		err := ap.OnResize()
+		ap.EndSyncMode()
+		return err
 	}
 	return nil
 }
@@ -86,6 +89,7 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // will automatically call OnResize if set and if a resize signal is received and continue trying
 // to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
+	ap.EndSyncMode()
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -108,21 +112,19 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 		}
 	default:
 		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
-		if n != 0 {
-			ap.Data = ap.buf[0:n]
-		}
+		ap.Data = ap.buf[0:n]
 		return n, err
 	}
 	return 0, nil
 }
 
 func (ap *AnsiPixels) StartSyncMode() {
-	_, _ = ap.Out.WriteString("\033[?2026h")
+	ap.WriteString("\033[?2026h")
 }
 
 // End sync (and flush).
 func (ap *AnsiPixels) EndSyncMode() {
-	_, _ = ap.Out.WriteString("\033[?2026l")
+	ap.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
 }
 
@@ -167,9 +169,17 @@ func (ap *AnsiPixels) MoveHorizontally(x int) {
 	}
 }
 
+func (ap *AnsiPixels) WriteString(msg string) {
+	_, _ = ap.Out.WriteString(msg)
+}
+
+func (ap *AnsiPixels) WriteRune(r rune) {
+	_, _ = ap.Out.WriteRune(r)
+}
+
 func (ap *AnsiPixels) WriteAtStr(x, y int, msg string) {
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(msg)
+	ap.WriteString(msg)
 }
 
 func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
@@ -177,22 +187,26 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
+func (ap *AnsiPixels) ScreenWidth(str string) int {
+	return uniseg.StringWidth(str)
+}
+
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := (ap.W - len(s)) / 2
+	x := (ap.W - ap.ScreenWidth(s)) / 2
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
+	ap.WriteString(s)
 }
 
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - len(s) - ap.Margin
+	x := ap.W - ap.ScreenWidth(s) - ap.Margin
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
+	ap.WriteString(s)
 }
 
 func (ap *AnsiPixels) ClearEndOfLine() {
-	_, _ = ap.Out.WriteString("\033[K")
+	ap.WriteString("\033[K")
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
@@ -255,43 +269,71 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 }
 
 func (ap *AnsiPixels) HideCursor() {
-	_, _ = ap.Out.WriteString("\033[?25l") // hide cursor
+	ap.WriteString("\033[?25l") // hide cursor
 }
 
 func (ap *AnsiPixels) ShowCursor() {
-	_, _ = ap.Out.WriteString("\033[?25h") // show cursor
+	ap.WriteString("\033[?25h") // show cursor
 }
 
-func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) error {
-	return ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
+func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) {
+	ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
 }
 
-func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) error {
-	return ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
+func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
+	ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) error {
-	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(topLeft)
-	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, _ = ap.Out.WriteString(topRight)
+func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) {
+	if y >= 0 {
+		ap.MoveCursor(x, y)
+		ap.WriteString(topLeft)
+		ap.WriteString(strings.Repeat(Horizontal, w-2))
+		ap.WriteString(topRight)
+	}
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
-		_, _ = ap.Out.WriteString(Vertical)
-		ap.MoveHorizontally(x + w - 1)
-		_, _ = ap.Out.WriteString(Vertical)
+		if y+i == 0 {
+			ap.WriteString(topRight)
+			if x+w < ap.W {
+				ap.MoveHorizontally(x + w - 1)
+				ap.WriteString(topLeft)
+			}
+		} else {
+			ap.WriteString(Vertical)
+			ap.MoveHorizontally(x + w - 1)
+			ap.WriteString(Vertical)
+		}
 	}
 	ap.MoveCursor(x, y+h-1)
-	_, _ = ap.Out.WriteString(bottomLeft)
-	_, _ = ap.Out.WriteString(strings.Repeat(Horizontal, w-2))
-	_, err := ap.Out.WriteString(bottomRight)
-	return err
+	ap.WriteString(bottomLeft)
+	ap.WriteString(strings.Repeat(Horizontal, w-3))
+	if x+w <= ap.W {
+		ap.WriteString(Horizontal + bottomRight)
+	} else {
+		ap.WriteString(topRight)
+	}
 }
 
 func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := (ap.W - len(s)) / 2
+	w := ap.ScreenWidth(s)
+	x := (ap.W - w) / 2
 	ap.MoveCursor(x, y)
-	_, _ = ap.Out.WriteString(s)
-	_ = ap.DrawRoundBox(x-1, y-1, len(s)+2, 3)
+	ap.WriteString(s)
+	ap.DrawRoundBox(x-1, y-1, w+2, 3)
+}
+
+func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
+	s := fmt.Sprintf(msg, args...)
+	w := ap.ScreenWidth(s)
+	x := ap.W - w // not using margin as we assume we want to join lines in the corner
+	ap.MoveCursor(x, y)
+	ap.WriteString(s)
+	ap.DrawRoundBox(x-1, y-1, w+2, 3)
+}
+
+func FormatDate(d *time.Time) string {
+	return fmt.Sprintf("%d-%02d-%02d-%02d%02d%02d", d.Year(), d.Month(), d.Day(),
+		d.Hour(), d.Minute(), d.Second())
 }

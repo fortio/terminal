@@ -1,0 +1,3 @@
+FROM scratch
+COPY brick /usr/bin/brick
+ENTRYPOINT ["/usr/bin/brick"]

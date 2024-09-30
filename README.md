@@ -86,3 +86,34 @@ See [life/](life/) for a classic Conway's game of life black and white demo (wit
 Same installation as above, just replace `fps` by `life`.
 
 ![life screenshot](life/life.png)
+
+
+## Brick
+
+Play an old time favorite, or watch replays of saved games... or even let the computer play!
+
+See the options below.
+
+![brick screenshot](brick.png)
+
+```
+brick 0.20.0 usage:
+	brick [flags]
+or 1 of the special arguments
+	brick {help|envhelp|version|buildinfo}
+flags:
+  -autoplay
+    	Computer plays mode
+  -fps float
+    	Frames per second (default 30)
+  -lives int
+    	Number of lives - 0 is infinite (default 3)
+  -nodeath
+    	No death mode
+  -nosave
+    	Don't save the game as JSON (default is to save)
+  -replay game
+    	Replay a game from a JSON file
+  -seed seed
+    	Random number generator seed, default (0) is time based
+```

@@ -40,20 +40,20 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 			switch {
 			case pixel1 == pixel2:
 				if pixel1 == prev1 {
-					_, _ = ap.Out.WriteRune('█')
+					ap.WriteRune('█')
 					continue // we haven't changed color
 				}
 				if pixel2 == prev2 {
-					_, _ = ap.Out.WriteRune(' ')
+					ap.WriteRune(' ')
 					continue // we haven't changed color
 				}
-				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm█", pixel1.R, pixel1.G, pixel1.B))
+				ap.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm█", pixel1.R, pixel1.G, pixel1.B))
 				prev1 = pixel1
 				continue
 			case pixel1 == prev1 && pixel2 == prev2:
-				_, _ = ap.Out.WriteRune('▀')
+				ap.WriteRune('▀')
 			default:
-				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
+				ap.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
 					pixel1.R, pixel1.G, pixel1.B,
 					pixel2.R, pixel2.G, pixel2.B))
 			}
@@ -63,7 +63,7 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 		sy++
 		ap.MoveCursor(sx, sy)
 	}
-	_, err = ap.Out.WriteString("\033[0m") // reset color
+	ap.WriteString("\033[0m") // reset color
 	return err
 }
 
@@ -101,27 +101,26 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 			bgColor := convertColorTo216(pixel2)
 			switch {
 			case fgColor == prevFg && bgColor == prevBg:
-				_, _ = ap.Out.WriteRune('▄')
+				ap.WriteRune('▄')
 			case fgColor == prevFg:
-				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm▄", bgColor))
+				ap.WriteString(fmt.Sprintf("\033[38;5;%dm▄", bgColor))
 			case bgColor == prevBg:
-				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[48;5;%dm▄", fgColor))
+				ap.WriteString(fmt.Sprintf("\033[48;5;%dm▄", fgColor))
 			default:
 				// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows.
-				_, _ = ap.Out.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
+				ap.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
 			}
 			prevFg = fgColor
 			prevBg = bgColor
 		}
 		sy++
 	}
-	_, err = ap.Out.WriteString("\033[0m") // reset color
+	ap.WriteString("\033[0m") // reset color
 	return err
 }
 
 func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) error {
 	ap.WriteAtStr(sx, sy, color)
-	var err error
 	threshold := uint8(127)
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
@@ -129,11 +128,11 @@ func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) e
 			pixel2 := img.GrayAt(x, y+1).Y > threshold
 			switch {
 			case pixel1 && pixel2:
-				_, _ = ap.Out.WriteRune(FullPixel)
+				ap.WriteRune(FullPixel)
 			case pixel1 && !pixel2:
-				_, _ = ap.Out.WriteRune(TopHalfPixel)
+				ap.WriteRune(TopHalfPixel)
 			case !pixel1 && pixel2:
-				_, _ = ap.Out.WriteRune(BottomHalfPixel)
+				ap.WriteRune(BottomHalfPixel)
 			case !pixel1 && !pixel2:
 				_ = ap.Out.WriteByte(' ')
 			}
@@ -141,7 +140,7 @@ func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) e
 		sy++
 		ap.MoveCursor(sx, sy)
 	}
-	_, err = ap.Out.WriteString("\033[0m") // reset color
+	_, err := ap.Out.WriteString("\033[0m") // reset color
 	return err
 }
 

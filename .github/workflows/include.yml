@@ -40,3 +40,15 @@ jobs:
             GH_PAT: ${{ secrets.GH_PAT }}
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
+    releaser-brick:
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
+        with:
+            description: "Fortio terminal brick smashing game in the style of Breakout"
+            binary_name: "brick"
+            main_path: "./brick"
+            dockerfile: "./Dockerfile.brick"
+        secrets:
+            GH_PAT: ${{ secrets.GH_PAT }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+            DOCKER_USER: ${{ secrets.DOCKER_USER }}
