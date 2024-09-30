@@ -219,7 +219,11 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	case 0:
 		ap.WriteRightBoxed(0, "☠️")
 	case -1:
-		ap.WriteRightBoxed(0, "∞❤️")
+		if b.Replay {
+			ap.WriteRightBoxed(0, "🔂")
+		} else {
+			ap.WriteRightBoxed(0, "∞❤️")
+		}
 	default:
 		ap.WriteRightBoxed(0, "%d❤️", b.Lives)
 	}
