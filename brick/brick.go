@@ -92,22 +92,27 @@ func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick 
 		// border on each side plus spaces in between bricks
 		NumW:       numW,
 		Padding:    padding,
-		PaddlePos:  width / 2,
 		State:      make([]bool, numW*8),
-		BallX:      float64(width) / 2.,
 		BallHeight: 2. * float64(height),
-		BallY:      2 * (8 + 3), // just below the bricks.
 		PaddleY:    paddleY,
-		BallAngle:  -math.Pi/2 + (rnd.Float64()-0.5)*math.Pi/2.,
-		BallSpeed:  1.05,
 		Lives:      numLives,
 		CheckLives: checkLives,
 		Seed:       seed,
 		Frames:     1,
 		rnd:        rnd,
 	}
+	b.ResetBall()
 	b.Initial()
 	return b
+}
+
+func (b *Brick) ResetBall() {
+	b.BallX = float64(b.Width) / 2.
+	b.BallY = 2 * (8 + 3) // just below the bricks.
+	b.BallAngle = -math.Pi/2 + (b.rnd.Float64()-0.5)*math.Pi/2.
+	b.BallSpeed = 1.05
+	b.PaddlePos = b.Width / 2
+	b.PaddleDirection = 0
 }
 
 func (b *Brick) Has(x, y int) bool {
@@ -128,7 +133,19 @@ func (b *Brick) Clear(x, y int) {
 	}
 }
 
-func (b *Brick) Next() {
+func (b *Brick) Death() {
+	if b.Lives == -1 {
+		b.ResetBall()
+		return
+	}
+	b.Lives--
+	if b.Lives > 0 {
+		b.ResetBall()
+	}
+}
+
+// Returns true if there has been a death.
+func (b *Brick) Next() bool {
 	if b.Replay && (len(b.MoveRecords) > 0) && (b.MoveRecords[0].Frame == b.Frames) {
 		b.PaddleDirection = b.MoveRecords[0].Direction
 		b.MoveRecords = b.MoveRecords[1:]
@@ -164,22 +181,28 @@ func (b *Brick) Next() {
 	case (1+by2 == b.PaddleY) && (by%2 == 0) && paddleXdistance <= float64(PaddleWidth)/2.:
 		if b.JustBounced {
 			b.JustBounced = false
-			return
+			return false
 		}
 		vx += PaddleSpinFactor * float64(b.PaddleDirection)
 		vy = -vy
 		b.BallAngle = math.Atan2(vy, vx)
 		b.BallSpeed = min(1.4, max(0.4, math.Sqrt(vx*vx+vy*vy)))
 		b.JustBounced = true
-		return
+		return false
 		// bounce on walls
-	case b.BallY < 0 || b.BallY >= b.BallHeight:
+	case b.BallY >= b.BallHeight:
+		if b.CheckLives {
+			b.Death()
+			return true
+		}
+		fallthrough
+	case b.BallY < 0:
 		b.BallAngle = -b.BallAngle
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
 		b.BallAngle = math.Mod(math.Pi-b.BallAngle, 2*math.Pi)
 	default:
 		b.JustBounced = false
-		return
+		return false
 	}
 	// avoid vertical or horizontal movement
 	dx := math.Cos(b.BallAngle)
@@ -192,6 +215,7 @@ func (b *Brick) Next() {
 	}
 	b.BallX += b.BallSpeed * dx
 	b.BallY -= b.BallSpeed * dy
+	return false
 }
 
 func (b *Brick) AutoPlay(vx, vy float64) {
@@ -342,7 +366,7 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
-func Main() int {
+func Main() int { //nolint:funlen // flags etc.
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
@@ -394,12 +418,22 @@ func Main() int {
 	if handleKeys(ap, b, true /* no pauses just at the start */) {
 		return 0
 	}
+	death := false
 	for {
 		restarted = false
 		ap.StartSyncMode()
 		ap.ClearScreen()
 		Draw(ap, b)
 		showInfo(ap, b)
+		if death {
+			DeathInfo(ap, b)
+			if b.Lives == 0 {
+				atEnd(ap, b)
+				return 0
+			}
+			death = false
+			continue
+		}
 		ap.EndSyncMode()
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -414,8 +448,21 @@ func Main() int {
 			}
 			return 0
 		}
-		b.Next()
+		death = b.Next()
 	}
+}
+
+func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
+	if b.Lives == 0 {
+		ap.WriteBoxed(ap.H/2, " ☠️ Game Over ☠️ ")
+	} else {
+		if b.Lives == -1 {
+			ap.WriteBoxed(ap.H/2, " ☠️ Lost a life (∞ left 💔) ")
+		} else {
+			ap.WriteBoxed(ap.H/2, " ☠️ Lost a life, %d left 💔 ", b.Lives)
+		}
+	}
+	_ = ap.ReadOrResizeOrSignal()
 }
 
 func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -441,10 +488,7 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 	case 'i':
 		b.ShowInfo = !b.ShowInfo
 	case 3 /* ^C */, 'Q': // Not lower case q, too near the A,S,D keys
-		b.ShowInfo = true
-		showInfo(ap, b)
-		ap.MoveCursor(0, 1)
-		ap.Out.Flush()
+		atEnd(ap, b)
 		return true
 	case ' ':
 		if noPause {
@@ -474,4 +518,11 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 		}
 	}
 	return false
+}
+
+func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
+	b.ShowInfo = true
+	showInfo(ap, b)
+	ap.MoveCursor(0, 1)
+	ap.Out.Flush()
 }
