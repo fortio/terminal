@@ -33,6 +33,7 @@ type Brick struct {
 	PaddleY         int
 	Score           int
 	Lives           int
+	NumBricks       int // number of bricks left - 0 == win
 	State           []bool
 	BallX           float64
 	BallY           float64
@@ -109,7 +110,7 @@ func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick 
 func (b *Brick) ResetBall() {
 	b.BallX = float64(b.Width) / 2.
 	b.BallY = 2 * (8 + 3) // just below the bricks.
-	b.BallAngle = -math.Pi/2 + (b.rnd.Float64()-0.5)*math.Pi/2.
+	b.BallAngle = 2*math.Pi - math.Pi/2 + (b.rnd.Float64()-0.5)*math.Pi/2.
 	b.BallSpeed = .98
 	b.PaddlePos = b.Width / 2
 	b.PaddleDirection = 0
@@ -121,6 +122,7 @@ func (b *Brick) Has(x, y int) bool {
 
 func (b *Brick) Clear(x, y int) {
 	b.State[y*b.NumW+x] = false
+	b.NumBricks--
 	switch y {
 	case 0, 1:
 		b.Score += 7
@@ -188,7 +190,7 @@ func (b *Brick) Next() bool {
 		b.BallAngle = math.Atan2(vy, vx)
 		b.BallSpeed = min(1.1, max(0.3, math.Sqrt(vx*vx+vy*vy)))
 		b.JustBounced = true
-		// bounce on walls
+	// bounce on walls
 	case b.BallY >= b.BallHeight:
 		if b.CheckLives {
 			b.Death()
@@ -196,26 +198,29 @@ func (b *Brick) Next() bool {
 		}
 		fallthrough
 	case b.BallY < 0:
-		b.BallAngle = -b.BallAngle
+		b.BallAngle = 2*math.Pi - b.BallAngle
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
-		b.BallAngle = math.Mod(math.Pi-b.BallAngle, 2*math.Pi)
+		b.BallAngle = math.Mod(3*math.Pi-b.BallAngle, 2*math.Pi)
 	default:
 		b.JustBounced = false
 		return false
 	}
 	// avoid vertical or horizontal movement
 	dx := math.Cos(b.BallAngle)
+	dy := math.Sin(b.BallAngle)
 	if math.Abs(dx) < 0.2 {
 		b.BallAngle += (b.rnd.Float64() - 0.5) * math.Pi / 7
 	}
-	dy := math.Sin(b.BallAngle)
 	if math.Abs(dy) < 0.3 {
-		incr := b.rnd.Float64() * math.Pi / 7
-		if dy > 0 {
+		incr := .15 + b.rnd.Float64()/10 // add 0.15 to 0.25 of vertical movement.
+		if dy < 0 {
 			incr = -incr
 		}
-		b.BallAngle += incr
+		b.BallAngle = math.Atan2(dy+incr, dx)
 	}
+	// Angle might have changed above, recalculate dx, dy
+	dx = math.Cos(b.BallAngle)
+	dy = math.Sin(b.BallAngle)
 	b.BallX += b.BallSpeed * dx
 	b.BallY -= b.BallSpeed * dy
 	return false
@@ -238,16 +243,13 @@ func (b *Brick) AutoPlay(vx, vy float64) {
 	}
 }
 
-func (b *Brick) Set(x, y int) {
-	b.State[y*b.NumW+x] = true
-}
-
 func (b *Brick) Initial() {
 	for y := range 8 {
 		for x := range b.NumW {
-			b.Set(x, y)
+			b.State[y*b.NumW+x] = true
 		}
 	}
+	b.NumBricks = 8 * b.NumW
 }
 
 func (b *Brick) recordMove(direction int8) {
@@ -327,7 +329,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		bxx := max(0, min(b.NumW-1, (bx-b.Padding)/(BrickWidth+1)))
 		byy := max(0, min(7, by2-1))
 		if b.Has(bxx, byy) {
-			b.BallAngle = -b.BallAngle
+			b.BallAngle = 2*math.Pi - b.BallAngle
 			b.Clear(bxx, byy)
 		}
 	}
@@ -369,7 +371,7 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
-func Main() int {
+func Main() int { //nolint:funlen // many flags etc...
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
@@ -437,6 +439,9 @@ func Main() int {
 			death = false
 			continue
 		}
+		if b.NumBricks == 0 {
+			return handleWin(ap, b)
+		}
 		ap.EndSyncMode()
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -453,6 +458,13 @@ func Main() int {
 		}
 		death = b.Next()
 	}
+}
+
+func handleWin(ap *ansipixels.AnsiPixels, b *Brick) int {
+	ap.WriteBoxed(ap.H/2, " 🏆✨ You won! ✨🏆 ")
+	_ = ap.ReadOrResizeOrSignal()
+	atEnd(ap, b)
+	return 0
 }
 
 func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
