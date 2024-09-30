@@ -33,6 +33,7 @@ type Brick struct {
 	PaddleY         int
 	Score           int
 	Lives           int
+	NumBricks       int // number of bricks left - 0 == win
 	State           []bool
 	BallX           float64
 	BallY           float64
@@ -121,6 +122,7 @@ func (b *Brick) Has(x, y int) bool {
 
 func (b *Brick) Clear(x, y int) {
 	b.State[y*b.NumW+x] = false
+	b.NumBricks--
 	switch y {
 	case 0, 1:
 		b.Score += 7
@@ -241,16 +243,13 @@ func (b *Brick) AutoPlay(vx, vy float64) {
 	}
 }
 
-func (b *Brick) Set(x, y int) {
-	b.State[y*b.NumW+x] = true
-}
-
 func (b *Brick) Initial() {
 	for y := range 8 {
 		for x := range b.NumW {
-			b.Set(x, y)
+			b.State[y*b.NumW+x] = true
 		}
 	}
+	b.NumBricks = 8 * b.NumW
 }
 
 func (b *Brick) recordMove(direction int8) {
@@ -372,7 +371,7 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
-func Main() int {
+func Main() int { //nolint:funlen // many flags etc...
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
@@ -440,6 +439,9 @@ func Main() int {
 			death = false
 			continue
 		}
+		if b.NumBricks == 0 {
+			return handleWin(ap, b)
+		}
 		ap.EndSyncMode()
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -456,6 +458,13 @@ func Main() int {
 		}
 		death = b.Next()
 	}
+}
+
+func handleWin(ap *ansipixels.AnsiPixels, b *Brick) int {
+	ap.WriteBoxed(ap.H/2, " 🏆✨ You won! ✨🏆 ")
+	_ = ap.ReadOrResizeOrSignal()
+	atEnd(ap, b)
+	return 0
 }
 
 func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
