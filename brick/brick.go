@@ -99,7 +99,7 @@ func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick 
 		BallY:      2 * (8 + 3), // just below the bricks.
 		PaddleY:    paddleY,
 		BallAngle:  -math.Pi/2 + (rnd.Float64()-0.5)*math.Pi/2.,
-		BallSpeed:  1.1,
+		BallSpeed:  1.05,
 		Lives:      numLives,
 		CheckLives: checkLives,
 		Seed:       seed,
@@ -169,7 +169,7 @@ func (b *Brick) Next() {
 		vx += PaddleSpinFactor * float64(b.PaddleDirection)
 		vy = -vy
 		b.BallAngle = math.Atan2(vy, vx)
-		b.BallSpeed = min(1.5, max(0.5, math.Sqrt(vx*vx+vy*vy)))
+		b.BallSpeed = min(1.4, max(0.4, math.Sqrt(vx*vx+vy*vy)))
 		b.JustBounced = true
 		return
 		// bounce on walls
@@ -195,15 +195,10 @@ func (b *Brick) Next() {
 }
 
 func (b *Brick) AutoPlay(vx, vy float64) {
-	target := b.BallX
+	target := b.BallX + vx
 	delta := 0.
 	if vy > 0 {
 		target = float64(b.Width) / 2.
-	} else {
-		delta = -1.
-		if vx < 0 {
-			delta = 1
-		}
 	}
 	target = math.Round(target + delta)
 	switch {
