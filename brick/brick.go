@@ -45,6 +45,8 @@ type Brick struct {
 	CheckLives      bool
 	ShowInfo        bool
 	Replay          bool
+	Auto            bool
+	JustBounced     bool
 	MoveRecords     []MoveRecord
 }
 
@@ -130,6 +132,15 @@ func (b *Brick) Next() {
 		b.MoveRecords = b.MoveRecords[1:]
 	}
 	b.Frames++
+	// move ball (before adjustments)
+	vx := b.BallSpeed * math.Cos(b.BallAngle)
+	vy := b.BallSpeed * math.Sin(b.BallAngle)
+	b.BallX += vx
+	b.BallY -= vy
+	// auto
+	if b.Auto {
+		b.AutoPlay(vx, vy)
+	}
 	// move paddle
 	b.PaddlePos += int(b.PaddleDirection)
 	halfWidth := PaddleWidth / 2 // 7 so 3.5
@@ -141,11 +152,7 @@ func (b *Brick) Next() {
 		b.PaddlePos = b.Width - 1 - halfWidth
 		b.PaddleDirection = 0
 	}
-	vx := b.BallSpeed * math.Cos(b.BallAngle)
-	vy := b.BallSpeed * math.Sin(b.BallAngle)
-	b.BallX += vx
-	b.BallY -= vy
-
+	// bounce ball
 	by := safecast.MustRound[int](b.BallY)
 	by2 := by / 2
 
@@ -153,17 +160,23 @@ func (b *Brick) Next() {
 	switch {
 	// bounce on paddle
 	case (1+by2 == b.PaddleY) && (by%2 == 0) && paddleXdistance <= float64(PaddleWidth)/2.:
+		if b.JustBounced {
+			b.JustBounced = false
+			return
+		}
 		vx += PaddleSpinFactor * float64(b.PaddleDirection)
 		vy = -vy
 		b.BallAngle = math.Atan2(vy, vx)
 		b.BallSpeed = min(1.5, max(0.5, math.Sqrt(vx*vx+vy*vy)))
+		b.JustBounced = true
 		return
-	// bounce on walls
-	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
-		b.BallAngle = math.Pi - b.BallAngle
+		// bounce on walls
 	case b.BallY < 0 || b.BallY >= b.BallHeight:
 		b.BallAngle = -b.BallAngle
+	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
+		b.BallAngle = math.Pi - b.BallAngle
 	default:
+		b.JustBounced = false
 		return
 	}
 	// avoid vertical or horizontal movement
@@ -177,6 +190,28 @@ func (b *Brick) Next() {
 	}
 	b.BallX += b.BallSpeed * dx
 	b.BallY -= b.BallSpeed * dy
+}
+
+func (b *Brick) AutoPlay(vx, vy float64) {
+	target := b.BallX
+	delta := 0.
+	if vy > 0 {
+		target = float64(b.Width) / 2.
+	} else {
+		delta = -1.
+		if vx < 0 {
+			delta = 1
+		}
+	}
+	target = math.Round(target + delta)
+	switch {
+	case target < float64(b.PaddlePos):
+		b.Left()
+	case target > float64(b.PaddlePos):
+		b.Right()
+	default:
+		b.Center()
+	}
 }
 
 func (b *Brick) Set(x, y int) {
@@ -215,6 +250,10 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteString(log.ANSIColors.Reset)
 	ap.DrawRoundBox(0, 0, ap.W, ap.H)
 	ap.WriteBoxed(0, "Score %d", b.Score)
+	livesSymbol := "❤️"
+	if b.Auto {
+		livesSymbol = "🤖"
+	}
 	switch b.Lives {
 	case 0:
 		ap.WriteRightBoxed(0, "☠️")
@@ -222,10 +261,10 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		if b.Replay {
 			ap.WriteRightBoxed(0, "🔂")
 		} else {
-			ap.WriteRightBoxed(0, "∞❤️")
+			ap.WriteRightBoxed(0, "∞%s", livesSymbol)
 		}
 	default:
-		ap.WriteRightBoxed(0, "%d❤️", b.Lives)
+		ap.WriteRightBoxed(0, "%d%s", b.Lives, livesSymbol)
 	}
 	for y := range 8 {
 		ap.MoveCursor(b.Padding+1, 3+y)
@@ -310,6 +349,7 @@ func Main() int {
 	noSave := flag.Bool("nosave", false, "Don't save the game as JSON (default is to save)")
 	seed := flag.Uint64("seed", 0, "Random number generator `seed`, default (0) is time based")
 	replay := flag.String("replay", "", "Replay a `game` from a JSON file")
+	autoPlay := flag.Bool("autoplay", false, "Computer plays mode")
 	cli.Main()
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
@@ -336,6 +376,7 @@ func Main() int {
 			prevInfo = b.ShowInfo
 		}
 		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath, seedV) // half pixels vertically.
+		b.Auto = *autoPlay
 		b.ShowInfo = prevInfo
 		Draw(ap, b)
 		ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
