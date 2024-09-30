@@ -109,7 +109,7 @@ func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick 
 func (b *Brick) ResetBall() {
 	b.BallX = float64(b.Width) / 2.
 	b.BallY = 2 * (8 + 3) // just below the bricks.
-	b.BallAngle = -math.Pi/2 + (b.rnd.Float64()-0.5)*math.Pi/2.
+	b.BallAngle = 2*math.Pi - math.Pi/2 + (b.rnd.Float64()-0.5)*math.Pi/2.
 	b.BallSpeed = .98
 	b.PaddlePos = b.Width / 2
 	b.PaddleDirection = 0
@@ -188,7 +188,7 @@ func (b *Brick) Next() bool {
 		b.BallAngle = math.Atan2(vy, vx)
 		b.BallSpeed = min(1.1, max(0.3, math.Sqrt(vx*vx+vy*vy)))
 		b.JustBounced = true
-		// bounce on walls
+	// bounce on walls
 	case b.BallY >= b.BallHeight:
 		if b.CheckLives {
 			b.Death()
@@ -196,26 +196,29 @@ func (b *Brick) Next() bool {
 		}
 		fallthrough
 	case b.BallY < 0:
-		b.BallAngle = -b.BallAngle
+		b.BallAngle = 2*math.Pi - b.BallAngle
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
-		b.BallAngle = math.Mod(math.Pi-b.BallAngle, 2*math.Pi)
+		b.BallAngle = math.Mod(3*math.Pi-b.BallAngle, 2*math.Pi)
 	default:
 		b.JustBounced = false
 		return false
 	}
 	// avoid vertical or horizontal movement
 	dx := math.Cos(b.BallAngle)
+	dy := math.Sin(b.BallAngle)
 	if math.Abs(dx) < 0.2 {
 		b.BallAngle += (b.rnd.Float64() - 0.5) * math.Pi / 7
 	}
-	dy := math.Sin(b.BallAngle)
 	if math.Abs(dy) < 0.3 {
-		incr := b.rnd.Float64() * math.Pi / 7
-		if dy > 0 {
+		incr := .15 + b.rnd.Float64()/10 // add 0.15 to 0.25 of vertical movement.
+		if dy < 0 {
 			incr = -incr
 		}
-		b.BallAngle += incr
+		b.BallAngle = math.Atan2(dy+incr, dx)
 	}
+	// Angle might have changed above, recalculate dx, dy
+	dx = math.Cos(b.BallAngle)
+	dy = math.Sin(b.BallAngle)
 	b.BallX += b.BallSpeed * dx
 	b.BallY -= b.BallSpeed * dy
 	return false
@@ -327,7 +330,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		bxx := max(0, min(b.NumW-1, (bx-b.Padding)/(BrickWidth+1)))
 		byy := max(0, min(7, by2-1))
 		if b.Has(bxx, byy) {
-			b.BallAngle = -b.BallAngle
+			b.BallAngle = 2*math.Pi - b.BallAngle
 			b.Clear(bxx, byy)
 		}
 	}
