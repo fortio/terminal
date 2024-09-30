@@ -48,6 +48,7 @@ type Brick struct {
 	Auto            bool
 	JustBounced     bool
 	MoveRecords     []MoveRecord
+	rnd             *rand.Rand
 }
 
 /*
@@ -103,6 +104,7 @@ func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick 
 		CheckLives: checkLives,
 		Seed:       seed,
 		Frames:     1,
+		rnd:        rnd,
 	}
 	b.Initial()
 	return b
@@ -131,7 +133,6 @@ func (b *Brick) Next() {
 		b.PaddleDirection = b.MoveRecords[0].Direction
 		b.MoveRecords = b.MoveRecords[1:]
 	}
-	b.Frames++
 	// move ball (before adjustments)
 	vx := b.BallSpeed * math.Cos(b.BallAngle)
 	vy := b.BallSpeed * math.Sin(b.BallAngle)
@@ -141,6 +142,7 @@ func (b *Brick) Next() {
 	if b.Auto {
 		b.AutoPlay(vx, vy)
 	}
+	b.Frames++
 	// move paddle
 	b.PaddlePos += int(b.PaddleDirection)
 	halfWidth := PaddleWidth / 2 // 7 so 3.5
@@ -174,7 +176,7 @@ func (b *Brick) Next() {
 	case b.BallY < 0 || b.BallY >= b.BallHeight:
 		b.BallAngle = -b.BallAngle
 	case b.BallX <= 0 || b.BallX >= float64(b.Width)-1:
-		b.BallAngle = math.Pi - b.BallAngle
+		b.BallAngle = math.Mod(math.Pi-b.BallAngle, 2*math.Pi)
 	default:
 		b.JustBounced = false
 		return
@@ -182,11 +184,11 @@ func (b *Brick) Next() {
 	// avoid vertical or horizontal movement
 	dx := math.Cos(b.BallAngle)
 	if math.Abs(dx) < 0.2 {
-		b.BallAngle += (rand.Float64() - 0.5) * math.Pi / 7 //nolint:gosec // not crypto
+		b.BallAngle += (b.rnd.Float64() - 0.5) * math.Pi / 7
 	}
 	dy := math.Sin(b.BallAngle)
 	if math.Abs(dy) < 0.2 {
-		b.BallAngle += (rand.Float64() - 0.5) * math.Pi / 7 //nolint:gosec // not crypto
+		b.BallAngle += (b.rnd.Float64() - 0.5) * math.Pi / 7
 	}
 	b.BallX += b.BallSpeed * dx
 	b.BallY -= b.BallSpeed * dy
@@ -228,6 +230,9 @@ func (b *Brick) Initial() {
 
 func (b *Brick) recordMove(direction int8) {
 	if b.Replay {
+		return
+	}
+	if direction == b.PaddleDirection {
 		return
 	}
 	b.MoveRecords = append(b.MoveRecords, MoveRecord{Frame: b.Frames, Direction: direction})
