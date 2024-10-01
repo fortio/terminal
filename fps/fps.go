@@ -87,8 +87,10 @@ func main() {
 
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	// q, ^C, ^D to exit.
-	for _, key := range ap.Data {
+	cleaned := ansipixels.AnsiClean(ap.Data)
+	for _, key := range cleaned {
 		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
+			log.Infof("Exiting on key %q from %q / %q", key, cleaned, ap.Data)
 			return true
 		}
 	}
@@ -286,6 +288,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
 	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
 	exactlyFlag := flag.Int64("n", 0, "Start immediately an FPS test with the specified `number of frames` (default is interactive)")
+	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
 	cli.MinArgs = 0
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
@@ -318,7 +321,6 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}
-	// ap.MouseTrackingOn()
 	ap.TrueColor = *trueColorFlag
 	ap.Color = *colorFlag
 	ap.Gray = *grayFlag
@@ -328,7 +330,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	}
 	defer func() {
 		ap.MoveCursor(0, ap.H-1)
-		// ap.MouseTrackingOff()
+		ap.MouseTrackingOff()
 		ap.Restore() // flushes and shows cursor and resets terminal back to original state.
 	}()
 	// GetSize done in Open (and resize signal handler).
@@ -385,6 +387,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		return log.FErrf("Error reading initial key: %v", err)
 	}
 	ap.HideCursor()
+	if !*noMouseFlag {
+		ap.MouseTrackingOn()
+	}
 	ap.OnResize = func() error {
 		ap.StartSyncMode()
 		ap.ClearScreen()

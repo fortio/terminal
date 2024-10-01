@@ -3,6 +3,7 @@ package ansipixels
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -69,18 +70,24 @@ func (ap *AnsiPixels) Open() (err error) {
 	return
 }
 
-var CleanAnsiRE = regexp.MustCompile("\x1b\\[[^@-~]*([@-~]|$)")
+// So this handles both outgoing and incoming escape sequences, but maybe we should split them
+// to keep the outgoing (for string width etc) and the incoming (find key pressed without being
+// confused by a "q" in the middle of the mouse coordinates) separate.
+var CleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
 
 // Remove all Ansi code from a given string. Useful among other things to get the correct string width.
 func AnsiCleanRE(str string) string {
 	return CleanAnsiRE.ReplaceAllString(str, "")
 }
 
-const startSequence = "\x1b["
+var startSequence = []byte("\x1b[")
 
-func AnsiClean(str string) string {
-	// Index also uses IndexBytes and SIMD when available internally so no need to convert to bytes.
-	idx := strings.Index(str, startSequence)
+func AnsiClean(str []byte) []byte {
+	// note strings.Index also uses IndexBytes and SIMD when available internally
+	// a string version would be fast too without the need to convert to bytes.
+	// yet this version is a bit faster and fewer allocations and we need byte based
+	// for the stopKey check anyway.
+	idx := bytes.Index(str, startSequence)
 	if idx == -1 {
 		return str
 	}
@@ -91,20 +98,29 @@ func AnsiClean(str string) string {
 	buf := make([]byte, 0, l-3) // remaining worst case is ESC[m so -3 at least.
 	for {
 		buf = append(buf, str[:idx]...)
-		// skip until end of escape sequence
-		for idx += 2; str[idx] < 64; idx++ {
-			if idx == l-1 {
-				return string(buf)
+		idx += 2
+		if str[idx] == 'M' {
+			// Mouse is fixed size
+			idx += 3
+			if idx >= l-1 {
+				return buf
+			}
+		} else {
+			// Normal escape: skip until end of escape sequence
+			for ; str[idx] < 64; idx++ {
+				if idx == l-1 {
+					return buf
+				}
 			}
 		}
 		str = str[idx+1:]
-		idx = strings.Index(str, startSequence)
+		idx = bytes.Index(str, startSequence)
 		if idx == -1 {
 			break
 		}
 	}
 	buf = append(buf, str...)
-	return string(buf)
+	return buf
 }
 
 func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
@@ -226,7 +242,8 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 }
 
 func (ap *AnsiPixels) ScreenWidth(str string) int {
-	return uniseg.StringWidth(AnsiClean(str))
+	// Hopefully the compiler will optimize this alloc wise for string<->[]byte.
+	return uniseg.StringWidth(string(AnsiClean([]byte(str))))
 }
 
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {

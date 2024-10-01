@@ -44,6 +44,26 @@ var testCases = []struct {
 		"\x1b[31mHello\x1b[0m \x1b[32mWorld\x1b[0m tada!",
 		"Hello World tada!",
 	},
+	{
+		"WithMouseEscapeSequence",
+		"Hello \x1b[MCqGMouse",
+		"Hello Mouse",
+	},
+	{
+		"UnterminatedMouseEscapeSequence1",
+		"Hello \x1b[MCq",
+		"Hello ",
+	},
+	{
+		"UnterminatedMouseEscapeSequence2",
+		"Hello \x1b[MC",
+		"Hello ",
+	},
+	{
+		"UnterminatedMouseEscapeSequence3",
+		"Hello \x1b[M",
+		"Hello ",
+	},
 }
 
 func TestAnsiCleanRE(t *testing.T) {
@@ -60,8 +80,8 @@ func TestAnsiCleanRE(t *testing.T) {
 func TestAnsiCleanHR(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := AnsiClean(tc.input)
-			if actual != tc.expected {
+			actual := AnsiClean([]byte(tc.input))
+			if string(actual) != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, actual)
 			}
 		})
@@ -80,9 +100,10 @@ func BenchmarkAnsiCleanRE(b *testing.B) {
 
 func BenchmarkAnsiCleanHR(b *testing.B) {
 	for _, tc := range testCases {
+		inp := []byte(tc.input)
 		b.Run(tc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				AnsiClean(tc.input)
+				AnsiClean(inp)
 			}
 		})
 	}
