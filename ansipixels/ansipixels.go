@@ -69,6 +69,44 @@ func (ap *AnsiPixels) Open() (err error) {
 	return
 }
 
+var CleanAnsiRE = regexp.MustCompile("\x1b\\[[^@-~]*([@-~]|$)")
+
+// Remove all Ansi code from a given string. Useful among other things to get the correct string width.
+func AnsiCleanRE(str string) string {
+	return CleanAnsiRE.ReplaceAllString(str, "")
+}
+
+const startSequence = "\x1b["
+
+func AnsiClean(str string) string {
+	// Index also uses IndexBytes and SIMD when available internally so no need to convert to bytes.
+	idx := strings.Index(str, startSequence)
+	if idx == -1 {
+		return str
+	}
+	l := len(str)
+	if idx == l-2 {
+		return str[:idx] // last 3 bytes are ESC[m
+	}
+	buf := make([]byte, 0, l-3) // worst case is ESC[m (well or a bug) so -3 at least.
+	for {
+		buf = append(buf, str[:idx]...)
+		// skip until end of escape sequence
+		for idx += 2; str[idx] < 64; idx++ {
+			if idx == l-1 {
+				return string(buf)
+			}
+		}
+		str = str[idx+1:]
+		idx = strings.Index(str, startSequence)
+		if idx == -1 {
+			break
+		}
+	}
+	buf = append(buf, str...)
+	return string(buf)
+}
+
 func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 	if !ap.IsResizeSignal(s) {
 		return terminal.ErrSignal
@@ -188,7 +226,7 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 }
 
 func (ap *AnsiPixels) ScreenWidth(str string) int {
-	return uniseg.StringWidth(str)
+	return uniseg.StringWidth(AnsiClean(str))
 }
 
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
@@ -198,9 +236,31 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	ap.WriteString(s)
 }
 
+func (ap *AnsiPixels) TruncateLeftToFit(msg string, max int) (string, int) {
+	w := ap.ScreenWidth(msg)
+	if w < max {
+		return msg, w
+	}
+	// slow path.
+	str := "…"
+	runes := []rune(msg)
+	// This isn't optimized and also because of AnsiClean behind the scene we might remove codes we should keep.
+	for i := range runes {
+		w = ap.ScreenWidth(string(runes[i:]))
+		if w < max {
+			return str + string(runes[i:]), w + 1
+		}
+	}
+	return str, 1
+}
+
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - ap.ScreenWidth(s) - ap.Margin
+	s, l := ap.TruncateLeftToFit(s, ap.W-2*ap.Margin)
+	x := ap.W - l - ap.Margin
+	if x < 0 {
+		panic("TruncateLeftToFit returned a string longer than the width")
+	}
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
 }

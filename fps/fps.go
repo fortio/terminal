@@ -318,6 +318,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	if err := ap.Open(); err != nil {
 		log.Fatalf("Not a terminal: %v", err)
 	}
+	// ap.MouseTrackingOn()
 	ap.TrueColor = *trueColorFlag
 	ap.Color = *colorFlag
 	ap.Gray = *grayFlag
@@ -327,6 +328,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	}
 	defer func() {
 		ap.MoveCursor(0, ap.H-1)
+		// ap.MouseTrackingOff()
 		ap.Restore() // flushes and shows cursor and resets terminal back to original state.
 	}()
 	// GetSize done in Open (and resize signal handler).
@@ -454,7 +456,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, "Target FPS %s, %dx%d, typed so far: [%q]", fpsStr, ap.W, ap.H, entry)
+			ap.WriteRight(ap.H-1-ap.Margin, "Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]",
+				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
+				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
