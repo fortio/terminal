@@ -21,12 +21,6 @@ import (
 	_ "golang.org/x/image/webp" // Import WebP decoder
 )
 
-const (
-	FullPixel       = '█'
-	TopHalfPixel    = '▀'
-	BottomHalfPixel = '▄'
-)
-
 func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	ap.MoveCursor(sx, sy)
 	var err error
