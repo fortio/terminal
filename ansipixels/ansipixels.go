@@ -236,9 +236,9 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	ap.WriteString(s)
 }
 
-func (ap *AnsiPixels) TruncateLeftToFit(msg string, max int) (string, int) {
+func (ap *AnsiPixels) TruncateLeftToFit(msg string, maxWidth int) (string, int) {
 	w := ap.ScreenWidth(msg)
-	if w < max {
+	if w < maxWidth {
 		return msg, w
 	}
 	// slow path.
@@ -247,7 +247,7 @@ func (ap *AnsiPixels) TruncateLeftToFit(msg string, max int) (string, int) {
 	// This isn't optimized and also because of AnsiClean behind the scene we might remove codes we should keep.
 	for i := range runes {
 		w = ap.ScreenWidth(string(runes[i:]))
-		if w < max {
+		if w < maxWidth {
 			return str + string(runes[i:]), w + 1
 		}
 	}
