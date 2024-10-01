@@ -25,6 +25,16 @@ var testCases = []struct {
 		"Hello World",
 	},
 	{
+		"ShortestEscapeSequenceAtEnd",
+		"Hello Woooo\x1b[m",
+		"Hello Woooo",
+	},
+	{
+		"ShortestEscapeSequence",
+		"\x1b[m",
+		"",
+	},
+	{
 		"SingleEscapeSequence",
 		"Hello \x1b[31mWorld\x1b[0m cruel.",
 		"Hello World cruel.",

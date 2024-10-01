@@ -86,9 +86,9 @@ func AnsiClean(str string) string {
 	}
 	l := len(str)
 	if idx == l-2 {
-		return str[:idx] // last 3 bytes are ESC[m
+		return str[:idx] // last 2 bytes are a truncated ESC[
 	}
-	buf := make([]byte, 0, l-3) // worst case is ESC[m (well or a bug) so -3 at least.
+	buf := make([]byte, 0, l-3) // remaining worst case is ESC[m so -3 at least.
 	for {
 		buf = append(buf, str[:idx]...)
 		// skip until end of escape sequence
