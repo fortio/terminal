@@ -461,7 +461,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, "Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s] Mouse %d,%d (%d)",
+			ap.WriteRight(ap.H-1-ap.Margin, "Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s] Mouse %d,%d (%06b)",
 				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
 				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray,
 				ap.Mx, ap.My, ap.Mbuttons)
