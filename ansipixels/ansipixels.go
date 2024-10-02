@@ -32,8 +32,11 @@ type AnsiPixels struct {
 	state         *term.State
 	buf           [BUFSIZE]byte
 	Data          []byte
-	W, H          int // Width and Height
-	x, y          int // Cursor last set position
+	W, H          int  // Width and Height
+	x, y          int  // Cursor last set position
+	Mouse         bool // Mouse event received
+	Mx, My        int  // Mouse last known position
+	Mbuttons      int  // Mouse buttons and modifier state
 	C             chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
@@ -167,6 +170,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	default:
 		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
 		ap.Data = ap.buf[0:n]
+		ap.MouseDecode()
 		return n, err
 	}
 	return 0, nil
@@ -340,6 +344,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		}
 		ap.Data = append(ap.Data, res[1]...)
 		ap.Data = append(ap.Data, res[4]...)
+		ap.MouseDecode()
 		break
 	}
 	return x, y, err
