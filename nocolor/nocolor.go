@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"io"
 	"os"
 
@@ -27,22 +28,43 @@ func NoColorSetup() {
 
 func Main() int {
 	NoColorSetup()
+	sizeFlag := flag.Int("s", 1024, "Buffer size, in bytes, to use for reading/writing")
 	cli.ArgsHelp = "\nReads from stdin, writes to stdout, filters out all Ansi code (color, cursor movement, etc...) sequences\n"
 	cli.Main()
-	var buf [1024]byte
+	bufSize := *sizeFlag
+	// We don't want so small that it's enough to re-assemble escape sequences (and gets inifinite loop with left over).
+	if bufSize < 8 {
+		return log.FErrf("Buffer size too small: %d", bufSize)
+	}
+	return Filter(bufSize, os.Stdin, os.Stdout)
+}
+
+func Filter(bufSize int, in io.Reader, out io.Writer) int {
+	buf := make([]byte, bufSize)
 	var totalR int64
 	var totalW int64
 	var numFiltered int64
+	var numReads int
+	leftOverIndex := 0
 	for {
-		rn, rerr := os.Stdin.Read(buf[:])
+		rn, rerr := in.Read(buf[leftOverIndex:])
 		if errors.Is(rerr, io.EOF) { // rn guaranteed to be 0 in this case.
 			break
 		}
-		// Write/salvage whatever was read even if there is a read error.
+		numReads++
 		totalR += int64(rn)
-		filtered := ansipixels.AnsiClean(buf[:rn])
+		// Write/salvage whatever was read even if there is a read error.
+		l := leftOverIndex + rn
+		filtered, endIdx := ansipixels.AnsiClean(buf[:l])
+		log.Debugf("Buf %q -> %q (left %d)", buf[:l], filtered, l-endIdx)
+		wn, werr := out.Write(filtered) // write before we might overwrite the buffer, filtered could be a slice of the original.
+		if endIdx == l {
+			leftOverIndex = 0
+		} else {
+			leftOverIndex = l - endIdx
+			copy(buf, buf[endIdx:l])
+		}
 		numFiltered += int64(rn - len(filtered))
-		wn, werr := os.Stdout.Write(filtered)
 		totalW += int64(wn)
 		if werr != nil {
 			return log.FErrf("Error writing: %v", werr)
@@ -51,6 +73,7 @@ func Main() int {
 			return log.FErrf("Error reading: %v", rerr)
 		}
 	}
-	log.LogVf("Filtered %d bytes (Total bytes read: %d, written: %d)", numFiltered, totalR, totalW)
+	log.LogVf("Filtered %d bytes (Total bytes read: %d, written: %d in %d read/write)",
+		numFiltered, totalR, totalW, numReads)
 	return 0
 }
