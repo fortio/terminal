@@ -57,6 +57,6 @@ func (ap *AnsiPixels) MouseDecode() {
 	ap.Mx = int(x) - 32
 	ap.My = int(y) - 32
 	ap.Mbuttons = int(b) - 32
-	ap.Mouse = true
 	ap.MouseDecode()
+	ap.Mouse = true
 }

@@ -461,10 +461,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s Mouse %d,%d (%06b)",
+			invert := ""
+			if ap.Mouse {
+				invert = "\033[7m"
+			}
+			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
 				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
 				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray, log.ANSIColors.Reset,
-				ap.Mx, ap.My, ap.Mbuttons)
+				invert, ap.Mx, ap.My, ap.Mbuttons, log.ANSIColors.Reset)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
