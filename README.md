@@ -141,7 +141,7 @@ or pick a binary from the [releases](https://github.com/fortio/terminal/releases
 
 ## Nocolor
 
-`nocolor` is a very simple unix style filter: it removes all ansi codes from the input stream and writes the filtered version, color free, to stdout.
+`nocolor` is a very simple unix style filter ([source code](https://github.com/fortio/terminal/blob/main/nocolor/nocolor.go#L42), uses [ansipixels.AnsiClean](https://pkg.go.dev/fortio.org/terminal/ansipixels#AnsiClean)): it removes all ansi codes from the input stream and writes the filtered version, color free, to stdout.
 
 To install if you have go:
 ```shell
