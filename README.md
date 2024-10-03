@@ -117,3 +117,22 @@ flags:
   -seed seed
     	Random number generator seed, default (0) is time based
 ```
+
+Like for the others, to try if you have go:
+```shell
+go run fortio.org/terminal/brick@latest
+```
+or pick a binary from the [releases](https://github.com/fortio/terminal/releases)
+
+
+## Nocolor
+
+`nocolor` is a very simple unix style filter: it removes all ansi codes from the input stream and writes the filtered version, color free, to stdout.
+
+To install if you have go:
+```shell
+go install fortio.org/terminal/nocolor@latest
+# then
+somethingProducingColors | nocolor
+```
+or pick a binary from the [releases](https://github.com/fortio/terminal/releases)

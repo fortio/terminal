@@ -52,3 +52,15 @@ jobs:
             GH_PAT: ${{ secrets.GH_PAT }}
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
+    releaser-nocolor:
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
+        with:
+            description: "Fortio terminal nocolor (and no other ansi code either) filter"
+            binary_name: "nocolor"
+            main_path: "./nocolor"
+            dockerfile: "./Dockerfile.nocolor"
+        secrets:
+            GH_PAT: ${{ secrets.GH_PAT }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+            DOCKER_USER: ${{ secrets.DOCKER_USER }}

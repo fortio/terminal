@@ -77,15 +77,18 @@ func (ap *AnsiPixels) Open() (err error) {
 // to keep the outgoing (for string width etc) and the incoming (find key pressed without being
 // confused by a "q" in the middle of the mouse coordinates) separate.
 // This extra complexity (M mode) is now not needed as we run MouseDecode() and that removes/parses the mouse data.
-var CleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
+var cleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
 
 // Remove all Ansi code from a given string. Useful among other things to get the correct string width.
-func AnsiCleanRE(str string) string {
-	return CleanAnsiRE.ReplaceAllString(str, "")
+func ansiCleanRE(str string) string {
+	return cleanAnsiRE.ReplaceAllString(str, "")
 }
 
 var startSequence = []byte("\x1b[")
 
+// AnsiClean removes all Ansi code from a given byte slice.
+// Useful among other things to get the correct string to pass to uniseq.StringWidth
+// (ap.StringWidth does it for you).
 func AnsiClean(str []byte) []byte {
 	// note strings.Index also uses IndexBytes and SIMD when available internally
 	// a string version would be fast too without the need to convert to bytes.

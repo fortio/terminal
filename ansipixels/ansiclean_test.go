@@ -72,7 +72,7 @@ var testCases = []struct {
 func TestAnsiCleanRE(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := AnsiCleanRE(tc.input)
+			actual := ansiCleanRE(tc.input)
 			if actual != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, actual)
 			}
@@ -95,7 +95,7 @@ func BenchmarkAnsiCleanRE(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				AnsiCleanRE(tc.input)
+				ansiCleanRE(tc.input)
 			}
 		})
 	}
