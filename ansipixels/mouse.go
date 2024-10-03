@@ -11,6 +11,10 @@ func (ap *AnsiPixels) MouseClickOff() {
 }
 
 func (ap *AnsiPixels) MouseTrackingOn() {
+	// Note default is supposed to be 1 but it isn't as of 2024-11-02
+	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
+	// Let us see shift key modifiers:
+	ap.WriteString("\033[>1s")
 	ap.WriteString("\033[?1003h")
 }
 
