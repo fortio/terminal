@@ -1,0 +1,208 @@
+[0mΦορτίο [34mdev[0m usage:
+	fortio [35mcommand [0m[[36mflags[0m] target
+where command is one of: load (load testing), server (starts ui, rest api,
+ http-echo, redirect, proxies, tcp-echo, udp-echo and grpc ping servers), 
+ tcp-echo (only the tcp-echo server), udp-echo (only udp-echo server),
+ report (report only UI server), redirect (only the redirect server),
+ proxies (only the -M and -P configured proxies), grpcping (gRPC client),
+ or curl (single URL debug), or nc (single tcp or udp:// connection),
+ or version (prints the full version and build details).
+where target is a URL (http load tests) or host:port (grpc health test),
+ or tcp://host:port (tcp load test), or udp://host:port (udp load test).
+or 1 of the special arguments
+	fortio {[35mhelp[0m|[35menvhelp[0m|[35mversion[0m|[35mbuildinfo[0m}
+flags:
+[36m  -H key:value
+[36m    [0m	Additional HTTP header(s) or gRPC metadata. Multiple key:value pairs can be passed using multiple -H.
+[36m  -L[0m	Follow redirects (implies -std-client) - do not use for load test
+[36m  -M value
+[36m    [0m	HTTP multi proxy to run, e.g -M "localport1 baseDestURL1 baseDestURL2" -M ...
+[36m  -P value
+[36m    [0m	TCP proxies to run, e.g -P "localport1 dest_host1:dest_port1" -P "[::1]:0 www.google.com:443" ...
+[36m  -X string
+[36m    [0m	HTTP method to use instead of GET/POST depending on payload/content-type
+[36m  -a[0m	Automatically save JSON result with filename based on labels & timestamp
+[36m  -abort-on int
+[36m    [0m	HTTP status code that if encountered aborts the run. e.g., 503 or -1 for socket errors.
+[36m  -access-log-file path
+[36m    [0m	file path to log all requests to. Maybe have performance impacts
+[36m  -access-log-format format
+[36m    [0m	format for access log. Supported values: [json, influx] [32m(default "json")
+[36m  -allow-initial-errors
+[36m    [0m	Allow and don't abort on initial warmup errors
+[36m  -base-url URL
+[36m    [0m	base URL used as prefix for data/index.tsv generation. (when empty, the URL from the first request is used)
+[36m  -c int
+[36m    [0m	Number of connections/goroutine/threads [32m(default 4)
+[36m  -cacert Path
+[36m    [0m	Path to a custom CA certificate file to be used for the TLS client connections, if empty, use https:// prefix for standard internet/system CAs
+[36m  -calc-qps
+[36m    [0m	Calculate the qps based on number of requests (-n) and duration (-t)
+[36m  -cert Path
+[36m    [0m	Path to the certificate file to be used for client or server TLS
+[36m  -compression
+[36m    [0m	Enable HTTP compression
+[36m  -config-dir directory
+[36m    [0m	Config directory to watch for dynamic flag changes
+[36m  -config-port port
+[36m    [0m	Config port to open for dynamic flag UI/api
+[36m  -connection-reuse min:max
+[36m    [0m	Range min:max for the max number of connections to reuse for each thread, default to unlimited. e.g. 10:30 means randomly choose a max connection reuse threshold between 10 and 30 requests.
+[36m  -content-type string
+[36m    [0m	Sets HTTP content type. Setting this value switches the request method from GET to POST.
+[36m  -curl
+[36m    [0m	Just fetch the content once
+[36m  -curl-stdout-headers
+[36m    [0m	Restore pre 1.22 behavior where HTTP headers of the fast client are output to stdout in curl mode. now stderr by default.
+[36m  -data-dir Directory
+[36m    [0m	Directory where JSON results are stored/read [32m(default ".")
+[36m  -dns-method method
+[36m    [0m	When a name resolves to multiple ip, which method to pick: cached-rr for cached round-robin, rnd for random, first for first answer (pre 1.30 behavior), rr for round-robin. [32m(default cached-rr)
+[36m  -echo-debug-path URI
+[36m    [0m	http echo server URI for debug, empty turns off that part (more secure) [32m(default "/debug")
+[36m  -echo-server-default-params value
+[36m    [0m	Default parameters/querystring to use if there isn't one provided explicitly. E.g "status=404&delay=3s"
+[36m  -gomaxprocs int
+[36m    [0m	Setting for runtime.GOMAXPROCS, < 1 doesn't change the default
+[36m  -grpc
+[36m    [0m	Use gRPC (health check by default, add -ping for ping) for load testing
+[36m  -grpc-compression
+[36m    [0m	Enable gRPC compression
+[36m  -grpc-max-streams uint
+[36m    [0m	MaxConcurrentStreams for the gRPC server. Default (0) is to leave the option unset.
+[36m  -grpc-ping-delay duration
+[36m    [0m	gRPC ping delay in response
+[36m  -grpc-port port
+[36m    [0m	grpc server port. Can be in the form of host:port, ip:port or port or /unix/domain/path or "disabled" to not start the gRPC server. [32m(default "8079")
+[36m  -h2
+[36m    [0m	Attempt to use HTTP/2.0 / h2 (instead of HTTP/1.1) for both TLS and h2c
+[36m  -halfclose
+[36m    [0m	When not keepalive, whether to half close the connection (only for fast http)
+[36m  -health
+[36m    [0m	gRPC ping client mode: use health instead of ping
+[36m  -healthservice string
+[36m    [0m	which service string to pass to health check
+[36m  -http-port port
+[36m    [0m	http-echo server port. Can be in the form of host:port, ip:port, port or /unix/domain/path or "disabled". [32m(default "8080")
+[36m  -http1.0
+[36m    [0m	Use HTTP/1.0 (instead of HTTP/1.1)
+[36m  -httpbufferkb kbytes
+[36m    [0m	Size of the buffer (max data size) for the optimized HTTP client in kbytes [32m(default 128)
+[36m  -httpccch
+[36m    [0m	Check for Connection: Close Header
+[36m  -https-insecure
+[36m    [0m	Long form of the -k flag
+[36m  -jitter
+[36m    [0m	set to true to de-synchronize parallel clients' by 10%
+[36m  -json path
+[36m    [0m	JSON output to provided file path or '-' for stdout (empty = no json output, unless -a is used)
+[36m  -k[0m	Do not verify certs in HTTPS/TLS/gRPC connections
+[36m  -keepalive
+[36m    [0m	Keep connection alive (only for fast HTTP/1.1) [32m(default true)
+[36m  -key Path
+[36m    [0m	Path to the key file matching the -cert
+[36m  -labels string
+[36m    [0m	Additional config data/labels to add to the resulting JSON, defaults to target URL and hostname
+[36m  -log-errors
+[36m    [0m	Log HTTP non-2xx/418 status codes as they occur [32m(default true)
+[36m  -logger-file-line
+[36m    [0m	Filename and line numbers emitted in JSON logs, use -logger-file-line=false to disable [32m(default true)
+[36m  -logger-force-color
+[36m    [0m	Force color output even if stderr isn't a terminal
+[36m  -logger-goroutine
+[36m    [0m	GoroutineID emitted in JSON/color logs, use -logger-goroutine=false to disable [32m(default true)
+[36m  -logger-json
+[36m    [0m	Log in JSON format, use -logger-json=false to disable [32m(default true)
+[36m  -logger-no-color
+[36m    [0m	Prevent colorized output even if stderr is a terminal
+[36m  -logger-timestamp
+[36m    [0m	Timestamps emitted in JSON logs, use -logger-timestamp=false to disable [32m(default true)
+[36m  -loglevel level
+[36m    [0m	log level, one of [Debug Verbose Info Warning Error Critical Fatal] [32m(default Info)
+[36m  -max-echo-delay value
+[36m    [0m	Maximum sleep time for delay= echo server parameter. dynamic flag. [32m(default 1.5s)
+[36m  -maxpayloadsizekb Kbytes
+[36m    [0m	MaxPayloadSize is the maximum size of payload to be generated by the EchoHandler size= argument. In Kbytes. [32m(default 256)
+[36m  -mtls
+[36m    [0m	Require client certificate signed by -cacert for client connections
+[36m  -multi-mirror-origin
+[36m    [0m	Mirror the request URL to the target for multi proxies (-M) [32m(default true)
+[36m  -multi-serial-mode
+[36m    [0m	Multi server (-M) requests one at a time instead of parallel mode
+[36m  -n int
+[36m    [0m	Run for exactly this number of calls instead of duration. Default (0) is to use duration (-t). Default is 1 when used as gRPC ping count.
+[36m  -nc-dont-stop-on-eof
+[36m    [0m	in netcat (nc) mode, don't abort as soon as remote side closes
+[36m  -no-reresolve
+[36m    [0m	Keep the initial DNS resolution and don't re-resolve when making new connections (because of error or reuse limit reached)
+[36m  -nocatchup
+[36m    [0m	set to exact fixed qps and prevent fortio from trying to catchup when the target fails to keep up temporarily
+[36m  -offset duration
+[36m    [0m	Offset of the histogram data
+[36m  -p string
+[36m    [0m	List of pXX to calculate [32m(default "50,75,90,99,99.9")
+[36m  -payload string
+[36m    [0m	Payload string to send along
+[36m  -payload-file path
+[36m    [0m	File path to be use as payload (POST for HTTP), replaces -payload when set.
+[36m  -payload-size int
+[36m    [0m	Additional random payload size, replaces -payload when set > 0, must be smaller than -maxpayloadsizekb. Setting this switches HTTP to POST.
+[36m  -ping
+[36m    [0m	gRPC load test: use ping instead of health
+[36m  -pprof
+[36m    [0m	Enable pprof HTTP endpoint in the Web UI handler server
+[36m  -profile file
+[36m    [0m	write .cpu and .mem profiles to file
+[36m  -proxy-all-headers
+[36m    [0m	Determines if only tracing or all headers (and cookies) are copied from request on the fetch2 ui/server endpoint [32m(default true)
+[36m  -qps float
+[36m    [0m	Queries Per Seconds or 0 for no wait/max qps [32m(default 8)
+[36m  -quiet
+[36m    [0m	Quiet mode, sets loglevel to Error (quietly) to reduces the output
+[36m  -r float
+[36m    [0m	Resolution of the histogram lowest buckets in seconds [32m(default 0.001)
+[36m  -redirect-port port
+[36m    [0m	Redirect all incoming traffic to https:// URL (need ingress to work properly). Can be in the form of host:port, ip:port, port or "disabled" to disable the feature. [32m(default "8081")
+[36m  -resolve IP
+[36m    [0m	Resolve host name to this IP
+[36m  -resolve-ip-type type
+[36m    [0m	Resolve type: ip4 for ipv4, ip6 for ipv6 only, use ip for both [32m(default ip4)
+[36m  -runid int
+[36m    [0m	Optional RunID to add to JSON result and auto save filename, to match server mode
+[36m  -s int
+[36m    [0m	Number of streams per gRPC connection [32m(default 1)
+[36m  -sequential-warmup
+[36m    [0m	http(s) runner warmup done sequentially instead of parallel. When set, restores pre 1.21 behavior
+[36m  -server-idle-timeout value
+[36m    [0m	Default IdleTimeout for servers [32m(default 30s)
+[36m  -static-dir path
+[36m    [0m	Deprecated/unused path.
+[36m  -stdclient
+[36m    [0m	Use the slower net/http standard client (slower but supports h2/h2c)
+[36m  -stream
+[36m    [0m	Stream payload from stdin (only for fortio curl mode)
+[36m  -sync URL
+[36m    [0m	index.tsv or s3/gcs bucket XML URL to fetch at startup for server modes.
+[36m  -sync-interval duration
+[36m    [0m	Refresh the URL every given interval (default, no refresh)
+[36m  -t duration
+[36m    [0m	How long to run the test or 0 to run until ^C [32m(default 5s)
+[36m  -tcp-port port
+[36m    [0m	tcp-echo server port. Can be in the form of host:port, ip:port, port or /unix/domain/path or "disabled". [32m(default "8078")
+[36m  -timeout duration
+[36m    [0m	Connection and read timeout value (for HTTP) [32m(default 3s)
+[36m  -udp-async
+[36m    [0m	if true, udp echo server will use separate go routine to reply
+[36m  -udp-port port
+[36m    [0m	udp-echo server port. Can be in the form of host:port, ip:port, port or "disabled". [32m(default "8078")
+[36m  -udp-timeout duration
+[36m    [0m	Udp timeout [32m(default 750ms)
+[36m  -ui-path URI
+[36m    [0m	HTTP server URI for UI, empty turns off that part (more secure) [32m(default "/fortio/")
+[36m  -uniform
+[36m    [0m	set to true to de-synchronize parallel clients' requests uniformly
+[36m  -unix-socket path
+[36m    [0m	Unix domain socket path to use for physical connection
+[36m  -user user:password
+[36m    [0m	User credentials for basic authentication (for HTTP). Input data format should be user:password
+[36m[0m

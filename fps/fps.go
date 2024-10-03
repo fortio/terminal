@@ -87,7 +87,7 @@ func main() {
 
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	// q, ^C, ^D to exit.
-	cleaned := ansipixels.AnsiClean(ap.Data)
+	cleaned, _ := ansipixels.AnsiClean(ap.Data)
 	for _, key := range cleaned {
 		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
 			log.Debugf("Exiting on key %q from %q / %q", key, cleaned, ap.Data)

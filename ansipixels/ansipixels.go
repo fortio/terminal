@@ -77,56 +77,69 @@ func (ap *AnsiPixels) Open() (err error) {
 // to keep the outgoing (for string width etc) and the incoming (find key pressed without being
 // confused by a "q" in the middle of the mouse coordinates) separate.
 // This extra complexity (M mode) is now not needed as we run MouseDecode() and that removes/parses the mouse data.
-var CleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
+var cleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
 
 // Remove all Ansi code from a given string. Useful among other things to get the correct string width.
-func AnsiCleanRE(str string) string {
-	return CleanAnsiRE.ReplaceAllString(str, "")
+func ansiCleanRE(str string) string {
+	return cleanAnsiRE.ReplaceAllString(str, "")
 }
 
 var startSequence = []byte("\x1b[")
 
-func AnsiClean(str []byte) []byte {
+// AnsiClean removes all Ansi code from a given byte slice.
+// Useful among other things to get the correct string to pass to uniseq.StringWidth
+// (ap.StringWidth does it for you).
+// Returns the length of the processed input - unterminated sequences can be reprocessed
+// using data from str[returnedVal:] plus additional data (see tests and nocolor for usage).
+func AnsiClean(str []byte) ([]byte, int) {
 	// note strings.Index also uses IndexBytes and SIMD when available internally
 	// a string version would be fast too without the need to convert to bytes.
 	// yet this version is a bit faster and fewer allocations and we need byte based
 	// for the stopKey check anyway.
 	idx := bytes.Index(str, startSequence)
-	if idx == -1 {
-		return str
-	}
 	l := len(str)
+	if idx == -1 {
+		if l > 0 && str[l-1] == 27 {
+			return str[:l-1], l - 1
+		}
+		return str, l
+	}
 	if idx == l-2 {
-		return str[:idx] // last 2 bytes are a truncated ESC[
+		return str[:idx], idx // last 2 bytes are a truncated ESC[
 	}
 	buf := make([]byte, 0, l-3) // remaining worst case is ESC[m so -3 at least.
+	end := l
+	oIdx := idx // value we use in case it's not terminated
 	for {
 		buf = append(buf, str[:idx]...)
+		cur := idx
 		idx += 2
-		/*
-			if str[idx] == 'M' {
-				// Mouse is fixed size
-				idx += 3
-				if idx >= l-1 {
-					return buf
-				}
-			} else {
-		*/
-		// Normal escape: skip until end of escape sequence
-		for ; str[idx] < 64; idx++ {
-			if idx == l-1 {
-				return buf
+		for {
+			if idx >= l {
+				return buf, oIdx
 			}
+			if str[idx] >= 64 {
+				break
+			}
+			idx++
 		}
-		// }
-		str = str[idx+1:]
+		idx++
+		oIdx += idx - cur
+		l -= idx
+		str = str[idx:]
 		idx = bytes.Index(str, startSequence)
 		if idx == -1 {
 			break
 		}
+		oIdx += idx
+	}
+	nl := len(str)
+	if nl > 0 && str[nl-1] == 27 {
+		end--
+		str = str[:nl-1]
 	}
 	buf = append(buf, str...)
-	return buf
+	return buf, end
 }
 
 func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
@@ -250,7 +263,8 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 
 func (ap *AnsiPixels) ScreenWidth(str string) int {
 	// Hopefully the compiler will optimize this alloc wise for string<->[]byte.
-	return uniseg.StringWidth(string(AnsiClean([]byte(str))))
+	b, _ := AnsiClean([]byte(str))
+	return uniseg.StringWidth(string(b))
 }
 
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
