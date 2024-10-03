@@ -90,7 +90,7 @@ func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	cleaned := ansipixels.AnsiClean(ap.Data)
 	for _, key := range cleaned {
 		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
-			log.Infof("Exiting on key %q from %q / %q", key, cleaned, ap.Data)
+			log.Debugf("Exiting on key %q from %q / %q", key, cleaned, ap.Data)
 			return true
 		}
 	}
@@ -461,7 +461,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, "Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s Mouse %d,%d (%06b)",
+			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s Mouse %d,%d (%06b)",
 				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
 				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray, log.ANSIColors.Reset,
 				ap.Mx, ap.My, ap.Mbuttons)
