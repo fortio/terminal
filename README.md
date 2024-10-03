@@ -149,4 +149,10 @@ go install fortio.org/terminal/nocolor@latest
 # then
 somethingProducingColors | nocolor
 ```
-or pick a binary from the [releases](https://github.com/fortio/terminal/releases)
+
+Or on a mac
+```sh
+brew install fortio/tap/nocolor
+```
+
+Or pick a binary from the [releases](https://github.com/fortio/terminal/releases)
