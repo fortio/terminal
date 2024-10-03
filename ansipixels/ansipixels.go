@@ -3,6 +3,7 @@ package ansipixels
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -31,8 +32,11 @@ type AnsiPixels struct {
 	state         *term.State
 	buf           [BUFSIZE]byte
 	Data          []byte
-	W, H          int // Width and Height
-	x, y          int // Cursor last set position
+	W, H          int  // Width and Height
+	x, y          int  // Cursor last set position
+	Mouse         bool // Mouse event received
+	Mx, My        int  // Mouse last known position
+	Mbuttons      int  // Mouse buttons and modifier state
 	C             chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
@@ -67,6 +71,62 @@ func (ap *AnsiPixels) Open() (err error) {
 		err = ap.GetSize()
 	}
 	return
+}
+
+// So this handles both outgoing and incoming escape sequences, but maybe we should split them
+// to keep the outgoing (for string width etc) and the incoming (find key pressed without being
+// confused by a "q" in the middle of the mouse coordinates) separate.
+// This extra complexity (M mode) is now not needed as we run MouseDecode() and that removes/parses the mouse data.
+var CleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
+
+// Remove all Ansi code from a given string. Useful among other things to get the correct string width.
+func AnsiCleanRE(str string) string {
+	return CleanAnsiRE.ReplaceAllString(str, "")
+}
+
+var startSequence = []byte("\x1b[")
+
+func AnsiClean(str []byte) []byte {
+	// note strings.Index also uses IndexBytes and SIMD when available internally
+	// a string version would be fast too without the need to convert to bytes.
+	// yet this version is a bit faster and fewer allocations and we need byte based
+	// for the stopKey check anyway.
+	idx := bytes.Index(str, startSequence)
+	if idx == -1 {
+		return str
+	}
+	l := len(str)
+	if idx == l-2 {
+		return str[:idx] // last 2 bytes are a truncated ESC[
+	}
+	buf := make([]byte, 0, l-3) // remaining worst case is ESC[m so -3 at least.
+	for {
+		buf = append(buf, str[:idx]...)
+		idx += 2
+		/*
+			if str[idx] == 'M' {
+				// Mouse is fixed size
+				idx += 3
+				if idx >= l-1 {
+					return buf
+				}
+			} else {
+		*/
+		// Normal escape: skip until end of escape sequence
+		for ; str[idx] < 64; idx++ {
+			if idx == l-1 {
+				return buf
+			}
+		}
+		// }
+		str = str[idx+1:]
+		idx = bytes.Index(str, startSequence)
+		if idx == -1 {
+			break
+		}
+	}
+	buf = append(buf, str...)
+	return buf
 }
 
 func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
@@ -113,6 +173,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	default:
 		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
 		ap.Data = ap.buf[0:n]
+		ap.MouseDecode()
 		return n, err
 	}
 	return 0, nil
@@ -188,7 +249,8 @@ func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 }
 
 func (ap *AnsiPixels) ScreenWidth(str string) int {
-	return uniseg.StringWidth(str)
+	// Hopefully the compiler will optimize this alloc wise for string<->[]byte.
+	return uniseg.StringWidth(string(AnsiClean([]byte(str))))
 }
 
 func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
@@ -198,9 +260,31 @@ func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
 	ap.WriteString(s)
 }
 
+func (ap *AnsiPixels) TruncateLeftToFit(msg string, maxWidth int) (string, int) {
+	w := ap.ScreenWidth(msg)
+	if w < maxWidth {
+		return msg, w
+	}
+	// slow path.
+	str := "…"
+	runes := []rune(msg)
+	// This isn't optimized and also because of AnsiClean behind the scene we might remove codes we should keep.
+	for i := range runes {
+		w = ap.ScreenWidth(string(runes[i:]))
+		if w < maxWidth {
+			return str + string(runes[i:]), w + 1
+		}
+	}
+	return str, 1
+}
+
 func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	x := ap.W - ap.ScreenWidth(s) - ap.Margin
+	s, l := ap.TruncateLeftToFit(s, ap.W-2*ap.Margin)
+	x := ap.W - l - ap.Margin
+	if x < 0 {
+		panic("TruncateLeftToFit returned a string longer than the width")
+	}
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
 }
@@ -265,6 +349,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		ap.Data = append(ap.Data, res[4]...)
 		break
 	}
+	ap.MouseDecode()
 	return x, y, err
 }
 

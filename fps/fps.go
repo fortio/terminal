@@ -87,8 +87,10 @@ func main() {
 
 func isStopKey(ap *ansipixels.AnsiPixels) bool {
 	// q, ^C, ^D to exit.
-	for _, key := range ap.Data {
+	cleaned := ansipixels.AnsiClean(ap.Data)
+	for _, key := range cleaned {
 		if key == 'q' || key == 'Q' || key == 3 || key == 4 {
+			log.Debugf("Exiting on key %q from %q / %q", key, cleaned, ap.Data)
 			return true
 		}
 	}
@@ -286,6 +288,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		"Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides")
 	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
 	exactlyFlag := flag.Int64("n", 0, "Start immediately an FPS test with the specified `number of frames` (default is interactive)")
+	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
 	cli.MinArgs = 0
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
@@ -327,6 +330,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	}
 	defer func() {
 		ap.MoveCursor(0, ap.H-1)
+		ap.MouseTrackingOff()
 		ap.Restore() // flushes and shows cursor and resets terminal back to original state.
 	}()
 	// GetSize done in Open (and resize signal handler).
@@ -383,6 +387,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		return log.FErrf("Error reading initial key: %v", err)
 	}
 	ap.HideCursor()
+	if !*noMouseFlag {
+		ap.MouseTrackingOn()
+	}
 	ap.OnResize = func() error {
 		ap.StartSyncMode()
 		ap.ClearScreen()
@@ -454,7 +461,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				return 0
 			}
 			entry = append(entry, ap.Data...)
-			ap.WriteRight(ap.H-1-ap.Margin, "Target FPS %s, %dx%d, typed so far: [%q]", fpsStr, ap.W, ap.H, entry)
+			invert := ""
+			if ap.Mouse {
+				invert = "\033[7m"
+			}
+			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
+				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
+				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray, log.ANSIColors.Reset,
+				invert, ap.Mx, ap.My, ap.Mbuttons, log.ANSIColors.Reset)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {

@@ -70,7 +70,7 @@ const (
 	PaddleYDelta = 3
 	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
 	PaddleWidth  = 7
-	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement - let's use 1/2 blocks instead.
+	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement, ⚪ is even worse as double width. so we use 1/2 blocks instead.
 	PaddleSpinFactor = 0.7
 )
 
