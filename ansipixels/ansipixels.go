@@ -76,6 +76,7 @@ func (ap *AnsiPixels) Open() (err error) {
 // So this handles both outgoing and incoming escape sequences, but maybe we should split them
 // to keep the outgoing (for string width etc) and the incoming (find key pressed without being
 // confused by a "q" in the middle of the mouse coordinates) separate.
+// This extra complexity (M mode) is now not needed as we run MouseDecode() and that removes/parses the mouse data.
 var CleanAnsiRE = regexp.MustCompile("\x1b\\[(M.(.(.|$)|$)|[^@-~]*([@-~]|$))")
 
 // Remove all Ansi code from a given string. Useful among other things to get the correct string width.
@@ -102,20 +103,22 @@ func AnsiClean(str []byte) []byte {
 	for {
 		buf = append(buf, str[:idx]...)
 		idx += 2
-		if str[idx] == 'M' {
-			// Mouse is fixed size
-			idx += 3
-			if idx >= l-1 {
-				return buf
-			}
-		} else {
-			// Normal escape: skip until end of escape sequence
-			for ; str[idx] < 64; idx++ {
-				if idx == l-1 {
+		/*
+			if str[idx] == 'M' {
+				// Mouse is fixed size
+				idx += 3
+				if idx >= l-1 {
 					return buf
 				}
+			} else {
+		*/
+		// Normal escape: skip until end of escape sequence
+		for ; str[idx] < 64; idx++ {
+			if idx == l-1 {
+				return buf
 			}
 		}
+		// }
 		str = str[idx+1:]
 		idx = bytes.Index(str, startSequence)
 		if idx == -1 {

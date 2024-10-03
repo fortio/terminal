@@ -44,26 +44,29 @@ var testCases = []struct {
 		"\x1b[31mHello\x1b[0m \x1b[32mWorld\x1b[0m tada!",
 		"Hello World tada!",
 	},
-	{
-		"WithMouseEscapeSequence",
-		"Hello \x1b[MCqGMouse",
-		"Hello Mouse",
-	},
-	{
-		"UnterminatedMouseEscapeSequence1",
-		"Hello \x1b[MCq",
-		"Hello ",
-	},
-	{
-		"UnterminatedMouseEscapeSequence2",
-		"Hello \x1b[MC",
-		"Hello ",
-	},
-	{
-		"UnterminatedMouseEscapeSequence3",
-		"Hello \x1b[M",
-		"Hello ",
-	},
+	/* we don't need mouse escape clean up anymore as we parse the mouse escape sequences */
+	/*
+		{
+			"WithMouseEscapeSequence",
+			"Hello \x1b[MCqGMouse",
+			"Hello Mouse",
+		},
+		{
+			"UnterminatedMouseEscapeSequence1",
+			"Hello \x1b[MCq",
+			"Hello ",
+		},
+		{
+			"UnterminatedMouseEscapeSequence2",
+			"Hello \x1b[MC",
+			"Hello ",
+		},
+		{
+			"UnterminatedMouseEscapeSequence3",
+			"Hello \x1b[M",
+			"Hello ",
+		},
+	*/
 }
 
 func TestAnsiCleanRE(t *testing.T) {
