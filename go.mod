@@ -4,7 +4,7 @@ go 1.22.7
 
 require (
 	fortio.org/cli v1.9.2
-	fortio.org/fortio v1.67.0
+	fortio.org/fortio v1.67.1
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
 	fortio.org/term v0.23.0-fortio-6
