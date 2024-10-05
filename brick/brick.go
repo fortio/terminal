@@ -538,6 +538,6 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
 	b.ShowInfo = true
 	showInfo(ap, b)
-	ap.MoveCursor(0, ap.H-PaddleYDelta-3)
+	ap.MoveCursor(0, ap.H-PaddleYDelta) // so 0,1 is great for shells that don't clear the bottom of the screen... yet zsh does that.
 	ap.Out.Flush()
 }
