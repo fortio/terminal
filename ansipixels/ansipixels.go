@@ -427,7 +427,11 @@ func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
 	w := ap.ScreenWidth(s)
 	x := ap.W - w // not using margin as we assume we want to join lines in the corner
-	ap.MoveCursor(x, y)
+	// On some terminals, namely apple terminal and allacritty, the ❤️ isn't actually double width,
+	// or it doesn't erase the last corner character. So we need to erase it manually.
+	ap.MoveCursor(x+w-1, y)
+	ap.WriteRune(' ')
+	ap.MoveHorizontally(x)
 	ap.WriteString(s)
 	ap.DrawRoundBox(x-1, y-1, w+2, 3)
 }
