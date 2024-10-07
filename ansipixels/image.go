@@ -57,7 +57,7 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 		sy++
 		ap.MoveCursor(sx, sy)
 	}
-	ap.WriteString("\033[0m") // reset color
+	ap.WriteString(Reset) // reset color
 	return err
 }
 
@@ -87,7 +87,7 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		prevFg := uint8(0)
 		prevBg := uint8(0)
-		ap.WriteAtStr(sx, sy, "\033[0m")
+		ap.WriteAtStr(sx, sy, Reset)
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
@@ -109,7 +109,7 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 		}
 		sy++
 	}
-	ap.WriteString("\033[0m") // reset color
+	ap.WriteString(Reset) // reset color
 	return err
 }
 
@@ -134,7 +134,7 @@ func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) e
 		sy++
 		ap.MoveCursor(sx, sy)
 	}
-	_, err := ap.Out.WriteString("\033[0m") // reset color
+	_, err := ap.Out.WriteString(Reset) // reset color
 	return err
 }
 

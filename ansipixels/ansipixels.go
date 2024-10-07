@@ -21,7 +21,7 @@ import (
 	"github.com/rivo/uniseg"
 )
 
-const BUFSIZE = 1024
+const bufSize = 1024
 
 type AnsiPixels struct {
 	FdIn          int
@@ -30,7 +30,7 @@ type AnsiPixels struct {
 	In            *os.File
 	InWithTimeout *terminal.TimeoutReader
 	state         *term.State
-	buf           [BUFSIZE]byte
+	buf           [bufSize]byte
 	Data          []byte
 	W, H          int  // Width and Height
 	x, y          int  // Cursor last set position
@@ -184,7 +184,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 			return 0, err
 		}
 	default:
-		n, err := ap.InWithTimeout.Read(ap.buf[0:BUFSIZE])
+		n, err := ap.InWithTimeout.Read(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		ap.MouseDecode()
 		return n, err
@@ -328,10 +328,10 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 	i := 0
 	ap.Data = nil
 	for {
-		if i == BUFSIZE {
+		if i == bufSize {
 			return x, y, errors.New("buffer full, no cursor position found")
 		}
-		n, err = ap.In.Read(ap.buf[i:BUFSIZE])
+		n, err = ap.In.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}

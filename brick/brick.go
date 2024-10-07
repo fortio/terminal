@@ -276,7 +276,7 @@ func (b *Brick) Right() {
 }
 
 func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
-	ap.WriteString(log.ANSIColors.Reset)
+	ap.WriteString(ansipixels.Reset)
 	ap.DrawRoundBox(0, 0, ap.W, ap.H)
 	ap.WriteBoxed(0, "Score %d", b.Score)
 	livesSymbol := "❤️"
@@ -299,13 +299,13 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
 		case 0:
-			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.BrightRed)
+			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.BrightRed)
 		case 2:
-			ap.WriteAtStr(b.Padding+1, 3+y, "\033[38;5;214m") // orange
+			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Orange) 
 		case 4:
-			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.Green)
+			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Green)
 		case 6:
-			ap.WriteAtStr(b.Padding+1, 3+y, log.ANSIColors.Yellow)
+			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Yellow)
 		}
 		for n := range b.NumW {
 			if n > 0 {
@@ -318,9 +318,9 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 			}
 		}
 	}
-	ap.WriteString(log.ANSIColors.Cyan)
+	ap.WriteString(ansipixels.Cyan)
 	ap.WriteAtStr(1+b.PaddlePos-3, ap.H-PaddleYDelta, Paddle)
-	ap.WriteString(log.ANSIColors.Reset)
+	ap.WriteString(ansipixels.Reset)
 	bx := safecast.MustRound[int](b.BallX)
 	by := safecast.MustRound[int](b.BallY)
 	by2 := by / 2

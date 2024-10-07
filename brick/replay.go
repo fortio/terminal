@@ -61,7 +61,7 @@ func ReplayGame(ap *ansipixels.AnsiPixels, fname string) int {
 	for {
 		err := ap.ReadOrResizeOrSignal()
 		if err != nil || handleKeys(ap, b, true) {
-			ap.WriteAt(0, 1, "%sReplay aborted", log.ANSIColors.Reset)
+			ap.WriteAt(0, 1, "%sReplay aborted", ansipixels.Reset)
 			ap.MoveCursor(0, 2)
 			ap.Out.Flush()
 			return 0
@@ -95,7 +95,7 @@ func replayGame(ap *ansipixels.AnsiPixels, b *Brick, numFrames uint64) int {
 		if b.Frames <= numFrames {
 			b.Next()
 		} else {
-			ap.WriteCentered(ap.H/2, "%s🔂 Replay done... any key to exit...", log.ANSIColors.Reset)
+			ap.WriteCentered(ap.H/2, "%s🔂 Replay done... any key to exit...", ansipixels.Reset)
 			ap.MoveCursor(0, 1)
 			_ = ap.ReadOrResizeOrSignal()
 			return 0
