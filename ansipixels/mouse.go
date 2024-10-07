@@ -84,6 +84,10 @@ func (ap *AnsiPixels) CtrlMod() bool {
 	return ap.Mbuttons&Alt != 0
 }
 
+func (ap *AnsiPixels) AnyModifier() bool {
+	return ap.Mbuttons&AllModifiers != 0
+}
+
 func (ap *AnsiPixels) LeftClick() bool {
 	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseLeft)
 }
