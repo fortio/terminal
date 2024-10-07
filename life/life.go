@@ -150,6 +150,7 @@ type Game struct {
 	lastClickX, lastClickY int
 	delta                  int // which 1/2 pixel we're targeting with the mouse.
 	lastWasClick           bool
+	lastWasAlt             bool
 	hasMouse               bool
 }
 
@@ -238,7 +239,7 @@ func (g *Game) DrawOne() {
 	if g.showHelp {
 		helpText := "Space to pause, q to quit, i for info, other key to run\n"
 		if g.hasMouse {
-			helpText += "Left click or hold to set, right click to clear\nClick in same spot for other half pixel"
+			helpText += "Left click or hold to set, right click to clear\nHold Alt or click in same spot for other half pixel"
 		} else {
 			helpText += "Mouse support disabled, run without -nomouse for mouse support"
 		}
@@ -276,9 +277,19 @@ func (g *Game) HandleMouse() {
 		delta = g.delta
 	}
 	g.lastWasClick = false
+	alt := g.ap.AltMod()
+	if alt {
+		delta = 1
+		g.lastWasAlt = true
+	} else {
+		if g.lastWasAlt {
+			delta = 0
+		}
+		g.lastWasAlt = false
+	}
 	switch {
 	case g.ap.LeftClick(), ld:
-		log.LogVf("Mouse left (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, ld, g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse left (%06b) alt %t click (drag %t) at %d, %d", g.ap.Mbuttons, alt, ld, g.ap.Mx, g.ap.My)
 		g.c.SetCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
 		g.lastWasClick = true
 		g.ap.MouseTrackingOn() // needed for drag, other ap.MouseClickOn() is enough.
@@ -287,7 +298,7 @@ func (g *Game) HandleMouse() {
 			return
 		}
 	case g.ap.RightClick():
-		log.LogVf("Mouse right (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, leftDrag, g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse right (%06b) alt %t click (drag %t) at %d, %d", g.ap.Mbuttons, alt, leftDrag, g.ap.Mx, g.ap.My)
 		g.c.ClearCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
 		g.lastWasClick = true
 	default:
