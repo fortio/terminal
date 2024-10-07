@@ -42,8 +42,16 @@ func (c *Conway) Set(x, y int) {
 	c.Cells[1-c.Current][y*c.Width+x] = 1
 }
 
+func (c *Conway) SetCurrent(x, y int) {
+	c.Cells[c.Current][y*c.Width+x] = 1
+}
+
 func (c *Conway) Clear(x, y int) {
 	c.Cells[1-c.Current][y*c.Width+x] = 0
+}
+
+func (c *Conway) ClearCurrent(x, y int) {
+	c.Cells[c.Current][y*c.Width+x] = 0
 }
 
 func (c *Conway) Copy(x, y int) {
@@ -125,57 +133,145 @@ func Draw(ap *ansipixels.AnsiPixels, c *Conway) {
 	}
 }
 
+type GameState string
+
+const (
+	Paused  = "Paused"
+	Running = "Running"
+)
+
+type Game struct {
+	ap                     *ansipixels.AnsiPixels
+	c                      *Conway
+	state                  GameState
+	showInfo               bool
+	showHelp               bool
+	generation             uint64
+	lastClickX, lastClickY int
+	delta                  int // which 1/2 pixel we're targeting with the mouse.
+}
+
 func Main() int {
 	fpsFlag := flag.Float64("fps", 60, "Frames per second")
 	flagRandomFill := flag.Float64("fill", 0.1, "Random fill factor (0 to 1)")
 	flagGlider := flag.Bool("glider", false, "Start with a glider (default is random)")
 	cli.Main()
+	game := &Game{}
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
-	defer ap.Restore()
+	game.ap = ap
+	defer game.End()
 	ap.HideCursor()
-	var generation uint64
-	var c *Conway
+	ap.MouseClickOn()
 	fillFactor := float32(*flagRandomFill)
 	ap.OnResize = func() error {
-		c = NewConway(ap.W, 2*ap.H) // half pixels vertically.
+		game.c = NewConway(ap.W, 2*ap.H) // half pixels vertically.
 		if *flagGlider {
-			c.Glider(ap.W/3, 2*ap.H/3) // first third of the screen
+			game.c.Glider(ap.W/3, 2*ap.H/3) // first third of the screen
 		} else {
 			// Random
-			c.Randomize(fillFactor)
+			game.c.Randomize(fillFactor)
 		}
-		c.Current = 1 - c.Current
-		generation = 0
+		game.c.Current = 1 - game.c.Current
+		game.generation = 1
+		game.showInfo = true
+		game.state = Paused
+		game.showHelp = true
+		game.delta = 0
+		game.DrawOne()
 		return nil
 	}
 	_ = ap.OnResize()
-	showInfo := true
 	for {
-		ap.StartSyncMode()
-		ap.ClearScreen()
-		if showInfo {
-			ap.WriteRight(ap.H-1, "FPS %.0f Generation: %d ", ap.FPS, generation)
-		}
-		Draw(ap, c)
-		generation++
-		ap.EndSyncMode()
-		n, err := ap.ReadOrResizeOrSignalOnce()
-		if err != nil {
-			return log.FErrf("Error reading: %v", err)
-		}
-		if n > 0 {
-			switch ap.Data[0] {
-			case 'q', 'Q', 3:
-				ap.MoveCursor(0, 0)
-				return 0
-			case 'i', 'I':
-				showInfo = !showInfo
+		switch game.state {
+		case Running:
+			_, err := ap.ReadOrResizeOrSignalOnce()
+			if err != nil {
+				return log.FErrf("Error reading: %v", err)
+			}
+		case Paused:
+			err := ap.ReadOrResizeOrSignal()
+			if err != nil {
+				return log.FErrf("Error reading: %v", err)
 			}
 		}
-		c.Next()
+		if ap.Mouse {
+			game.HandleMouse()
+			continue
+		}
+		if len(ap.Data) == 0 {
+			game.Next()
+			continue
+		}
+		switch ap.Data[0] {
+		case 'q', 'Q', 3:
+			return 0
+		case 'i', 'I':
+			game.showInfo = !game.showInfo
+		case '?', 'h', 'H':
+			game.showHelp = true
+			game.state = Paused
+		case ' ':
+			game.state = Paused
+		default:
+			game.state = Running
+		}
+		game.Next()
 	}
+}
+
+func (g *Game) DrawOne() {
+	g.ap.StartSyncMode()
+	g.ap.ClearScreen()
+	if g.showInfo {
+		g.ap.WriteRight(g.ap.H-1, "%s FPS %.0f Generation: %d ", g.state, g.ap.FPS, g.generation)
+	}
+	Draw(g.ap, g.c)
+	if g.showHelp {
+		g.ap.WriteBoxed(g.ap.H/2+2, "Space to pause, q to quit, i for info, other key to run\nMouse clicks to edit")
+		g.showHelp = false
+	}
+	g.ap.EndSyncMode()
+}
+
+func (g *Game) Next() {
+	g.c.Next()
+	g.generation++
+	g.DrawOne()
+}
+
+func (g *Game) End() {
+	g.ap.MouseClickOff()
+	g.ap.ShowCursor()
+	g.ap.MoveCursor(0, g.ap.H-2)
+	g.ap.Restore()
+}
+
+func (g *Game) HandleMouse() {
+	delta := g.delta
+	if g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY {
+		delta = 1 - delta
+	}
+	switch {
+	case g.ap.LeftClick():
+		log.LogVf("Mouse left click at %d, %d", g.ap.Mx, g.ap.My)
+		g.c.SetCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
+	case g.ap.RightClick():
+		log.LogVf("Right click at %d, %d", g.ap.Mx, g.ap.My)
+		g.c.ClearCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
+	default:
+		log.Debugf("Mouse %b at %d, %d", g.ap.Mbuttons, g.ap.Mx, g.ap.My)
+		return
+	}
+	if g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY {
+		g.delta = 1 - g.delta
+	} else {
+		g.delta = 0
+	}
+	g.lastClickX = g.ap.Mx
+	g.lastClickY = g.ap.My
+	g.DrawOne()
 }

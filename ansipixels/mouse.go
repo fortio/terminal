@@ -60,3 +60,16 @@ func (ap *AnsiPixels) MouseDecode() {
 	ap.MouseDecode()
 	ap.Mouse = true
 }
+
+const (
+	MouseLeft  = 0
+	MouseRight = 0b10
+)
+
+func (ap *AnsiPixels) LeftClick() bool {
+	return ap.Mouse && (ap.Mbuttons == MouseLeft)
+}
+
+func (ap *AnsiPixels) RightClick() bool {
+	return ap.Mouse && (ap.Mbuttons == MouseRight)
+}

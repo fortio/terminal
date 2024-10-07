@@ -416,11 +416,20 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bot
 
 func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	s := fmt.Sprintf(msg, args...)
-	w := ap.ScreenWidth(s)
-	x := (ap.W - w) / 2
-	ap.MoveCursor(x, y)
-	ap.WriteString(s)
-	ap.DrawRoundBox(x-1, y-1, w+2, 3)
+	lines := strings.Split(s, "\n")
+	maxw := 0
+	widths := make([]int, 0, len(lines))
+	for _, l := range lines {
+		w := ap.ScreenWidth(l)
+		widths = append(widths, w)
+		maxw = max(maxw, w)
+	}
+	for i, l := range lines {
+		x := (ap.W - widths[i]) / 2
+		ap.MoveCursor(x, y+i)
+		ap.WriteString(l)
+	}
+	ap.DrawRoundBox((ap.W-maxw)/2-1, y-1, maxw+2, len(lines)+2)
 }
 
 func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
