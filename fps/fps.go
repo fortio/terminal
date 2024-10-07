@@ -22,7 +22,7 @@ import (
 	"github.com/loov/hrtime"
 )
 
-const defaultMonoImageColor = "\033[34m" // ansi blue-ish
+const defaultMonoImageColor = ansipixels.Blue // ansi blue-ish
 
 func jsonOutput(jsonFileName string, data any) {
 	var j []byte
@@ -44,7 +44,7 @@ func jsonOutput(jsonFileName string, data any) {
 		log.Fatalf("Close error for %s: %v", jsonFileName, err)
 	}
 	fmt.Printf("Successfully wrote %d bytes of Json data (visualize with %sfortio report%s):\n%s\n",
-		n, log.ANSIColors.Cyan, log.ANSIColors.Reset, jsonFileName)
+		n, ansipixels.Cyan, ansipixels.Reset, jsonFileName)
 }
 
 var (
@@ -138,10 +138,10 @@ func animate(ap *ansipixels.AnsiPixels, frame int64) {
 	h -= 2 * ap.Margin
 	total := 2*w + 2*h
 	pos := safecast.MustConvert[int](frame % safecast.MustConvert[int64](total))
-	charAt(ap, pos+2, w, h, "\033[31m█") // Red
-	charAt(ap, pos+1, w, h, "\033[32m█") // Green
-	charAt(ap, pos, w, h, "\033[34m█")   // Blue
-	charAt(ap, pos-1, w, h, "\033[0m ")  // erase and reset color
+	charAt(ap, pos+2, w, h, ansipixels.RedPixel)   // Red
+	charAt(ap, pos+1, w, h, ansipixels.GreenPixel) // ansipixels.Green
+	charAt(ap, pos, w, h, ansipixels.BluePixel)    // Blue
+	charAt(ap, pos-1, w, h, ansipixels.ResetClear) // erase and reset color
 }
 
 //go:embed fps.jpg
@@ -360,7 +360,8 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		e := ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
 		if !imagesOnly {
 			drawBox(ap, true)
-			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... \033[1D", fpsStr)
+			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... %s",
+				fpsStr, ansipixels.MoveLeft)
 			ap.ShowCursor()
 		}
 		ap.EndSyncMode()
@@ -442,9 +443,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			perfResults.ActualQPS = float64(frames) / perfResults.ActualDuration.Seconds()
 			// stats.Record("fps", fps)
 			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
-				log.ANSIColors.Green, elapsed.Round(10*time.Microsecond), log.ANSIColors.Reset,
-				log.ANSIColors.BrightRed, fps, log.ANSIColors.Reset,
-				log.ANSIColors.Cyan, perfResults.ActualQPS, log.ANSIColors.Reset)
+				ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
+				ansipixels.BrightRed, fps, ansipixels.Reset,
+				ansipixels.Cyan, perfResults.ActualQPS, ansipixels.Reset)
 			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
 				1/perfResults.hist.Min, 1/perfResults.hist.Max, 1/perfResults.hist.Avg(), 1/perfResults.hist.StdDev())
 			if perfResults.Exactly > 0 && frames >= perfResults.Exactly {
@@ -463,12 +464,12 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			entry = append(entry, ap.Data...)
 			invert := ""
 			if ap.Mouse {
-				invert = "\033[7m"
+				invert = ansipixels.Reverse
 			}
 			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
-				log.ANSIColors.Cyan, log.ANSIColors.Green, fpsStr, log.ANSIColors.Reset, ap.W, ap.H,
-				log.ANSIColors.DarkGray, log.ANSIColors.Reset, entry, log.ANSIColors.DarkGray, log.ANSIColors.Reset,
-				invert, ap.Mx, ap.My, ap.Mbuttons, log.ANSIColors.Reset)
+				ansipixels.Cyan, ansipixels.Green, fpsStr, ansipixels.Reset, ap.W, ap.H,
+				ansipixels.DarkGray, ansipixels.Reset, entry, ansipixels.DarkGray, ansipixels.Reset,
+				invert, ap.Mx, ap.My, ap.Mbuttons, ansipixels.Reset)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
