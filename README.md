@@ -22,7 +22,7 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 ## fortio.org/terminal/ansipixels
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal/ansipixels.svg)](https://pkg.go.dev/fortio.org/terminal/ansipixels)
 
-A much lower level library that allow direct control of both the input and the output of the terminal.
+A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers decoding/querying.
 
 
 ## FPS
@@ -95,7 +95,7 @@ flags:
 
 ## Game of life
 
-See [life/](life/) for a classic Conway's game of life black and white demo (with resizing supported etc...).
+See [life/](life/) for a classic Conway's game of life black and white demo (with resizing, mouse edits, etc... supported).
 
 Same installation as above, just replace `fps` by `life`.
 
