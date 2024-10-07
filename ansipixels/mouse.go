@@ -64,6 +64,7 @@ func (ap *AnsiPixels) MouseDecode() {
 const (
 	MouseLeft  = 0
 	MouseRight = 0b10
+	MouseMove  = 0b100000
 )
 
 func (ap *AnsiPixels) LeftClick() bool {
@@ -72,4 +73,12 @@ func (ap *AnsiPixels) LeftClick() bool {
 
 func (ap *AnsiPixels) RightClick() bool {
 	return ap.Mouse && (ap.Mbuttons == MouseRight)
+}
+
+func (ap *AnsiPixels) LeftDrag() bool {
+	return ap.Mouse && (ap.Mbuttons == MouseMove|MouseLeft)
+}
+
+func (ap *AnsiPixels) RightDrag() bool {
+	return ap.Mouse && (ap.Mbuttons == MouseMove|MouseRight)
 }

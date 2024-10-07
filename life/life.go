@@ -149,6 +149,7 @@ type Game struct {
 	generation             uint64
 	lastClickX, lastClickY int
 	delta                  int // which 1/2 pixel we're targeting with the mouse.
+	lastWasClick           bool
 }
 
 func Main() int {
@@ -165,7 +166,7 @@ func Main() int {
 	game.ap = ap
 	defer game.End()
 	ap.HideCursor()
-	ap.MouseClickOn()
+	ap.MouseTrackingOn() // needed for drag, other ap.MouseClickOn() is enough.
 	fillFactor := float32(*flagRandomFill)
 	ap.OnResize = func() error {
 		game.c = NewConway(ap.W, 2*ap.H) // half pixels vertically.
@@ -232,7 +233,7 @@ func (g *Game) DrawOne() {
 	Draw(g.ap, g.c)
 	if g.showHelp {
 		g.ap.WriteBoxed(g.ap.H/2+2, "Space to pause, q to quit, i for info, other key to run\n"+
-			"Left click to set, right click to clear\nClick in same spot for other half pixel")
+			"Left click or hold to set, right click to clear\nClick in same spot for other half pixel")
 		g.showHelp = false
 	}
 	g.ap.EndSyncMode()
@@ -245,7 +246,7 @@ func (g *Game) Next() {
 }
 
 func (g *Game) End() {
-	g.ap.MouseClickOff()
+	g.ap.MouseTrackingOff() // g.ap.MouseClickOff()
 	g.ap.ShowCursor()
 	g.ap.MoveCursor(0, g.ap.H-2)
 	g.ap.Restore()
@@ -256,18 +257,32 @@ func (g *Game) HandleMouse() {
 	// but for now it's pretty good to cycle a pixels' 2 halves. (2 left clicks, 2 right clicks)
 	delta := 0
 	sameSpot := g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY
+	prevWasClick := g.lastWasClick
+	leftDrag := g.ap.LeftDrag()
+	ld := prevWasClick && leftDrag && !sameSpot
 	if sameSpot {
 		delta = 1 - g.delta
+	} else if ld {
+		delta = g.delta
 	}
+	g.lastWasClick = false
 	switch {
-	case g.ap.LeftClick():
-		log.LogVf("Mouse left click at %d, %d", g.ap.Mx, g.ap.My)
+	case g.ap.LeftClick(), ld:
+		log.LogVf("Mouse left (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, ld, g.ap.Mx, g.ap.My)
 		g.c.SetCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
+		g.lastWasClick = true
+		if ld {
+			g.DrawOne()
+			return
+		}
 	case g.ap.RightClick():
-		log.LogVf("Right click at %d, %d", g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse right (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, leftDrag, g.ap.Mx, g.ap.My)
 		g.c.ClearCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
+		g.lastWasClick = true
 	default:
-		log.Debugf("Mouse %b at %d, %d", g.ap.Mbuttons, g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse %06b at %d, %d last was click %t same spot %t left drag %t",
+			g.ap.Mbuttons, g.ap.Mx, g.ap.My,
+			prevWasClick, sameSpot, leftDrag)
 		return
 	}
 	if sameSpot {
