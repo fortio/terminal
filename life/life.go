@@ -231,7 +231,8 @@ func (g *Game) DrawOne() {
 	}
 	Draw(g.ap, g.c)
 	if g.showHelp {
-		g.ap.WriteBoxed(g.ap.H/2+2, "Space to pause, q to quit, i for info, other key to run\nMouse clicks to edit")
+		g.ap.WriteBoxed(g.ap.H/2+2, "Space to pause, q to quit, i for info, other key to run\n"+
+			"Left click to set, right click to clear\nClick in same spot for other half pixel")
 		g.showHelp = false
 	}
 	g.ap.EndSyncMode()
@@ -251,9 +252,12 @@ func (g *Game) End() {
 }
 
 func (g *Game) HandleMouse() {
-	delta := g.delta
-	if g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY {
-		delta = 1 - delta
+	// maybe we need a different delta for left and right clicks
+	// but for now it's pretty good to cycle a pixels' 2 halves. (2 left clicks, 2 right clicks)
+	delta := 0
+	sameSpot := g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY
+	if sameSpot {
+		delta = 1 - g.delta
 	}
 	switch {
 	case g.ap.LeftClick():
@@ -266,7 +270,7 @@ func (g *Game) HandleMouse() {
 		log.Debugf("Mouse %b at %d, %d", g.ap.Mbuttons, g.ap.Mx, g.ap.My)
 		return
 	}
-	if g.ap.Mx == g.lastClickX && g.ap.My == g.lastClickY {
+	if sameSpot {
 		g.delta = 1 - g.delta
 	} else {
 		g.delta = 0
