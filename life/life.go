@@ -150,14 +150,17 @@ type Game struct {
 	lastClickX, lastClickY int
 	delta                  int // which 1/2 pixel we're targeting with the mouse.
 	lastWasClick           bool
+	lastWasAlt             bool
+	hasMouse               bool
 }
 
 func Main() int {
 	fpsFlag := flag.Float64("fps", 60, "Frames per second")
 	flagRandomFill := flag.Float64("fill", 0.1, "Random fill factor (0 to 1)")
 	flagGlider := flag.Bool("glider", false, "Start with a glider (default is random)")
+	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
 	cli.Main()
-	game := &Game{}
+	game := &Game{hasMouse: !*noMouseFlag}
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
 	if err != nil {
@@ -166,7 +169,9 @@ func Main() int {
 	game.ap = ap
 	defer game.End()
 	ap.HideCursor()
-	ap.MouseTrackingOn() // needed for drag, other ap.MouseClickOn() is enough.
+	if game.hasMouse {
+		ap.MouseClickOn() // start with just clicks, we turn on drag after a click.
+	}
 	fillFactor := float32(*flagRandomFill)
 	ap.OnResize = func() error {
 		game.c = NewConway(ap.W, 2*ap.H) // half pixels vertically.
@@ -232,8 +237,13 @@ func (g *Game) DrawOne() {
 	}
 	Draw(g.ap, g.c)
 	if g.showHelp {
-		g.ap.WriteBoxed(g.ap.H/2+2, "Space to pause, q to quit, i for info, other key to run\n"+
-			"Left click or hold to set, right click to clear\nClick in same spot for other half pixel")
+		helpText := "Space to pause, q to quit, i for info, other key to run\n"
+		if g.hasMouse {
+			helpText += "Left click or hold to set, right click to clear\nHold a modifier or click in same spot for other half pixel"
+		} else {
+			helpText += "Mouse support disabled, run without -nomouse for mouse support"
+		}
+		g.ap.WriteBoxed(g.ap.H/2+2, "%s", helpText)
 		g.showHelp = false
 	}
 	g.ap.EndSyncMode()
@@ -246,7 +256,8 @@ func (g *Game) Next() {
 }
 
 func (g *Game) End() {
-	g.ap.MouseTrackingOff() // g.ap.MouseClickOff()
+	g.ap.MouseTrackingOff()
+	g.ap.MouseClickOff()
 	g.ap.ShowCursor()
 	g.ap.MoveCursor(0, g.ap.H-2)
 	g.ap.Restore()
@@ -266,23 +277,37 @@ func (g *Game) HandleMouse() {
 		delta = g.delta
 	}
 	g.lastWasClick = false
+	modifier := g.ap.AnyModifier()
+	if modifier {
+		delta = 1
+		g.lastWasAlt = true
+	} else {
+		if g.lastWasAlt {
+			delta = 0
+		}
+		g.lastWasAlt = false
+	}
 	switch {
 	case g.ap.LeftClick(), ld:
-		log.LogVf("Mouse left (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, ld, g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse left (%06b) alt %t click (drag %t) at %d, %d", g.ap.Mbuttons, modifier, ld, g.ap.Mx, g.ap.My)
 		g.c.SetCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
 		g.lastWasClick = true
+		g.ap.MouseTrackingOn() // needed for drag, other ap.MouseClickOn() is enough.
 		if ld {
 			g.DrawOne()
 			return
 		}
 	case g.ap.RightClick():
-		log.LogVf("Mouse right (%06b) click (drag %t) at %d, %d", g.ap.Mbuttons, leftDrag, g.ap.Mx, g.ap.My)
+		log.LogVf("Mouse right (%06b) alt %t click (drag %t) at %d, %d", g.ap.Mbuttons, modifier, leftDrag, g.ap.Mx, g.ap.My)
 		g.c.ClearCurrent(g.ap.Mx-1, (g.ap.My-1)*2+delta)
 		g.lastWasClick = true
 	default:
 		log.LogVf("Mouse %06b at %d, %d last was click %t same spot %t left drag %t",
 			g.ap.Mbuttons, g.ap.Mx, g.ap.My,
 			prevWasClick, sameSpot, leftDrag)
+		if prevWasClick {
+			g.ap.MouseClickOn() // turns off drag and back to just clicks.
+		}
 		return
 	}
 	if sameSpot {

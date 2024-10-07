@@ -62,23 +62,44 @@ func (ap *AnsiPixels) MouseDecode() {
 }
 
 const (
-	MouseLeft  = 0
-	MouseRight = 0b10
-	MouseMove  = 0b100000
+	MouseLeft       = 0b00
+	MouseRight      = 0b10
+	MouseMove       = 0b100000
+	Shift           = 0b000100
+	Alt             = 0b001000
+	Ctrl            = 0b010000
+	AllModifiers    = Shift | Alt | Ctrl
+	AnyModifierMask = ^AllModifiers
 )
 
+func (ap *AnsiPixels) AltMod() bool {
+	return ap.Mbuttons&Alt != 0
+}
+
+func (ap *AnsiPixels) ShiftMod() bool {
+	return ap.Mbuttons&Alt != 0
+}
+
+func (ap *AnsiPixels) CtrlMod() bool {
+	return ap.Mbuttons&Alt != 0
+}
+
+func (ap *AnsiPixels) AnyModifier() bool {
+	return ap.Mbuttons&AllModifiers != 0
+}
+
 func (ap *AnsiPixels) LeftClick() bool {
-	return ap.Mouse && (ap.Mbuttons == MouseLeft)
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseLeft)
 }
 
 func (ap *AnsiPixels) RightClick() bool {
-	return ap.Mouse && (ap.Mbuttons == MouseRight)
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseRight)
 }
 
 func (ap *AnsiPixels) LeftDrag() bool {
-	return ap.Mouse && (ap.Mbuttons == MouseMove|MouseLeft)
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMove|MouseLeft)
 }
 
 func (ap *AnsiPixels) RightDrag() bool {
-	return ap.Mouse && (ap.Mbuttons == MouseMove|MouseRight)
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMove|MouseRight)
 }
