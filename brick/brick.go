@@ -301,7 +301,7 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		case 0:
 			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.BrightRed)
 		case 2:
-			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Orange) 
+			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Orange)
 		case 4:
 			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Green)
 		case 6:
