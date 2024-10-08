@@ -183,11 +183,11 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		ap.OnResize = func() error {
 			ap.StartSyncMode()
 			ap.ClearScreen()
-			/*
-				offsetX = max(-ap.W+1, offsetX)
-				offsetX = min(2*ap.W-1, offsetX)
-				offsetY = max(-ap.H+1, offsetY)
-				offsetY = min(2*ap.H-1, offsetY)
+			/* todo: prevent image from going off screen
+			offsetX = max(-ap.W+1, offsetX)
+			offsetX = min(2*ap.W-1, offsetX)
+			offsetY = max(-ap.H+1, offsetY)
+			offsetY = min(2*ap.H-1, offsetY)
 			*/
 			e := ap.ShowImage(img, zoom, offsetX, offsetY, defaultMonoImageColor)
 			if showInfo {
