@@ -65,12 +65,24 @@ const (
 	MouseLeft       = 0b00
 	MouseRight      = 0b10
 	MouseMove       = 0b100000
+	MouseWheelUp    = 0b1000000
+	MouseWheelDown  = 0b1000001
 	Shift           = 0b000100
 	Alt             = 0b001000
 	Ctrl            = 0b010000
 	AllModifiers    = Shift | Alt | Ctrl
 	AnyModifierMask = ^AllModifiers
+	// For some reason iterm2 and kitty etc set the MouseRight bit when shift-mousewheeling.
+	MouseWheelMask = ^(AllModifiers | MouseRight)
 )
+
+func (ap *AnsiPixels) MouseWheelUp() bool {
+	return ap.Mouse && ((ap.Mbuttons & MouseWheelMask) == MouseWheelUp)
+}
+
+func (ap *AnsiPixels) MouseWheelDown() bool {
+	return ap.Mouse && ((ap.Mbuttons & MouseWheelMask) == MouseWheelDown)
+}
 
 func (ap *AnsiPixels) AltMod() bool {
 	return ap.Mbuttons&Alt != 0

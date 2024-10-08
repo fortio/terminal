@@ -150,7 +150,14 @@ var fpsJpg []byte
 //go:embed fps_colors.jpg
 var fpsColorsJpg []byte
 
-func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:funlen // yeah well...
+func mouseOffets(ap *ansipixels.AnsiPixels, offsetX, offsetY *int) {
+	dx := float64(ap.Mx - ap.W/2)
+	dy := float64(2 * (ap.My - ap.H/2))
+	*offsetX -= safecast.MustRound[int](dx)
+	*offsetY -= safecast.MustRound[int](dy)
+}
+
+func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint:funlen,gocyclo // yeah well...
 	ap.Data = make([]byte, 3)
 	i := 0
 	l := len(imageFiles)
@@ -176,6 +183,12 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		ap.OnResize = func() error {
 			ap.StartSyncMode()
 			ap.ClearScreen()
+			/* todo: prevent image from going off screen
+			offsetX = max(-ap.W+1, offsetX)
+			offsetX = min(2*ap.W-1, offsetX)
+			offsetY = max(-ap.H+1, offsetY)
+			offsetY = min(2*ap.H-1, offsetY)
+			*/
 			e := ap.ShowImage(img, zoom, offsetX, offsetY, defaultMonoImageColor)
 			if showInfo {
 				ap.WriteRight(ap.H-1, "%s", info)
@@ -196,7 +209,20 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		if err != nil {
 			return log.FErrf("Error reading key: %v", err)
 		}
-		// ap.Data is set by ReadOrResizeOrSignal and can't be empty if no error was returned
+		switch {
+		case ap.MouseWheelUp():
+			zoom *= 1.25
+			goto redraw
+		case ap.MouseWheelDown():
+			zoom /= 1.25
+			goto redraw
+		case ap.LeftClick():
+			mouseOffets(ap, &offsetX, &offsetY)
+			goto redraw
+		case len(ap.Data) == 0:
+			goto redraw
+		}
+		// ap.Data is set by ReadOrResizeOrSignal and ~~can't be empty~~ (mouse clicks can have it empty) if no error was returned
 		largeSteps := int(10. * zoom)
 		c := ap.Data[0]
 		justRedraw := true
@@ -204,6 +230,7 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 		case '?', 'h', 'H':
 			ap.WriteCentered(ap.H/2-1, "Showing %d out of %d images, hit any key to continue, up/down for zoom,", i+1, l)
 			ap.WriteCentered(ap.H/2, "WSAD to pan, 'q' to exit, left arrow to go back, 'i' to toggle image information")
+			ap.WriteCentered(ap.H/2+1, "or Mouse wheel to zoom, Mouse click center; 'c' to reset to center of the image.")
 			ap.Out.Flush()
 			goto wait
 		case 'i', 'I':
@@ -225,6 +252,9 @@ func imagesViewer(ap *ansipixels.AnsiPixels, imageFiles []string) int { //nolint
 			offsetX--
 		case 'd':
 			offsetX++
+		case 'c', 'C':
+			offsetX = 0
+			offsetY = 0
 		case 12: // ^L, refresh
 		default:
 			justRedraw = false
@@ -331,12 +361,16 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	defer func() {
 		ap.MoveCursor(0, ap.H-1)
 		ap.MouseTrackingOff()
+		ap.MouseClickOff()
 		ap.Restore() // flushes and shows cursor and resets terminal back to original state.
 	}()
 	// GetSize done in Open (and resize signal handler).
 	ap.HideCursor()
 	ap.ClearScreen()
 	if imagesOnly && len(flag.Args()) > 0 {
+		if !*noMouseFlag {
+			ap.MouseClickOn()
+		}
 		return imagesViewer(ap, flag.Args())
 	}
 	var background *ansipixels.Image
