@@ -22,7 +22,7 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 ## fortio.org/terminal/ansipixels
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal/ansipixels.svg)](https://pkg.go.dev/fortio.org/terminal/ansipixels)
 
-A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers decoding/querying.
+A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying.
 
 
 ## FPS
@@ -48,7 +48,7 @@ or
 brew install fortio/tap/fps
 ```
 
-Use the `-image` flag to pass a different image to load as background. Or use `-i` and fps is now just a terminal image viewer.
+Use the `-image` flag to pass a different image to load as background. Or use `-i` and fps is now just a terminal image viewer (in addition to keys, you can now zoom using the mousewheel, click to move the image - see `?` for help).
 
 Pass an optional `maxfps` as argument.
 

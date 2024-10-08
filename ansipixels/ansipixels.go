@@ -297,7 +297,7 @@ func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 	s, l := ap.TruncateLeftToFit(s, ap.W-2*ap.Margin)
 	x := ap.W - l - ap.Margin
 	if x < 0 {
-		panic("TruncateLeftToFit returned a string longer than the width")
+		panic("TruncateLeftToFit returned a string longer than the width") // would be a bug/should never happen.
 	}
 	ap.MoveCursor(x, y)
 	ap.WriteString(s)
