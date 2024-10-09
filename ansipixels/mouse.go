@@ -3,6 +3,9 @@ package ansipixels
 import "bytes"
 
 func (ap *AnsiPixels) MouseClickOn() {
+	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
+	// Let us see shift key modifiers:
+	ap.WriteString("\033[>1s")
 	ap.WriteString("\033[?1000h")
 }
 
@@ -11,7 +14,6 @@ func (ap *AnsiPixels) MouseClickOff() {
 }
 
 func (ap *AnsiPixels) MouseTrackingOn() {
-	// Note default is supposed to be 1 but it isn't as of 2024-11-02
 	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
 	// Let us see shift key modifiers:
 	ap.WriteString("\033[>1s")
@@ -63,6 +65,7 @@ func (ap *AnsiPixels) MouseDecode() {
 
 const (
 	MouseLeft       = 0b00
+	MouseMiddle     = 0b01
 	MouseRight      = 0b10
 	MouseMove       = 0b100000
 	MouseWheelUp    = 0b1000000
@@ -104,12 +107,20 @@ func (ap *AnsiPixels) LeftClick() bool {
 	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseLeft)
 }
 
+func (ap *AnsiPixels) Middle() bool {
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMiddle)
+}
+
 func (ap *AnsiPixels) RightClick() bool {
 	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseRight)
 }
 
 func (ap *AnsiPixels) LeftDrag() bool {
 	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMove|MouseLeft)
+}
+
+func (ap *AnsiPixels) MiddleDrag() bool {
+	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMove|MouseMiddle)
 }
 
 func (ap *AnsiPixels) RightDrag() bool {
