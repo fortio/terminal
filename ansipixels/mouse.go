@@ -75,7 +75,8 @@ const (
 	Ctrl            = 0b010000
 	AllModifiers    = Shift | Alt | Ctrl
 	AnyModifierMask = ^AllModifiers
-	// For some reason iterm2 and kitty etc set the MouseRight bit when shift-mousewheeling.
+	// On a mac with a physical mouse, shift mousewheel is translated to button 6,7 which
+	// here looks like we set the MouseRight bit (when shift-mousewheeling).
 	MouseWheelMask = ^(AllModifiers | MouseRight)
 )
 
