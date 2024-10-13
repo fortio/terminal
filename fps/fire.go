@@ -16,25 +16,32 @@ type FireState struct {
 
 var fire *FireState
 
-var v2col [256]string
+var v2colTrueColor [256]string
+var v2col256 [256]string
 
 func init() {
 	for i := range 256 {
-		/*
-			r := min(255, 4*i)                // Red increases quickly and dominates
-			g := min(255, max(0, (i-96)*5))   // Green starts later and rises slower for more orange
-			b := min(255, max(0, (i-224)*12)) // Blue comes in very late, ensuring more orange and less yellow
-		*/
 		r := min(255, 4*i)
 		g := min(255, max(0, (i-64)*3))
 		b := min(255, max(0, (i-192)*6))
-		/*
-			r := min(255, 3*i)               // Red ramps up quickly
-			g := min(255, max(0, (i-64)*3))  // Green starts increasing earlier to transition to orange/yellow
-			b := min(255, max(0, (i-192)*4)) // Blue only increases near i = 192
-		*/
-		v2col[i] = fmt.Sprintf("\033[38;2;%d;%d;%dm█", r, g, b)
+		v2colTrueColor[i] = fmt.Sprintf("\033[38;2;%d;%d;%dm█", r, g, b)
 	}
+	v2col256[0] = "\033[38;5;16m█"   // ansi 216 black.
+	v2col256[1] = "\033[38;5;52m█"   // #5f0000
+	v2col256[2] = "\033[38;5;88m█"   // #870000
+	v2col256[3] = "\033[38;5;124m█"  // #af0000
+	v2col256[4] = "\033[38;5;160m█"  // #d70000
+	v2col256[5] = "\033[38;5;196m█"  // #ff0000
+	v2col256[6] = "\033[38;5;166m█"  // #d75f00
+	v2col256[7] = "\033[38;5;202m█"  // #ff5f00
+	v2col256[8] = "\033[38;5;208m█"  // #ff8700
+	v2col256[9] = "\033[38;5;214m█"  // #ffaf00
+	v2col256[10] = "\033[38;5;215m█" // #ffaf5f
+	v2col256[11] = "\033[38;5;220m█" // #ffd700
+	v2col256[12] = "\033[38;5;221m█" // #ffd75f
+	v2col256[13] = "\033[38;5;226m█" // #ffff00
+	v2col256[14] = "\033[38;5;227m█" // #ffff5f
+	v2col256[15] = "\033[38;5;231m█" // #ffffff
 }
 
 func InitFire(ap *ansipixels.AnsiPixels) *FireState {
@@ -70,7 +77,8 @@ func (f *FireState) Start() {
 	for x := range f.w {
 		f.Set(x, f.h-1, 255)
 		// Show/debug the palette:
-		// f.Set(x, f.h-2, safecast.MustConvert[byte]((255*x+1)/f.w))
+		// f.Set(x, f.h-3, safecast.MustConvert[byte](256-(255*(x+1))/f.w))
+		// f.Set(x, f.h-2, safecast.MustConvert[byte]((255*(x+1))/f.w))
 	}
 	f.on = true
 }
@@ -112,10 +120,14 @@ func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
 				ap.MoveCursor(x+ap.Margin, y+ap.Margin)
 				first = false
 			case x != prevX+1:
-				ap.MoveHorizontally(x)
+				ap.MoveHorizontally(x + ap.Margin)
 			}
 			prevX = x
-			ap.WriteString(v2col[v])
+			if ap.TrueColor {
+				ap.WriteString(v2colTrueColor[v])
+			} else {
+				ap.WriteString(v2col256[v/16])
+			}
 		}
 	}
 }
