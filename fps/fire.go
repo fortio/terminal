@@ -19,7 +19,7 @@ var fire *FireState
 var v2col [256]string
 
 func init() {
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		/*
 			r := min(255, 4*i)                // Red increases quickly and dominates
 			g := min(255, max(0, (i-96)*5))   // Green starts later and rises slower for more orange
@@ -67,7 +67,7 @@ func (f *FireState) Set(x, y int, v byte) byte {
 }
 
 func (f *FireState) Start() {
-	for x := 0; x < f.w; x++ {
+	for x := range f.w {
 		f.Set(x, f.h-1, 255)
 		// Show/debug the palette:
 		// f.Set(x, f.h-2, safecast.MustConvert[byte]((255*x+1)/f.w))
@@ -75,9 +75,9 @@ func (f *FireState) Start() {
 	f.on = true
 }
 
-// Turn off the fire at the bottom
+// Turn off the fire at the bottom.
 func (f *FireState) Off() {
-	for x := 0; x < f.w; x++ {
+	for x := range f.w {
 		f.Set(x, f.h-1, 1)
 	}
 	f.on = false
@@ -85,11 +85,11 @@ func (f *FireState) Off() {
 
 func (f *FireState) Update() {
 	for y := f.h - 2; y >= 0; y-- {
-		for x := 0; x < f.w; x++ {
-			r := rand.IntN(3) - 1
+		for x := range f.w {
+			r := rand.IntN(3) - 1 //nolint:gosec // this _is_ randv2!
 			v := f.At((x+r+f.w)%f.w, y+1)
 			pv := f.At(x, y)
-			newV := byte(max(0, (int(pv)+2*(int(v)-int(rand.Float32()*4.*255./(float32(f.h-1)))))/3))
+			newV := byte(max(0, (float32(pv)+4*(float32(v)-rand.Float32()*4.*255./(float32(f.h-1))))/5.)) //nolint:gosec // this _is_ randv2!
 			prev := f.Set(x, y, newV)
 			if prev != 0 && newV == 0 {
 				f.Set(x, y, 1)
@@ -99,23 +99,22 @@ func (f *FireState) Update() {
 }
 
 func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
-	for y := 0; y < f.h; y++ {
+	for y := range f.h {
 		first := true
-		prevX := -1
-		for x := 0; x < f.w; x++ {
+		prevX := -999
+		for x := range f.w {
 			v := f.At(x, y)
 			if v == 0 {
 				continue
 			}
-			prevX = x
-			if first {
+			switch {
+			case first:
 				ap.MoveCursor(x+ap.Margin, y+ap.Margin)
 				first = false
-			} else {
-				if x-prevX > 1 {
-					ap.MoveHorizontally(x)
-				}
+			case x != prevX+1:
+				ap.MoveHorizontally(x)
 			}
+			prevX = x
 			ap.WriteString(v2col[v])
 		}
 	}
