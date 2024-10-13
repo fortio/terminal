@@ -309,11 +309,11 @@ func (ap *AnsiPixels) ClearEndOfLine() {
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 
-// This also synchronizes the display.
+// This also synchronizes the display and ends the syncmode.
 func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 	x := -1
 	y := -1
-	reqPosStr := "\033[6n"
+	reqPosStr := "\033[?2026l\033[6n" // also ends sync mode
 	n, err := ap.Out.WriteString(reqPosStr)
 	if err != nil {
 		return x, y, err

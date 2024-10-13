@@ -319,10 +319,16 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	imagesOnlyFlag := flag.Bool("i", false, "Arguments are now images files to show, no FPS test (hit any key to continue)")
 	exactlyFlag := flag.Int64("n", 0, "Start immediately an FPS test with the specified `number of frames` (default is interactive)")
 	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
+	fireFlag := flag.Bool("fire", false, "Show fire animation instead of RGB around the image")
 	cli.MinArgs = 0
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "[maxfps] or fps -i imagefiles..."
 	cli.Main()
+	fireMode := *fireFlag
+	fireStr := "no_fire"
+	if fireMode {
+		fireStr = "fire"
+	}
 	imagesOnly := *imagesOnlyFlag
 	fpsLimit := -1.0
 	fpsStr := "unlimited"
@@ -340,9 +346,6 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		fpsStr = fmt.Sprintf("%.1f", fpsLimit)
 		hasFPSLimit = true
 		perfResults.hist = stats.NewHistogram(0, .01/fpsLimit)
-	} else {
-		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
-		perfResults.hist = stats.NewHistogram(0, 0.0000001)
 	}
 	perfResults.Exactly = *exactlyFlag
 	perfResults.RequestedQPS = fpsStr
@@ -425,6 +428,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	if !*noMouseFlag {
 		ap.MouseTrackingOn()
 	}
+	var frames int64
 	ap.OnResize = func() error {
 		ap.StartSyncMode()
 		ap.ClearScreen()
@@ -433,12 +437,15 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			drawBox(ap, false) // no boxed Width x Height in pure fps mode, keeping it simple.
 		}
 		ap.EndSyncMode()
+		// with max fps expect values in the tens of usec range with usec precision (at max fps for fast terminals)
+		perfResults.hist = stats.NewHistogram(0, 0.0000001)
+		frames = 0
+		setLabels("fps "+strings.TrimSuffix(fpsStr, ".0"), tenv, fmt.Sprintf("%dx%d", ap.W, ap.H), fireStr)
 		return e
 	}
 	if err = ap.OnResize(); err != nil {
 		return log.FErrf("Error showing image: %v", err)
 	}
-	frames := int64(0)
 	var elapsed time.Duration
 	var entry []byte
 	sendableTickerChan := make(chan time.Time, 1)
@@ -447,13 +454,12 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 	startTime := hrtime.Now()
 	now := startTime
 	if hasFPSLimit {
-		ticker := time.NewTicker(time.Second / time.Duration(fpsLimit))
+		ticker := time.NewTicker(time.Duration(float64(time.Second) / fpsLimit))
 		tickerChan = ticker.C
 	} else {
 		tickerChan = sendableTickerChan
 		sendableTickerChan <- perfResults.StartTime
 	}
-	setLabels("fps "+strings.TrimSuffix(fpsStr, ".0"), tenv, fmt.Sprintf("%dx%d", ap.W, ap.H))
 	for {
 		select {
 		case s := <-ap.C:
@@ -471,6 +477,10 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			if frames > 0 {
 				perfResults.hist.Record(sec) // record in milliseconds
 			}
+			if fireMode {
+				ap.StartSyncMode()
+				AnimateFire(ap, frames)
+			}
 			fps = 1. / sec
 			now = hrtime.Now()
 			perfResults.ActualDuration = (now - startTime)
@@ -485,7 +495,17 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			if perfResults.Exactly > 0 && frames >= perfResults.Exactly {
 				return 0
 			}
-			animate(ap, frames)
+			if !fireMode {
+				animate(ap, frames)
+			}
+			invert := ""
+			if ap.Mouse {
+				invert = ansipixels.Reverse
+			}
+			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
+				ansipixels.Cyan, ansipixels.Green, fpsStr, ansipixels.Reset, ap.W, ap.H,
+				ansipixels.DarkGray, ansipixels.Reset, entry, ansipixels.DarkGray, ansipixels.Reset,
+				invert, ap.Mx, ap.My, ap.Mbuttons, ansipixels.Reset)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
@@ -495,15 +515,11 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			if isStopKey(ap) {
 				return 0
 			}
-			entry = append(entry, ap.Data...)
-			invert := ""
-			if ap.Mouse {
-				invert = ansipixels.Reverse
+			if fireMode && len(ap.Data) > 0 && ap.Data[0] == ' ' {
+				ToggleFire()
+				ap.Data = ap.Data[1:]
 			}
-			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
-				ansipixels.Cyan, ansipixels.Green, fpsStr, ansipixels.Reset, ap.W, ap.H,
-				ansipixels.DarkGray, ansipixels.Reset, entry, ansipixels.DarkGray, ansipixels.Reset,
-				invert, ap.Mx, ap.My, ap.Mbuttons, ansipixels.Reset)
+			entry = append(entry, ap.Data...)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
 			frames++
 			if !hasFPSLimit {
