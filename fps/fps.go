@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	// hrtime "time"
+	"github.com/loov/hrtime"
+
 	"fortio.org/cli"
 	"fortio.org/fortio/periodic"
 	"fortio.org/fortio/stats"
@@ -19,7 +22,6 @@ import (
 	"fortio.org/safecast"
 	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
-	"github.com/loov/hrtime"
 )
 
 const defaultMonoImageColor = ansipixels.Blue // ansi blue-ish
@@ -474,6 +476,11 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		case v := <-tickerChan:
 			elapsed = hrtime.Since(now)
 			sec := elapsed.Seconds()
+			fps = 1. / sec
+			now = hrtime.Now()
+			// perfResults.ActualDuration = now.Sub(startTime)
+			perfResults.ActualDuration = now - startTime
+			perfResults.ActualQPS = float64(frames) / perfResults.ActualDuration.Seconds()
 			if frames > 0 {
 				perfResults.hist.Record(sec) // record in milliseconds
 			}
@@ -481,10 +488,6 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				ap.StartSyncMode()
 				AnimateFire(ap, frames)
 			}
-			fps = 1. / sec
-			now = hrtime.Now()
-			perfResults.ActualDuration = (now - startTime)
-			perfResults.ActualQPS = float64(frames) / perfResults.ActualDuration.Seconds()
 			// stats.Record("fps", fps)
 			ap.WriteAt(ap.W/2-20, ap.H/2+2, "%s Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
 				ansipixels.Reset, ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
