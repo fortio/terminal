@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 
+	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -82,10 +83,11 @@ func (f *FireState) Off() {
 func (f *FireState) Update() {
 	for y := f.h - 2; y >= 0; y-- {
 		for x := range f.w {
-			r := rand.IntN(3) - 1 //nolint:gosec // this _is_ randv2!
-			v := f.At((x+r+f.w)%f.w, y+1)
+			r := rand.Float32()                         //nolint:gosec // this _is_ randv2!
+			dx := safecast.MustTruncate[int](3*r - 1.5) // -1, 0, 1
+			v := f.At((x+dx+f.w)%f.w, y+1)
 			pv := f.At(x, y)
-			newV := byte(max(0, (float32(pv)+4*(float32(v)-rand.Float32()*2.5*255./(float32(f.h-1))))/5.)) //nolint:gosec // this _is_ randv2!
+			newV := byte(max(0, (float32(pv)+4*(float32(v)-r*2.5*255./(float32(f.h-1))))/5.))
 			prev := f.Set(x, y, newV)
 			if prev != 0 && newV == 0 {
 				f.Set(x, y, 1)
