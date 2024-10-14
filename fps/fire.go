@@ -88,7 +88,7 @@ func (f *FireState) Update() {
 				f.Set(x, y, v)
 				continue
 			}
-			newV := byte(max(0, float32(v)-r*3.5*255./(float32(f.h-1))))
+			newV := byte(max(0, float32(v)-r*3.2*255./(float32(f.h-1))))
 			if newV == 0 && pv != 0 {
 				newV = 1
 			}
