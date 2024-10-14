@@ -397,6 +397,9 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		e := ap.ShowImage(background, 1.0, 0, 0, defaultMonoImageColor)
 		if !imagesOnly {
 			drawBox(ap, true)
+			if fireMode {
+				ShowPalette(ap)
+			}
 			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... %s",
 				fpsStr, ansipixels.MoveLeft)
 			ap.ShowCursor()

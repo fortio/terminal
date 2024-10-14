@@ -17,8 +17,10 @@ type FireState struct {
 
 var fire *FireState
 
-var v2colTrueColor [256]string
-var v2col256 [256]string
+var (
+	v2colTrueColor [256]string
+	v2col256       [256]string
+)
 
 func init() {
 	for i := range 256 {
@@ -36,7 +38,6 @@ func init() {
 func InitFire(ap *ansipixels.AnsiPixels) *FireState {
 	f := &FireState{h: ap.H - 2*ap.Margin, w: ap.W - 2*ap.Margin}
 	f.buffer = make([]byte, f.h*f.w)
-	f.Start()
 	return f
 }
 
@@ -65,9 +66,6 @@ func (f *FireState) Set(x, y int, v byte) byte {
 func (f *FireState) Start() {
 	for x := range f.w {
 		f.Set(x, f.h-1, 255)
-		// Show/debug the palette:
-		// f.Set(x, f.h-3, safecast.MustConvert[byte](256-(255*(x+1))/f.w))
-		// f.Set(x, f.h-2, safecast.MustConvert[byte]((255*(x+1))/f.w))
 	}
 	f.on = true
 }
@@ -100,6 +98,7 @@ func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
 	for y := range f.h {
 		first := true
 		prevX := -999
+		prevColor := ""
 		for x := range f.w {
 			v := f.At(x, y)
 			if v == 0 {
@@ -113,10 +112,17 @@ func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
 				ap.MoveHorizontally(x + ap.Margin)
 			}
 			prevX = x
+			var newColor string
 			if ap.TrueColor {
-				ap.WriteString(v2colTrueColor[v])
+				newColor = v2colTrueColor[v]
 			} else {
-				ap.WriteString(v2col256[3*int(v)/64])
+				newColor = v2col256[3*int(v)/64]
+			}
+			if newColor != prevColor {
+				ap.WriteString(newColor)
+				prevColor = newColor
+			} else {
+				ap.WriteRune(ansipixels.FullPixel)
 			}
 		}
 	}
@@ -125,7 +131,19 @@ func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
 func AnimateFire(ap *ansipixels.AnsiPixels, frame int64) {
 	if frame == 0 {
 		fire = InitFire(ap)
+		fire.Start()
 	}
 	fire.Update()
 	fire.Render(ap)
+}
+
+func ShowPalette(ap *ansipixels.AnsiPixels) {
+	f := InitFire(ap)
+	// Show/debug the palette:
+	for x := range f.w {
+		v := safecast.MustConvert[byte]((255 * (x + 1)) / f.w)
+		f.Set(x, f.h-3, v)
+		f.Set(x, f.h-2, v)
+	}
+	f.Render(ap)
 }
