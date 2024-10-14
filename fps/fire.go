@@ -56,11 +56,8 @@ func (f *FireState) At(x, y int) byte {
 	return f.buffer[y*f.w+x]
 }
 
-func (f *FireState) Set(x, y int, v byte) byte {
-	idx := y*f.w + x
-	prev := f.buffer[idx]
-	f.buffer[idx] = v
-	return prev
+func (f *FireState) Set(x, y int, v byte) {
+	f.buffer[y*f.w+x] = v
 }
 
 func (f *FireState) Start() {
@@ -85,11 +82,17 @@ func (f *FireState) Update() {
 			dx := safecast.MustTruncate[int](3*r - 1.5) // -1, 0, 1
 			v := f.At((x+dx+f.w)%f.w, y+1)
 			pv := f.At(x, y)
-			newV := byte(max(0, (float32(pv)+4*(float32(v)-r*2.5*255./(float32(f.h-1))))/5.))
-			prev := f.Set(x, y, newV)
-			if prev != 0 && newV == 0 {
-				f.Set(x, y, 1)
+			if pv > v { // slow-ish decay when "off"
+				delta := max(1, byte(r*float32(pv-v)))
+				v = max(1, pv-delta)
+				f.Set(x, y, v)
+				continue
 			}
+			newV := byte(max(0, float32(v)-r*3.5*255./(float32(f.h-1))))
+			if newV == 0 && pv != 0 {
+				newV = 1
+			}
+			f.Set(x, y, newV)
 		}
 	}
 }
