@@ -67,30 +67,39 @@ Detailed statistics are saved in a JSON files and can be visualized or compared 
 
 ![fps fortio histogram](histogram.png)
 
+Hot (!) off the press a new `-fire` mode for fps (with space to toggle on/off and `i` to turn off the text):
+
+<img width="1058" alt="FPS Fire mode" src="https://github.com/user-attachments/assets/dae6cfd5-1e6c-4674-808e-93b89cc6f47f">
+
+
 ### Usage
 
 Additional flags/command help:
 ```
-fps v0.18.0 usage:
-	fps [flags] [maxfps] or fps -i imagefiles...
+fps 0.27.0 usage:
+        fps [flags] [maxfps] or fps -i imagefiles...
 or 1 of the special arguments
-	fps {help|envhelp|version|buildinfo}
+        fps {help|envhelp|version|buildinfo}
 flags:
   -color
-    	If your terminal supports color, this will load image in (216) colors instead of monochrome (default true)
+        If your terminal supports color, this will load image in (216) colors instead of monochrome
+  -fire
+        Show fire animation instead of RGB around the image
   -gray
-    	Convert the image to grayscale
-  -i	Arguments are now images files to show, no FPS test (hit any key to continue)
+        Convert the image to grayscale
+  -i    Arguments are now images files to show, no FPS test (hit any key to continue)
   -image string
-    	Image file to display in monochrome in the background instead of the default one
+        Image file to display in monochrome in the background instead of the default one
   -n number of frames
-    	Start immediately an FPS test with the specified number of frames (default is interactive)
+        Start immediately an FPS test with the specified number of frames (default is interactive)
   -nobox
-    	Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
+        Don't draw the box around the image, make the image full screen instead of 1 pixel less on all sides
   -nojson
         Don't output json file with results that otherwise get produced and can be visualized with fortio report
+  -nomouse
+        Disable mouse tracking
   -truecolor
-    	If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome
+        If your terminal supports truecolor, this will load image in truecolor (24bits) instead of monochrome (default true)
 ```
 
 ## Game of life
