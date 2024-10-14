@@ -12,9 +12,6 @@ import (
 	"strings"
 	"time"
 
-	// hrtime "time"
-	"github.com/loov/hrtime"
-
 	"fortio.org/cli"
 	"fortio.org/fortio/periodic"
 	"fortio.org/fortio/stats"
@@ -22,6 +19,7 @@ import (
 	"fortio.org/safecast"
 	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
+	"github.com/loov/hrtime" // To test hrtime correctness: hrtime "time".
 )
 
 const defaultMonoImageColor = ansipixels.Blue // ansi blue-ish
