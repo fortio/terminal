@@ -24,9 +24,9 @@ var (
 
 func init() {
 	for i := range 256 {
-		r := min(255, 4*i)
-		g := min(255, max(0, (i-64)*3))
-		b := min(255, max(0, (i-192)*6))
+		r := min(255, 3*i)
+		g := min(255, max(0, (i-84)*2))
+		b := min(255, max(0, (i-208)*5))
 		v2colTrueColor[i] = fmt.Sprintf("\033[38;2;%d;%d;%dm█", r, g, b)
 	}
 	//                          0   1   2   3    4    5    6    7    8    9    10   11
