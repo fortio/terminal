@@ -26,22 +26,10 @@ func init() {
 		b := min(255, max(0, (i-192)*6))
 		v2colTrueColor[i] = fmt.Sprintf("\033[38;2;%d;%d;%dm█", r, g, b)
 	}
-	v2col256[0] = "\033[38;5;16m█"   // ansi 216 black.
-	v2col256[1] = "\033[38;5;52m█"   // #5f0000
-	v2col256[2] = "\033[38;5;88m█"   // #870000
-	v2col256[3] = "\033[38;5;124m█"  // #af0000
-	v2col256[4] = "\033[38;5;160m█"  // #d70000
-	v2col256[5] = "\033[38;5;196m█"  // #ff0000
-	v2col256[6] = "\033[38;5;166m█"  // #d75f00
-	v2col256[7] = "\033[38;5;202m█"  // #ff5f00
-	v2col256[8] = "\033[38;5;208m█"  // #ff8700
-	v2col256[9] = "\033[38;5;214m█"  // #ffaf00
-	v2col256[10] = "\033[38;5;215m█" // #ffaf5f
-	v2col256[11] = "\033[38;5;220m█" // #ffd700
-	v2col256[12] = "\033[38;5;221m█" // #ffd75f
-	v2col256[13] = "\033[38;5;226m█" // #ffff00
-	v2col256[14] = "\033[38;5;227m█" // #ffff5f
-	v2col256[15] = "\033[38;5;231m█" // #ffffff
+	//                          0   1   2   3    4    5    6    7    8    9    10   11
+	for i, color := range []int{16, 52, 88, 124, 166, 202, 208, 214, 220, 226, 228, 231} {
+		v2col256[i] = fmt.Sprintf("\033[38;5;%dm█", color)
+	}
 }
 
 func InitFire(ap *ansipixels.AnsiPixels) *FireState {
@@ -97,7 +85,7 @@ func (f *FireState) Update() {
 			r := rand.IntN(3) - 1 //nolint:gosec // this _is_ randv2!
 			v := f.At((x+r+f.w)%f.w, y+1)
 			pv := f.At(x, y)
-			newV := byte(max(0, (float32(pv)+4*(float32(v)-rand.Float32()*4.*255./(float32(f.h-1))))/5.)) //nolint:gosec // this _is_ randv2!
+			newV := byte(max(0, (float32(pv)+4*(float32(v)-rand.Float32()*2.5*255./(float32(f.h-1))))/5.)) //nolint:gosec // this _is_ randv2!
 			prev := f.Set(x, y, newV)
 			if prev != 0 && newV == 0 {
 				f.Set(x, y, 1)
@@ -126,7 +114,7 @@ func (f *FireState) Render(ap *ansipixels.AnsiPixels) {
 			if ap.TrueColor {
 				ap.WriteString(v2colTrueColor[v])
 			} else {
-				ap.WriteString(v2col256[v/16])
+				ap.WriteString(v2col256[3*int(v)/64])
 			}
 		}
 	}

@@ -486,8 +486,8 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			perfResults.ActualDuration = (now - startTime)
 			perfResults.ActualQPS = float64(frames) / perfResults.ActualDuration.Seconds()
 			// stats.Record("fps", fps)
-			ap.WriteAt(ap.W/2-20, ap.H/2+2, " Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
-				ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
+			ap.WriteAt(ap.W/2-20, ap.H/2+2, "%s Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
+				ansipixels.Reset, ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
 				ansipixels.BrightRed, fps, ansipixels.Reset,
 				ansipixels.Cyan, perfResults.ActualQPS, ansipixels.Reset)
 			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
