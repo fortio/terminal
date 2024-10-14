@@ -400,6 +400,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			if fireMode {
 				ShowPalette(ap)
 			}
+			ap.WriteCentered(ap.H/2+4, "In -fire mode, space bar to toggle on/off; i to hide text")
 			ap.WriteCentered(ap.H/2+3, "FPS %s test... any key to start; q, ^C, or ^D to exit... %s",
 				fpsStr, ansipixels.MoveLeft)
 			ap.ShowCursor()
@@ -432,6 +433,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		ap.MouseTrackingOn()
 	}
 	var frames int64
+	var hideText bool
 	ap.OnResize = func() error {
 		ap.StartSyncMode()
 		ap.ClearScreen()
@@ -444,6 +446,7 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 		perfResults.hist = stats.NewHistogram(0, 0.0000001)
 		frames = 0
 		setLabels("fps "+strings.TrimSuffix(fpsStr, ".0"), tenv, fmt.Sprintf("%dx%d", ap.W, ap.H), fireStr)
+		hideText = false
 		return e
 	}
 	if err = ap.OnResize(); err != nil {
@@ -490,26 +493,30 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				AnimateFire(ap, frames)
 			}
 			// stats.Record("fps", fps)
-			ap.WriteAt(ap.W/2-20, ap.H/2+2, "%s Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
-				ansipixels.Reset, ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
-				ansipixels.BrightRed, fps, ansipixels.Reset,
-				ansipixels.Cyan, perfResults.ActualQPS, ansipixels.Reset)
-			ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
-				1/perfResults.hist.Min, 1/perfResults.hist.Max, 1/perfResults.hist.Avg(), 1/perfResults.hist.StdDev())
+			if !hideText {
+				ap.WriteAt(ap.W/2-20, ap.H/2+2, "%s Last frame %s%v%s FPS: %s%.0f%s Avg %s%.2f%s ",
+					ansipixels.Reset, ansipixels.Green, elapsed.Round(10*time.Microsecond), ansipixels.Reset,
+					ansipixels.BrightRed, fps, ansipixels.Reset,
+					ansipixels.Cyan, perfResults.ActualQPS, ansipixels.Reset)
+				ap.WriteAt(ap.W/2-20, ap.H/2+3, " Best %.1f Worst %.1f: %.1f +/- %.1f ",
+					1/perfResults.hist.Min, 1/perfResults.hist.Max, 1/perfResults.hist.Avg(), 1/perfResults.hist.StdDev())
+			}
 			if perfResults.Exactly > 0 && frames >= perfResults.Exactly {
 				return 0
 			}
 			if !fireMode {
 				animate(ap, frames)
 			}
-			invert := ""
-			if ap.Mouse {
-				invert = ansipixels.Reverse
+			if !hideText {
+				invert := ""
+				if ap.Mouse {
+					invert = ansipixels.Reverse
+				}
+				ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
+					ansipixels.Cyan, ansipixels.Green, fpsStr, ansipixels.Reset, ap.W, ap.H,
+					ansipixels.DarkGray, ansipixels.Reset, entry, ansipixels.DarkGray, ansipixels.Reset,
+					invert, ap.Mx, ap.My, ap.Mbuttons, ansipixels.Reset)
 			}
-			ap.WriteRight(ap.H-1-ap.Margin, " Target %sFPS %s%s%s, %dx%d, typed so far: %s[%s%q%s]%s %sMouse %d,%d (%06b)%s",
-				ansipixels.Cyan, ansipixels.Green, fpsStr, ansipixels.Reset, ap.W, ap.H,
-				ansipixels.DarkGray, ansipixels.Reset, entry, ansipixels.DarkGray, ansipixels.Reset,
-				invert, ap.Mx, ap.My, ap.Mbuttons, ansipixels.Reset)
 			// Request cursor position (note that FPS is about the same without it, the Flush seems to be enough)
 			_, _, err = ap.ReadCursorPos()
 			if err != nil {
@@ -519,9 +526,14 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 			if isStopKey(ap) {
 				return 0
 			}
-			if fireMode && len(ap.Data) > 0 && ap.Data[0] == ' ' {
-				ToggleFire()
-				ap.Data = ap.Data[1:]
+			if len(ap.Data) > 0 {
+				switch {
+				case fireMode && ap.Data[0] == ' ':
+					ToggleFire()
+				case ap.Data[0] == 'i':
+					hideText = !hideText
+				}
+
 			}
 			entry = append(entry, ap.Data...)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
