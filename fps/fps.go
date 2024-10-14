@@ -533,7 +533,6 @@ func Main() int { //nolint:funlen,gocognit,gocyclo,maintidx // color and mode if
 				case ap.Data[0] == 'i':
 					hideText = !hideText
 				}
-
 			}
 			entry = append(entry, ap.Data...)
 			ap.Data = ap.Data[0:0:cap(ap.Data)] // reset buffer
