@@ -22,12 +22,12 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 ## fortio.org/terminal/ansipixels
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal/ansipixels.svg)](https://pkg.go.dev/fortio.org/terminal/ansipixels)
 
-A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying.
+A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying and many functions to emit the corresponding [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code) (colors, cursor positioning etc).
 
 
 ## FPS
 
-There is also a new [ansipixels](https://pkg.go.dev/fortio.org/terminal/ansipixels) package for drawing on the terminal and the tagged release also include `fps` that uses that package to test your terminal frames per second capabilities.
+The tagged release of `ansipixels` also includes a standalone binary, `fps`, that uses that package to test your terminal frames per second capabilities.
 See the source [fps/fps.go](fps/fps.go)
 
 You can get the binary from [releases](https://github.com/fortio/terminal/releases)
