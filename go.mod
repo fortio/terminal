@@ -1,10 +1,10 @@
 module fortio.org/terminal
 
-go 1.22.7
+go 1.23.3
 
 require (
 	fortio.org/cli v1.9.2
-	fortio.org/fortio v1.67.1
+	fortio.org/fortio v1.68.0
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
 	fortio.org/term v0.23.0-fortio-6
