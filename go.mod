@@ -11,7 +11,7 @@ require (
 	github.com/loov/hrtime v1.0.3
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.23.0
-	golang.org/x/sys v0.28.0
+	golang.org/x/sys v0.29.0
 )
 
 // replace fortio.org/term => ../term
