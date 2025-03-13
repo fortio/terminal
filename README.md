@@ -24,6 +24,7 @@ The implementations currently is a wrapper fully encapsulating (our fork of) [x/
 
 A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying and many functions to emit the corresponding [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code) (colors, cursor positioning etc).
 
+Do feel free to use [fortio.org/progressbar](https://github.com/fortio/progressbar) as well
 
 ## FPS
 
