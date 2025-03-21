@@ -3,7 +3,7 @@ all: lint test demo
 GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
 demo:
-	go run -tags $(GO_BUILD_TAGS) ./example/ -loglevel debug -only-valid
+	go run -race -tags $(GO_BUILD_TAGS) ./example/ -loglevel debug -only-valid
 
 tinygo-demo:
 	# No luck on mac https://github.com/tinygo-org/tinygo/issues/4395
@@ -13,7 +13,7 @@ tinygo-demo:
 
 test:
 	CGO_ENABLED=0 go test -tags $(GO_BUILD_TAGS) ./...
-	(echo -e "help\rafter 1s hi\r"; sleep 2) | go run -tags $(GO_BUILD_TAGS) ./example # check non terminal input
+	(echo -e "help\rafter 1s hi\r"; sleep 2) | go run -race -tags $(GO_BUILD_TAGS) ./example # check non terminal input
 
 lint: .golangci.yml
 	CGO_ENABLED=0 golangci-lint run --build-tags $(GO_BUILD_TAGS)

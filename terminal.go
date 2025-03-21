@@ -12,7 +12,7 @@ import (
 
 	"fortio.org/log"
 	"fortio.org/safecast"
-	"fortio.org/term"
+	"golang.org/x/term"
 )
 
 type Terminal struct {
@@ -30,6 +30,7 @@ type Terminal struct {
 	historyFile string
 	capacity    int
 	autoHistory bool
+	history     *stRingBuffer // original implementation of new History + exposed constructor etc.
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -49,8 +50,10 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 		fdOut:      safecast.MustConvert[int](os.Stdout.Fd()),
 		intrReader: intrReader,
 		Context:    ctx,
+		history:    NewHistory(DefaultHistoryCapacity),
 	}
 	t.term = term.NewTerminal(rw, "")
+	t.term.History = t.history
 	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
@@ -62,7 +65,7 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 		return
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
-	t.capacity = term.DefaultHistoryEntries
+	t.capacity = DefaultHistoryCapacity
 	t.loggerSetup()
 	_ = t.UpdateSize() // error already logged
 	t.ResetInterrupts(ctx)
@@ -138,7 +141,7 @@ func (t *Terminal) SetHistoryFile(f string) error {
 		log.Infof("Loaded %d history entries from %s", len(entries), f)
 	}
 	for _, e := range entries[start:] {
-		t.term.AddToHistory(e)
+		t.AddToHistory(e)
 	}
 	return nil
 }
@@ -147,16 +150,27 @@ func (t *Terminal) SetHistoryFile(f string) error {
 
 // AddToHistory add commands to the history.
 func (t *Terminal) AddToHistory(commands ...string) {
-	t.term.AddToHistory(commands...)
+	for _, c := range commands {
+		t.term.History.Add(c)
+	}
 }
 
 // History returns the current history state.
 func (t *Terminal) History() []string {
-	return t.term.History()
+	res := []string{}
+	for i := 0; ; i++ {
+		c, ok := t.term.History.At(i)
+		if !ok {
+			break
+		}
+		res = append(res, c)
+	}
+	return res
 }
 
 // DefaultHistoryCapacity is the default number of entries in the history (99).
-const DefaultHistoryCapacity = term.DefaultHistoryEntries
+// History index 1-99 prints using %02d.
+const DefaultHistoryCapacity = 99
 
 // NewHistory creates/resets the history to a new one with the given capacity.
 // Using 0 as capacity will disable history reading and writing but not change
@@ -170,13 +184,13 @@ func (t *Terminal) NewHistory(capacity int) {
 	if capacity == 0 { // leave the underlying history as is, avoids crashing with 0 as well.
 		return
 	}
-	t.term.NewHistory(capacity)
+	t.term.History = NewHistory(capacity)
 }
 
 // SetAutoHistory enables/disables auto history (default is enabled).
 func (t *Terminal) SetAutoHistory(enabled bool) {
 	t.autoHistory = enabled
-	t.term.AutoHistory(enabled)
+	t.history.AutoHistory(enabled)
 }
 
 // AutoHistory returns the current auto history setting.
@@ -185,8 +199,10 @@ func (t *Terminal) AutoHistory() bool {
 }
 
 // ReplaceLatest replaces the current history with the given commands, returns the previous value.
+// Enables to add invalid commands to the history for editing purpose and
+// replace them with the corrected version. Returns the replaced entry.
 func (t *Terminal) ReplaceLatest(command string) string {
-	return t.term.ReplaceLatest(command)
+	return t.history.Replace(command)
 }
 
 func readOrCreateHistory(f string) ([]string, error) {
@@ -280,7 +296,7 @@ func (t *Terminal) Close() error {
 		log.Debugf("No history file %q or capacity %d, not saving history", t.historyFile, t.capacity)
 		return nil
 	}
-	h := t.term.History()
+	h := t.History()
 	// log.LogVf("got history %v", h)
 	slices.Reverse(h)
 	extra := len(h) - t.capacity
@@ -321,4 +337,85 @@ func (t *Terminal) SetAutoCompleteCallback(f AutoCompleteCallback) {
 	t.term.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		return f(t, line, pos, key)
 	}
+}
+
+// -- History ring buffer as in https://github.com/golang/term/pull/15/files
+// (ie same but with size configurable and using the History API from
+// https://github.com/golang/go/issues/68780#issuecomment-2707041053 )
+
+// stRingBuffer is a ring buffer of strings.
+type stRingBuffer struct {
+	// entries contains max elements.
+	entries []string
+	max     int
+	// head contains the index of the element most recently added to the ring.
+	head int
+	// size contains the number of elements in the ring.
+	size int
+	// autoHistory, if true, causes lines to be automatically added to the history.
+	// If false, call AddToHistory to add lines to the history for instance only adding
+	// successful commands. Defaults to true. This is controlled through AutoHistory(bool).
+	autoHistory bool
+}
+
+// Creates a new ring buffer of strings with the given capacity.
+func NewHistory(capacity int) *stRingBuffer {
+	return &stRingBuffer{
+		entries:     make([]string, capacity),
+		max:         capacity,
+		autoHistory: true,
+	}
+}
+
+func (s *stRingBuffer) Add(a string) {
+	if !s.autoHistory {
+		return
+	}
+	s.ReallyAdd(a)
+}
+
+func (s *stRingBuffer) ReallyAdd(a string) {
+	if s.entries[s.head] == a {
+		// Already there at the top, so don't add.
+		// Also has the nice side effect of ignoring empty strings,
+		// no s.size check on purpose.
+		return
+	}
+	s.head = (s.head + 1) % s.max
+	s.entries[s.head] = a
+	if s.size < s.max {
+		s.size++
+	}
+}
+
+// Replace theoretically could panic on an empty ring buffer but
+// it's harmless on strings.
+func (s *stRingBuffer) Replace(a string) string {
+	previous := s.entries[s.head]
+	s.entries[s.head] = a
+	return previous
+}
+
+// At returns the value passed to the nth previous call to Add.
+// If n is zero then the immediately prior value is returned, if one, then the
+// next most recent, and so on. If such an element doesn't exist then ok is
+// false.
+func (s *stRingBuffer) At(n int) (value string, ok bool) {
+	if n < 0 || n >= s.size {
+		return "", false
+	}
+	index := s.head - n
+	if index < 0 {
+		index += s.max
+	}
+	return s.entries[index], true
+}
+
+// AutoHistory sets the auto history flag.
+// If true, lines are automatically added to the history by x/term using Add().
+// If false, call ReallyAdd to add lines to the history for instance
+// only adding successful commands.
+// Defaults to true.
+func (s *stRingBuffer) AutoHistory(enabled bool) {
+	s.autoHistory = enabled
 }

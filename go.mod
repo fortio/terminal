@@ -8,11 +8,14 @@ require (
 	fortio.org/cli v1.10.0
 	fortio.org/log v1.17.2
 	fortio.org/safecast v1.0.0
-	fortio.org/term v0.29.0-fortio-1
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.26.0
 	golang.org/x/sys v0.32.0
+	golang.org/x/term v0.32.0
 )
+
+// Remove once 0.32.0 is released / https://github.com/golang/term/pull/20 merged
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321061617-b9f8be7d8922
 
 require (
 	fortio.org/struct2env v0.4.2 // indirect
