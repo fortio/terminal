@@ -408,6 +408,7 @@ func (th *TermHistory) Replace(a string) string {
 // next most recent, and so on. If such an element doesn't exist then ok is
 // false.
 func (th *TermHistory) At(n int) (value string, ok bool) {
+	log.Debugf("Called At(%d) for history (head %d sz %d max %d)", n, th.head, th.size, th.max)
 	if n < 0 || n >= th.size {
 		return "", false
 	}

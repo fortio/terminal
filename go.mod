@@ -15,7 +15,7 @@ require (
 )
 
 // Remove once 0.32.0 is released / https://github.com/golang/term/pull/20 merged
-replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321061617-b9f8be7d8922
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321160327-bad1ef1afeb0
 
 require (
 	fortio.org/struct2env v0.4.2 // indirect
