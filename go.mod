@@ -7,12 +7,14 @@ require (
 	fortio.org/fortio v1.68.1
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
-	fortio.org/term v0.29.0-fortio-1
 	github.com/loov/hrtime v1.0.3
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.25.0
 	golang.org/x/sys v0.31.0
+	golang.org/x/term v0.31.0
 )
+
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321061617-b9f8be7d8922
 
 require (
 	fortio.org/sets v1.2.0 // indirect
