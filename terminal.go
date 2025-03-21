@@ -29,7 +29,6 @@ type Terminal struct {
 	intrReader  *InterruptReader
 	historyFile string
 	capacity    int
-	autoHistory bool
 	history     *TermHistory // original implementation of new History + exposed constructor etc.
 }
 
@@ -146,12 +145,12 @@ func (t *Terminal) SetHistoryFile(f string) error {
 	return nil
 }
 
-// Forward the term history API and not just the high level file history api above.
+// Implements the rest of the term history API and not just the high level file history api above.
 
-// AddToHistory add commands to the history.
+// AddToHistory add commands to the TermHistory.
 func (t *Terminal) AddToHistory(commands ...string) {
 	for _, c := range commands {
-		t.term.History.Add(c)
+		t.history.UnconditionalAdd(c)
 	}
 }
 
@@ -189,13 +188,12 @@ func (t *Terminal) NewHistory(capacity int) {
 
 // SetAutoHistory enables/disables auto history (default is enabled).
 func (t *Terminal) SetAutoHistory(enabled bool) {
-	t.autoHistory = enabled
-	t.history.AutoHistory(enabled)
+	t.history.AutoHistory = enabled
 }
 
 // AutoHistory returns the current auto history setting.
 func (t *Terminal) AutoHistory() bool {
-	return t.autoHistory
+	return t.history.AutoHistory
 }
 
 // ReplaceLatest replaces the current history with the given commands, returns the previous value.
@@ -352,10 +350,10 @@ type TermHistory struct {
 	head int
 	// size contains the number of elements in the ring.
 	size int
-	// autoHistory, if true, causes lines to be automatically added to the history.
+	// AutoHistory, if true, causes lines to be automatically added to the history (through term's History.Add()).
 	// If false, call AddToHistory to add lines to the history for instance only adding
 	// successful commands. Defaults to true. This is controlled through AutoHistory(bool).
-	autoHistory bool
+	AutoHistory bool
 }
 
 // Creates a new ring buffer of strings with the given capacity.
@@ -363,14 +361,14 @@ func NewHistory(capacity int) *TermHistory {
 	return &TermHistory{
 		entries:     make([]string, capacity),
 		max:         capacity,
-		autoHistory: true,
+		AutoHistory: true,
 	}
 }
 
 // Add is the term.History interface implementation and
 // conditionally adds a string to the ring buffer based on the autoHistory flag.
 func (th *TermHistory) Add(a string) {
-	if !th.autoHistory {
+	if !th.AutoHistory {
 		return
 	}
 	th.UnconditionalAdd(a)
@@ -412,13 +410,4 @@ func (th *TermHistory) At(n int) (value string, ok bool) {
 		index += th.max
 	}
 	return th.entries[index], true
-}
-
-// AutoHistory sets the auto history flag.
-// If true, lines are automatically added to the history by x/term using Add().
-// If false, call ReallyAdd to add lines to the history for instance
-// only adding successful commands.
-// Defaults to true.
-func (th *TermHistory) AutoHistory(enabled bool) {
-	th.autoHistory = enabled
 }
