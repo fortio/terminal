@@ -30,7 +30,7 @@ type Terminal struct {
 	historyFile string
 	capacity    int
 	autoHistory bool
-	history     *stRingBuffer // original implementation of new History + exposed constructor etc.
+	history     *TermHistory // original implementation of new History + exposed constructor etc.
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -343,8 +343,8 @@ func (t *Terminal) SetAutoCompleteCallback(f AutoCompleteCallback) {
 // (ie same but with size configurable and using the History API from
 // https://github.com/golang/go/issues/68780#issuecomment-2707041053 )
 
-// stRingBuffer is a ring buffer of strings.
-type stRingBuffer struct {
+// TermHistory is a ring buffer of strings.
+type TermHistory struct {
 	// entries contains max elements.
 	entries []string
 	max     int
@@ -359,40 +359,43 @@ type stRingBuffer struct {
 }
 
 // Creates a new ring buffer of strings with the given capacity.
-func NewHistory(capacity int) *stRingBuffer {
-	return &stRingBuffer{
+func NewHistory(capacity int) *TermHistory {
+	return &TermHistory{
 		entries:     make([]string, capacity),
 		max:         capacity,
 		autoHistory: true,
 	}
 }
 
-func (s *stRingBuffer) Add(a string) {
-	if !s.autoHistory {
+// Add is the term.History interface implementation and
+// conditionally adds a string to the ring buffer based on the autoHistory flag.
+func (th *TermHistory) Add(a string) {
+	if !th.autoHistory {
 		return
 	}
-	s.ReallyAdd(a)
+	th.UnconditionalAdd(a)
 }
 
-func (s *stRingBuffer) ReallyAdd(a string) {
-	if s.entries[s.head] == a {
+// UnconditionalAdd unconditionally add a string to the ring buffer.
+func (th *TermHistory) UnconditionalAdd(a string) {
+	if th.entries[th.head] == a {
 		// Already there at the top, so don't add.
 		// Also has the nice side effect of ignoring empty strings,
 		// no s.size check on purpose.
 		return
 	}
-	s.head = (s.head + 1) % s.max
-	s.entries[s.head] = a
-	if s.size < s.max {
-		s.size++
+	th.head = (th.head + 1) % th.max
+	th.entries[th.head] = a
+	if th.size < th.max {
+		th.size++
 	}
 }
 
 // Replace theoretically could panic on an empty ring buffer but
 // it's harmless on strings.
-func (s *stRingBuffer) Replace(a string) string {
-	previous := s.entries[s.head]
-	s.entries[s.head] = a
+func (th *TermHistory) Replace(a string) string {
+	previous := th.entries[th.head]
+	th.entries[th.head] = a
 	return previous
 }
 
@@ -400,15 +403,15 @@ func (s *stRingBuffer) Replace(a string) string {
 // If n is zero then the immediately prior value is returned, if one, then the
 // next most recent, and so on. If such an element doesn't exist then ok is
 // false.
-func (s *stRingBuffer) At(n int) (value string, ok bool) {
-	if n < 0 || n >= s.size {
+func (th *TermHistory) At(n int) (value string, ok bool) {
+	if n < 0 || n >= th.size {
 		return "", false
 	}
-	index := s.head - n
+	index := th.head - n
 	if index < 0 {
-		index += s.max
+		index += th.max
 	}
-	return s.entries[index], true
+	return th.entries[index], true
 }
 
 // AutoHistory sets the auto history flag.
@@ -416,6 +419,6 @@ func (s *stRingBuffer) At(n int) (value string, ok bool) {
 // If false, call ReallyAdd to add lines to the history for instance
 // only adding successful commands.
 // Defaults to true.
-func (s *stRingBuffer) AutoHistory(enabled bool) {
-	s.autoHistory = enabled
+func (th *TermHistory) AutoHistory(enabled bool) {
+	th.autoHistory = enabled
 }
