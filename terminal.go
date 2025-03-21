@@ -183,11 +183,16 @@ func (t *Terminal) NewHistory(capacity int) {
 	if capacity == 0 { // leave the underlying history as is, avoids crashing with 0 as well.
 		return
 	}
-	t.term.History = NewHistory(capacity)
+	newHistory := NewHistory(capacity)
+	// Copy AutoHistory setting
+	newHistory.AutoHistory = t.history.AutoHistory
+	t.history = newHistory
+	t.term.History = t.history
 }
 
 // SetAutoHistory enables/disables auto history (default is enabled).
 func (t *Terminal) SetAutoHistory(enabled bool) {
+	log.Debugf("SetAutoHistory %t", enabled)
 	t.history.AutoHistory = enabled
 }
 
@@ -368,6 +373,7 @@ func NewHistory(capacity int) *TermHistory {
 // Add is the term.History interface implementation and
 // conditionally adds a string to the ring buffer based on the autoHistory flag.
 func (th *TermHistory) Add(a string) {
+	log.Debugf("Called Add(%q) for history - auto %t", a, th.AutoHistory)
 	if !th.AutoHistory {
 		return
 	}
