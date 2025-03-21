@@ -15,7 +15,7 @@ require (
 )
 
 // Remove when the final history PR gets merged.
-replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321073845-fe1e3a49b77f
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250321160327-bad1ef1afeb0
 
 require (
 	fortio.org/sets v1.2.0 // indirect
