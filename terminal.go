@@ -418,3 +418,8 @@ func (th *TermHistory) At(n int) (value string, ok bool) {
 	}
 	return th.entries[index], true
 }
+
+// Len returns the current number of elements in the ring.
+func (th *TermHistory) Len() int {
+	return th.size
+}
