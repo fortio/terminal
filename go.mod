@@ -1,7 +1,6 @@
 module fortio.org/terminal
 
 go 1.23.5
-toolchain go1.24.1
 
 require (
 	fortio.org/cli v1.9.2
