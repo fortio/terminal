@@ -1,10 +1,11 @@
 module fortio.org/terminal
 
 go 1.23.5
+toolchain go1.24.1
 
 require (
 	fortio.org/cli v1.9.2
-	fortio.org/fortio v1.68.1
+	fortio.org/fortio v1.68.2
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
 	fortio.org/term v0.29.0-fortio-1
