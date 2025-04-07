@@ -7,7 +7,7 @@ require (
 	fortio.org/fortio v1.68.2
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
-	fortio.org/terminal v0.27.3-0.20250407202002-8ff888d01942
+	fortio.org/terminal v0.28.0-pre3
 	github.com/loov/hrtime v1.0.3
 )
 

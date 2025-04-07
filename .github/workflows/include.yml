@@ -22,6 +22,7 @@ jobs:
         with:
             description: "Fortio terminal fps checker"
             binary_name: "fps"
+            main_path: "./"
             mod_dir: "./fps/"
             dockerfile: "../Dockerfile.fps"
         secrets:
