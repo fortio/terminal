@@ -6,6 +6,7 @@ on:
       # branches: [ main ]
       tags:
         - 'v*'
+        - 'fps/v*'
     pull_request:
       branches: [ main ]
 
