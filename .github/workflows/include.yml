@@ -1,12 +1,11 @@
 # Same as full workflow (eg from fortio/multicurl) but without the goreleaser step
-name: "Shared library fortio workflows"
+name: "Shared fortio workflows"
 
 on:
     push:
-      # branches: [ main ] # put back once testing with prerelases on branch is done.
+      branches: [ main ] # put back once testing with prerelases on branch is done.
       tags:
         - 'v*'
-        - 'fps/v*'
     pull_request:
       branches: [ main ]
 
@@ -17,22 +16,9 @@ jobs:
         uses: fortio/workflows/.github/workflows/codecov.yml@main
     call-codeql:
         uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
-    releaser-fps:
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/fps/')
-        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir # put back @main once testing is done.
-        with:
-            description: "Fortio terminal fps checker"
-            binary_name: "fps"
-            main_path: "./"
-            mod_dir: "./fps/"
-            dockerfile: "../Dockerfile.fps"
-        secrets:
-            GH_PAT: ${{ secrets.GH_PAT }}
-            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-            DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-life:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
         with:
             description: "Fortio terminal Conway's game of life demo"
             binary_name: "life"
@@ -44,7 +30,7 @@ jobs:
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-brick:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
         with:
             description: "Fortio terminal brick smashing game in the style of Breakout"
             binary_name: "brick"
@@ -56,7 +42,7 @@ jobs:
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-nocolor:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
         with:
             description: "Fortio terminal nocolor (and no other ansi code either) filter"
             binary_name: "nocolor"
