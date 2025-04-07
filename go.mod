@@ -4,7 +4,7 @@ go 1.23.8
 
 require (
 	fortio.org/cli v1.9.2
-	fortio.org/fortio v1.68.2
+	fortio.org/fortio v1.69.0
 	fortio.org/log v1.17.1
 	fortio.org/safecast v1.0.0
 	fortio.org/term v0.29.0-fortio-1
@@ -16,9 +16,9 @@ require (
 
 require (
 	fortio.org/sets v1.2.0 // indirect
-	fortio.org/struct2env v0.4.1 // indirect
+	fortio.org/struct2env v0.4.2 // indirect
 	fortio.org/version v1.0.4 // indirect
 	github.com/kortschak/goroutine v1.1.2 // indirect
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20240904212608-c9da6b9a4008 // indirect
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20250118192723-a8ea4be81f07 // indirect
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 )
