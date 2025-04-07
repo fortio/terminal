@@ -3,7 +3,7 @@ name: "Shared library fortio workflows"
 
 on:
     push:
-      # branches: [ main ]
+      # branches: [ main ] # put back once testing with prerelases on branch is done.
       tags:
         - 'v*'
         - 'fps/v*'
@@ -18,8 +18,8 @@ jobs:
     call-codeql:
         uses: fortio/workflows/.github/workflows/codeql-analysis.yml@main
     releaser-fps:
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/fps/')
+        uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir # put back @main once testing is done.
         with:
             description: "Fortio terminal fps checker"
             binary_name: "fps"
@@ -31,7 +31,7 @@ jobs:
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-life:
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
         with:
             description: "Fortio terminal Conway's game of life demo"
@@ -43,7 +43,7 @@ jobs:
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-brick:
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
         with:
             description: "Fortio terminal brick smashing game in the style of Breakout"
@@ -55,7 +55,7 @@ jobs:
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-nocolor:
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: fortio/workflows/.github/workflows/releaser.yml@mod_dir
         with:
             description: "Fortio terminal nocolor (and no other ansi code either) filter"
