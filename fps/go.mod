@@ -1,4 +1,4 @@
-module fps
+module fortio.org/terminal/fps
 
 go 1.23.8
 
