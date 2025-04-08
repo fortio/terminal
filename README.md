@@ -28,12 +28,13 @@ Do feel free to use [fortio.org/progressbar](https://github.com/fortio/progressb
 
 ## FPS
 
-The tagged release of `ansipixels` also includes a standalone binary, `fps`, that uses that package to test your terminal frames per second capabilities.
-See the source [fps/fps.go](fps/fps.go)
+The tagged release of `ansipixels` used to includes a standalone binary, `fps`, that uses that package to test your terminal frames per second capabilities.
 
-You can get the binary from [releases](https://github.com/fortio/terminal/releases)
+See the source [github.com/fortio/fps/fps.go](https://github.com/fortio/fps/blob/main/fps.go)
 
-Or just run
+You can get the binary from [fps releases](https://github.com/fortio/fps/releases)
+
+Or just run (path is unchanged/preserved from original location)
 ```
 CGO_ENABLED=0 go install fortio.org/terminal/fps@latest  # to install or just
 CGO_ENABLED=0 go run fortio.org/terminal/fps@latest  # to run without install
