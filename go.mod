@@ -9,7 +9,7 @@ require (
 	fortio.org/term v0.29.0-fortio-1
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.25.0
-	golang.org/x/sys v0.31.0
+	golang.org/x/sys v0.32.0
 )
 
 require (
