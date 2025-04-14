@@ -1,4 +1,5 @@
-// ansipixel provides terminal drawing and key reading abilities. fps/fps.go and life/life.go are examples/demos of how to use it.
+// ansipixels provides terminal drawing and key reading abilities.
+// [fortio.org/terminal/fps] and life/life.go are examples/demos of how to use it.
 package ansipixels
 
 import (
