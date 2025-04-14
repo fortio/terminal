@@ -64,8 +64,27 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = term.DefaultHistoryEntries
 	t.loggerSetup()
+	_ = t.UpdateSize() // error already logged
 	t.ResetInterrupts(ctx)
 	return
+}
+
+// Refreshes the terminal size to current size (so wrapping works).
+// This is called automatically when the terminal is opened, but can be called
+// again if the terminal size changes (e.g. when resizing the window).
+func (t *Terminal) UpdateSize() error {
+	w, h, err := term.GetSize(t.fdOut)
+	if err != nil {
+		log.Errf("Error getting terminal size: %v", err)
+		return err
+	}
+	log.Debugf("Terminal size: %d x %d", w, h)
+	err = t.term.SetSize(w, h)
+	if err != nil {
+		log.Errf("Error setting terminal size (%d x %d): %v", w, h, err)
+		return err
+	}
+	return nil
 }
 
 // If you want to reset and restart after an interrupt, call this.
