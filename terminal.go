@@ -69,7 +69,7 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 	return
 }
 
-// Refreshes the terminal size to current size (so wrapping works).
+// UpdateSize refreshes the terminal size to current size (so wrapping works).
 // This is called automatically when the terminal is opened, but can be called
 // again if the terminal size changes (e.g. when resizing the window).
 func (t *Terminal) UpdateSize() error {
