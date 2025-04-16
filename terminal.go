@@ -39,13 +39,13 @@ type Terminal struct {
 // to the terminal in a manner that preserves the prompt.
 // New cancellable context is returned, use it to cancel the terminal
 // reading or check for done for control-c or signal.
-func Open(ctx context.Context) (t *Terminal, err error) {
+func Open(ctx context.Context) (*Terminal, error) {
 	intrReader := NewInterruptReader(os.Stdin, 256) // same as the internal x/term buffer size.
 	rw := struct {
 		io.Reader
 		io.Writer
 	}{intrReader, os.Stderr}
-	t = &Terminal{
+	t := &Terminal{
 		fd:         safecast.MustConvert[int](os.Stdin.Fd()),
 		fdOut:      safecast.MustConvert[int](os.Stdout.Fd()),
 		intrReader: intrReader,
@@ -58,18 +58,19 @@ func Open(ctx context.Context) (t *Terminal, err error) {
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
 		t.ResetInterrupts(ctx)
-		return
+		return t, nil
 	}
+	var err error
 	t.oldState, err = term.MakeRaw(t.fd)
 	if err != nil {
-		return
+		return t, err
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = DefaultHistoryCapacity
 	t.loggerSetup()
-	_ = t.UpdateSize() // error already logged
+	err = t.UpdateSize() // error already logged - tbd to return or not / not fatal
 	t.ResetInterrupts(ctx)
-	return
+	return t, err
 }
 
 // UpdateSize refreshes the terminal size to current size (so wrapping works).
