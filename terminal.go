@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -157,12 +158,8 @@ func (t *Terminal) AddToHistory(commands ...string) {
 // History returns the current history state.
 func (t *Terminal) History() []string {
 	res := []string{}
-	for i := 0; ; i++ {
-		c, ok := t.term.History.At(i)
-		if !ok {
-			break
-		}
-		res = append(res, c)
+	for i := range t.term.History.Len() {
+		res = append(res, t.term.History.At(i))
 	}
 	return res
 }
@@ -407,19 +404,20 @@ func (th *TermHistory) Replace(a string) string {
 // If n is zero then the immediately prior value is returned, if one, then the
 // next most recent, and so on. If such an element doesn't exist then ok is
 // false.
-func (th *TermHistory) At(n int) (value string, ok bool) {
+func (th *TermHistory) At(n int) string {
 	log.Debugf("Called At(%d) for history (head %d sz %d max %d)", n, th.head, th.size, th.max)
 	if n < 0 || n >= th.size {
-		return "", false
+		panic(fmt.Sprintf("TermHistory: index [%d] out of range [0,%d)", n, th.size))
 	}
 	index := th.head - n
 	if index < 0 {
 		index += th.max
 	}
-	return th.entries[index], true
+	return th.entries[index]
 }
 
 // Len returns the current number of elements in the ring.
 func (th *TermHistory) Len() int {
+	log.Debugf("Called Len() for history (head %d sz %d max %d)", th.head, th.size, th.max)
 	return th.size
 }
