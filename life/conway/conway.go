@@ -159,7 +159,11 @@ func (g *Game) DrawOne() {
 	g.AP.StartSyncMode()
 	g.AP.ClearScreen()
 	if g.ShowInfo {
-		g.AP.WriteRight(g.AP.H-1, "%s FPS %.0f Generation: %d ", g.State, g.AP.FPS, g.Generation)
+		if g.AP.FPS > 0 {
+			g.AP.WriteRight(g.AP.H-1, "%s FPS %.0f Generation: %d ", g.State, g.AP.FPS, g.Generation)
+		} else {
+			g.AP.WriteRight(g.AP.H-1, "Generation: %d ", g.Generation)
+		}
 	}
 	Draw(g.AP, g.C)
 	if g.ShowHelp {
