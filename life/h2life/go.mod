@@ -1,6 +1,6 @@
-module fortio.org/terminal/life/h2life
+module github.com/fortio/terminal/life/h2life
 
-go 1.24.2
+go 1.23.8
 
 require (
 	fortio.org/fortio v1.69.2
