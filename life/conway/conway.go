@@ -147,6 +147,14 @@ type Game struct {
 	HasMouse               bool
 }
 
+// Call once after randomize or reset/restart.
+func (g *Game) Start() {
+	g.C.Current = 1 - g.C.Current
+	g.Generation = 1
+	g.Delta = 0
+	g.DrawOne()
+}
+
 func (g *Game) DrawOne() {
 	g.AP.StartSyncMode()
 	g.AP.ClearScreen()

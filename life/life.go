@@ -41,13 +41,10 @@ func Main() int {
 			// Random
 			game.C.Randomize(fillFactor)
 		}
-		game.C.Current = 1 - game.C.Current
-		game.Generation = 1
 		game.ShowInfo = true
 		game.State = conway.Paused
 		game.ShowHelp = true
-		game.Delta = 0
-		game.DrawOne()
+		game.Start()
 		return nil
 	}
 	_ = ap.OnResize()
