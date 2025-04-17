@@ -1,0 +1,30 @@
+module fortio.org/terminal/life/h2life
+
+go 1.24.2
+
+require (
+	fortio.org/fortio v1.69.2
+	fortio.org/log v1.17.2
+	fortio.org/progressbar v0.12.0
+	fortio.org/scli v1.16.1
+	fortio.org/terminal v0.30.1-0.20250417225901-79a2a3679507
+)
+
+require (
+	fortio.org/cli v1.10.0 // indirect
+	fortio.org/dflag v1.8.1 // indirect
+	fortio.org/safecast v1.0.0 // indirect
+	fortio.org/sets v1.3.0 // indirect
+	fortio.org/struct2env v0.4.2 // indirect
+	fortio.org/term v0.29.0-fortio-1 // indirect
+	fortio.org/version v1.0.4 // indirect
+	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/kortschak/goroutine v1.1.2 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20250406160420-959f8f3db0fb // indirect
+	golang.org/x/image v0.26.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
+)
