@@ -145,6 +145,7 @@ type Game struct {
 	lastWasClick           bool
 	lastWasAlt             bool
 	HasMouse               bool
+	Extra                  func()
 }
 
 // Call once after randomize or reset/restart.
@@ -175,6 +176,9 @@ func (g *Game) DrawOne() {
 		}
 		g.AP.WriteBoxed(g.AP.H/2+2, "%s", helpText)
 		g.ShowHelp = false
+	}
+	if g.Extra != nil {
+		g.Extra()
 	}
 	g.AP.EndSyncMode()
 }
