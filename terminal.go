@@ -292,7 +292,8 @@ func (t *Terminal) Close() error {
 	err := term.Restore(t.fd, t.oldState)
 	t.oldState = nil
 	t.Out = os.Stderr
-	// saving history if any
+	// saving history if any - ok to panic (in a bad History implementation)
+	// after this point as we already restored the terminal.
 	if t.historyFile == "" || t.capacity <= 0 {
 		log.Debugf("No history file %q or capacity %d, not saving history", t.historyFile, t.capacity)
 		return nil
@@ -414,6 +415,12 @@ func (th *TermHistory) At(n int) string {
 	if index < 0 {
 		index += th.max
 	}
+	/* test panic in History:
+	res := th.entries[index]
+	if strings.HasPrefix(res, "panic ") {
+		panic(res[6:])
+	}
+	*/
 	return th.entries[index]
 }
 
