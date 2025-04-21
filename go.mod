@@ -11,11 +11,8 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.26.0
 	golang.org/x/sys v0.32.0
-	golang.org/x/term v0.32.0
+	golang.org/x/term v0.31.1-0.20250421193057-a809085bff59
 )
-
-// Remove when the final history PR gets merged.
-replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250416204715-ba6dd5cfb0cd
 
 require (
 	fortio.org/struct2env v0.4.2 // indirect
