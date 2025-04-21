@@ -17,7 +17,7 @@ See the godoc above for details.
 
 The [grol](https://github.com/grol-io/grol#grol) command line repl and others use this.
 
-The implementations currently is a wrapper fully encapsulating (our fork of) [x/term](https://github.com/golang/term), i.e. [fortio.org/term](https://github.com/fortio/term) and new features like the interrupts handling (filters Ctrl-C ahead of term' reads)
+The implementations currently is a wrapper fully encapsulating [golang.org/x/term](https://github.com/golang/term), with configurable History and new features like the interrupts handling (filters Ctrl-C ahead of term' reads)
 
 ## fortio.org/terminal/ansipixels
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal/ansipixels.svg)](https://pkg.go.dev/fortio.org/terminal/ansipixels)

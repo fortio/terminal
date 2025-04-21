@@ -33,9 +33,10 @@ const (
 	exitCmd   = "exit"
 	helpCmd   = "help"
 	testMLCmd = "multiline"
+	panicCmd  = "panic " // test panic handling
 )
 
-var commands = []string{promptCmd, afterCmd, sleepCmd, cancelCmd, exitCmd, helpCmd, testMLCmd}
+var commands = []string{promptCmd, afterCmd, sleepCmd, cancelCmd, exitCmd, helpCmd, testMLCmd, panicCmd}
 
 // func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
 
@@ -86,7 +87,10 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 	if err != nil {
 		return log.FErrf("Error opening terminal: %v", err)
 	}
-	defer t.Close()
+	defer func() {
+		t.Close()
+		log.Infof("Terminal closed/restored")
+	}()
 	onlyValid := *flagOnlyValid
 	if onlyValid {
 		t.SetAutoHistory(false)
@@ -210,6 +214,13 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 				log.Errf("Error running command %v: %v", args, err)
 			}
 			isValidCommand = true
+		case strings.HasPrefix(cmd, panicCmd):
+			if onlyValid {
+				t.AddToHistory(cmd)
+			}
+			// panic to test recovery
+			// this is a demo, not a real program
+			panic("test panic: " + cmd[len(panicCmd):])
 		default:
 			fmt.Fprintf(t.Out, "Unknown command %q\n", cmd)
 		}

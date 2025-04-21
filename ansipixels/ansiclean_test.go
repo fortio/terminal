@@ -135,7 +135,7 @@ func TestAnsiCleanHR(t *testing.T) {
 func BenchmarkAnsiCleanRE(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				ansiCleanRE(tc.input)
 			}
 		})
@@ -146,7 +146,7 @@ func BenchmarkAnsiCleanHR(b *testing.B) {
 	for _, tc := range testCases {
 		inp := []byte(tc.input)
 		b.Run(tc.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				AnsiClean(inp)
 			}
 		})
