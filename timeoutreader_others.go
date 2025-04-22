@@ -56,8 +56,7 @@ func (tr *TimeoutReader) readerLoop() {
 	defer tr.wg.Done()
 	defer close(tr.dataChan) // Close dataChan when loop exits
 
-	readBuf := make([]byte, 4096) // Adjust size as needed
-
+	readBuf := make([]byte, 4096) // Plenty even for copy paste.
 	for {
 		n, err := tr.file.Read(readBuf)
 		dataCopy := make([]byte, n)
@@ -108,23 +107,21 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 	select {
 	case res, ok := <-tr.dataChan:
 		tr.mu.Lock()
+		defer tr.mu.Unlock()
+
 		if !ok {
 			// Channel closed by the goroutine.
 			if tr.lastErr == nil {
 				tr.lastErr = io.EOF
 			}
-			errToReturn := tr.lastErr
-			tr.mu.Unlock()
-			return 0, errToReturn
+			return 0, tr.lastErr
 		}
 
 		// Received new data or error
 		isEOF := errors.Is(res.err, io.EOF)
 		if res.err != nil && !isEOF {
 			tr.lastErr = res.err
-			errToReturn := tr.lastErr
-			tr.mu.Unlock()
-			return 0, errToReturn
+			return 0, tr.lastErr
 		}
 
 		if len(res.data) > 0 {
@@ -141,7 +138,6 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 		if tr.internalBuf.Len() > 0 {
 			errToReturn = nil // Don't return EOF if buffer still has data
 		}
-		tr.mu.Unlock()
 		return n, errToReturn
 
 	case <-timer.C:
