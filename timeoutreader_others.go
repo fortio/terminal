@@ -7,6 +7,7 @@
 package terminal
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +16,8 @@ import (
 )
 
 const IsUnix = false
+
+var ErrDataTruncated = errors.New("data truncated")
 
 // readResult holds the outcome of a read operation performed by the background goroutine.
 type readResult struct {
@@ -96,6 +99,10 @@ func (tr *TimeoutReader) readerLoop() {
 // it waits up to the configured timeout for new data from the background reader.
 // Returns the number of bytes read and an error. If a timeout occurs while
 // waiting for new data, it returns (0, nil), indicating no data read and no error.
+// Note: You should not call Read() with a smaller buffer than the first one when it returns
+// early due to timeout as to avoid extra allocations the inflight buffer will be used
+// and thus could have more data than the new buffer, it will be lost/truncated in that case
+// and the error ErrDataTruncated will be returned.
 func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 	sameBuf := false
 	tr.mu.Lock()
@@ -125,6 +132,7 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 		if res.n > len(buf) {
 			// Unexpected.
 			log.Warnf("Read %d bytes from earlier Read request, but new buffer is only %d bytes", res.n, len(buf))
+			res.err = ErrDataTruncated
 		}
 		n := copy(buf, res.data[:res.n]) // Copy the data to the provided buffer
 		return n, res.err
