@@ -133,6 +133,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	// Check for signal and context every 250ms, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
 	tr := NewTimeoutReader(ir.reader, 250*time.Millisecond)
+	defer tr.Close()
 	defer ir.cond.Signal()
 	for {
 		// log.Debugf("InterruptReader loop")
