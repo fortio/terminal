@@ -32,10 +32,11 @@ type TimeoutReader struct {
 
 	internalBuf bytes.Buffer // Buffer for data read ahead
 	dataChan    chan readResult
-	stopChan    chan struct{}  // Signal channel to stop the goroutine
-	wg          sync.WaitGroup // To wait for the goroutine to exit
-	mu          sync.Mutex     // Protects internalBuf and lastErr
-	lastErr     error          // Stores persistent errors like EOF
+	stopChan    chan struct{} // Signal channel to stop the goroutine
+	// doNextRead  chan struct{}  // Channel to signal ok to do the next read
+	wg      sync.WaitGroup // To wait for the goroutine to exit
+	mu      sync.Mutex     // Protects internalBuf and lastErr
+	lastErr error          // Stores persistent errors like EOF
 }
 
 // NewTimeoutReader creates a new TimeoutReader with a persistent background reader.
@@ -43,11 +44,15 @@ type TimeoutReader struct {
 // A duration of 0 or less disables the timeout for waiting on new data.
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 	log.LogVf("Creating non select based TimeoutReader with timeout: %v", timeout)
+	if timeout <= 0 {
+		panic("Timeout must be greater than 0")
+	}
 	tr := &TimeoutReader{
 		file:     stream,
 		timeout:  timeout,
-		dataChan: make(chan readResult, 1),
+		dataChan: make(chan readResult), // not buffered so we don't goback to reading too early when resetting.
 		stopChan: make(chan struct{}),
+		// doNextRead: make(chan struct{}),
 	}
 
 	tr.wg.Add(1)
@@ -63,7 +68,12 @@ func (tr *TimeoutReader) readerLoop() {
 
 	readBuf := make([]byte, 4096) // Plenty even for copy paste.
 	for {
+		// Wait for the signal to read or stop
+		// log.Debugf("Waiting for ok to read")
+		// <-tr.doNextRead
+		log.Debugf("Before reading")
 		n, err := tr.file.Read(readBuf)
+		log.Debugf("Done reading %d %v", n, err)
 		dataCopy := make([]byte, n)
 		copy(dataCopy, readBuf[:n])
 		result := readResult{data: dataCopy, err: err}
@@ -71,9 +81,11 @@ func (tr *TimeoutReader) readerLoop() {
 		select {
 		case tr.dataChan <- result:
 			if err != nil {
+				log.LogVf("Exiting readloop from error %v", err)
 				return // Error or EOF occurred, stop reading.
 			}
 		case <-tr.stopChan:
+			log.LogVf("Exiting readloop from stop channel")
 			return // Stop signal received.
 		}
 	}
@@ -109,6 +121,7 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 	// 3. Internal buffer is empty, wait for data or timeout.
 	timer := time.NewTimer(tr.timeout)
 	defer timer.Stop()
+	// tr.doNextRead <- struct{}{} // Signal to the goroutine to read again
 	select {
 	case res, ok := <-tr.dataChan:
 		tr.mu.Lock()
@@ -171,6 +184,7 @@ func (tr *TimeoutReader) Close() error {
 		return nil // Already closed
 	default:
 	}
+	log.LogVf("Closing stop channel")
 	close(tr.stopChan)
 	tr.mu.Unlock()
 	tr.wg.Wait()

@@ -50,6 +50,9 @@ type TimeoutReader struct {
 }
 
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
+	if timeout <= 0 {
+		panic("Timeout must be greater than 0")
+	}
 	return &TimeoutReader{
 		fd: safecast.MustConvert[int](stream.Fd()),
 		tv: TimeoutToTimeval(timeout),
@@ -62,4 +65,9 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 
 func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 	tr.tv = TimeoutToTimeval(timeout)
+}
+
+// We don't really close the underlying but this is a chance to cleanup for the other implementation.
+func (tr *TimeoutReader) Close() error {
+	return nil
 }
