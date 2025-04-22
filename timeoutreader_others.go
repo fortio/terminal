@@ -1,6 +1,8 @@
-//go:build !unix
-// +build !unix
+//go:build !unix || test_alt_timeoutreader
+// +build !unix test_alt_timeoutreader
 
+// To test on unix/mac use for instance:
+// make GO_BUILD_TAGS=test_alt_timeoutreader,no_net,no_json,no_pprof
 package terminal
 
 import (
@@ -10,6 +12,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"fortio.org/log"
 )
 
 const IsUnix = false
@@ -38,6 +42,7 @@ type TimeoutReader struct {
 // The timeout applies to each Read call waiting for new data.
 // A duration of 0 or less disables the timeout for waiting on new data.
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
+	log.LogVf("Creating non select based TimeoutReader with timeout: %v", timeout)
 	tr := &TimeoutReader{
 		file:     stream,
 		timeout:  timeout,
@@ -150,6 +155,7 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 // ChangeTimeout updates the timeout duration for subsequent Read calls
 // when waiting for new data from the background reader.
 func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
+	log.LogVf("Changing non select based TimeoutReader to timeout: %v", newTimeout)
 	tr.mu.Lock()
 	tr.timeout = newTimeout
 	tr.mu.Unlock()
@@ -157,6 +163,7 @@ func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 
 // Close signals the background reader goroutine to stop and waits for it to exit.
 func (tr *TimeoutReader) Close() error {
+	log.LogVf("Closing non select based TimeoutReader")
 	tr.mu.Lock()
 	select {
 	case <-tr.stopChan:
