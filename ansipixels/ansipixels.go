@@ -46,6 +46,8 @@ type AnsiPixels struct {
 	Margin    int          // Margin around the image (image is smaller by 2*margin)
 	FPS       float64      // (Target) Frames per second used for Reading with timeout
 	OnResize  func() error // Callback when terminal is resized
+	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
+	firstClear bool
 }
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
@@ -57,6 +59,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		FPS:           fps,
 		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
 		C:             make(chan os.Signal, 1),
+		firstClear:    true,
 	}
 	signal.Notify(ap.C, signalList...)
 	return ap
@@ -221,8 +224,17 @@ func (ap *AnsiPixels) Restore() {
 	ap.state = nil
 }
 
+// ClearScreen erase current frame/screen and positions the cursor in top left.
+// First time we are  the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J.
 func (ap *AnsiPixels) ClearScreen() {
-	_, err := ap.Out.WriteString("\033[2J")
+	ap.x = 0
+	ap.y = 0
+	what := "\033[H\033[0J"
+	if ap.firstClear {
+		what = "\033[2J\033[H" // for consistency we also move to 0,0 (in our coordinate system, 1,1 in the terminal)
+		ap.firstClear = false
+	}
+	_, err := ap.Out.WriteString(what)
 	if err != nil {
 		log.Errf("Error clearing screen: %v", err)
 	}
