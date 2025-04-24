@@ -224,8 +224,8 @@ func (ap *AnsiPixels) Restore() {
 	ap.state = nil
 }
 
-// ClearScreen erase current frame/screen and positions the cursor in top left.
-// First time we are  the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J.
+// ClearScreen erases the current frame/screen and positions the cursor in the top left.
+// First time we clear the screen, we use 2J to push old content to the scrollback buffer, otherwise we use H+0J.
 func (ap *AnsiPixels) ClearScreen() {
 	ap.x = 0
 	ap.y = 0
