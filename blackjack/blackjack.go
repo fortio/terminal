@@ -331,8 +331,8 @@ func (g *Game) draw() {
 }
 
 func main() {
-	initialBalance := flag.Int("balance", 100, "Initial balance in dollars")
-	betAmount := flag.Int("bet", 10, "Bet amount in dollars")
+	initialBalance := flag.Int("balance", 100, "Initial balance in `dollars`")
+	betAmount := flag.Int("bet", 10, "Bet amount in `dollars`")
 	numDecks := flag.Int("decks", 4, "Number of decks to use")
 	cli.Main()
 

@@ -112,6 +112,14 @@ Same installation as above, just replace `fps` by `life`.
 
 ![life screenshot](life/life.png)
 
+## Blackjack
+
+See [blackjack/](blackjack/) for a classic blackjack game against dealer.
+
+Same installation as above, just replace `fps` by `blackjack`.
+
+![blackjack screenshot](blackjack/blackjack.png)
+
 
 ## Brick
 
