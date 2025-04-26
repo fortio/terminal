@@ -35,18 +35,18 @@ See the source [github.com/fortio/fps/fps.go](https://github.com/fortio/fps/blob
 You can get the binary from [fps releases](https://github.com/fortio/fps/releases)
 
 Or just run (path is unchanged/preserved from original location)
-```
+```sh
 CGO_ENABLED=0 go install fortio.org/terminal/fps@latest  # to install or just
 CGO_ENABLED=0 go run fortio.org/terminal/fps@latest  # to run without install
 ```
 
 or even
-```
+```sh
 docker run -ti fortio/fps # but that's obviously slower
 ```
 
 or
-```
+```sh
 brew install fortio/tap/fps
 ```
 
@@ -111,6 +111,14 @@ See [life/](life/) for a classic Conway's game of life black and white demo (wit
 Same installation as above, just replace `fps` by `life`.
 
 ![life screenshot](life/life.png)
+
+## Blackjack
+
+See [blackjack/](blackjack/) for a classic blackjack game against dealer.
+
+Same installation as above, just replace `fps` by `blackjack`.
+
+![blackjack screenshot](blackjack/blackjack.png)
 
 
 ## Brick

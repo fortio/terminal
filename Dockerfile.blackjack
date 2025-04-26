@@ -1,0 +1,3 @@
+FROM scratch
+COPY blackjack /usr/bin/blackjack
+ENTRYPOINT ["/usr/bin/blackjack"]

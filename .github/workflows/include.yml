@@ -40,6 +40,18 @@ jobs:
             GH_PAT: ${{ secrets.GH_PAT }}
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
             DOCKER_USER: ${{ secrets.DOCKER_USER }}
+    releaser-blackjack:
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: fortio/workflows/.github/workflows/releaser.yml@main
+        with:
+            description: "Fortio terminal blackjack card game"
+            binary_name: "blackjack"
+            main_path: "./blackjack"
+            dockerfile: "./Dockerfile.blackjack"
+        secrets:
+            GH_PAT: ${{ secrets.GH_PAT }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+            DOCKER_USER: ${{ secrets.DOCKER_USER }}
     releaser-nocolor:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: fortio/workflows/.github/workflows/releaser.yml@main
