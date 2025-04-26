@@ -48,7 +48,7 @@ type Game struct {
 
 // initDeck initializes a new shuffled deck.
 func (g *Game) initDeck(numDecks int) {
-	suits := []string{"♠", "❤", "♦", "♣"}
+	suits := []string{"♠", "♥", "♦", "♣"}
 	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "1 0", "J", "Q", "K"}
 
 	g.deck = &Deck{
@@ -106,7 +106,7 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	}
 	// Top suit
 	var cardContent string
-	if card.Suit == "❤" || card.Suit == "♦" {
+	if card.Suit == "♥" || card.Suit == "♦" {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
 	} else {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
