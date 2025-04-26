@@ -46,6 +46,9 @@ const (
 	BrightCyanBG   = "\033[106m"
 	WhiteBG        = "\033[107m"
 
+	// Inverse fg/bg colors
+	Inverse = "\033[7m"
+
 	// Select colors from the 256 colors set that are missing from.
 	Orange = "\033[38;5;214m"
 

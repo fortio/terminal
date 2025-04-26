@@ -42,6 +42,8 @@ type Game struct {
 	balance     int
 	bet         int
 	borderColor string
+	borderBG    string
+	wideBorder  bool
 }
 
 // initDeck initializes a new shuffled deck.
@@ -89,7 +91,9 @@ const (
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border: mostly redundant with the outer one except for the middle in between cards
-	g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.borderColor, false)
+	if g.borderColor != "" {
+		g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.borderColor, false)
+	}
 	// Draw card content
 	g.ap.MoveCursor(x, y)
 	if hidden {
@@ -124,12 +128,15 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 
 // drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
-	// Add extra bars vertically so space around cards is even on height vs width (as pixels are 2x tall than wide)
-	g.ap.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.borderColor, true)
 	for i, card := range cards {
 		hidden := hideFirst && i == 0
 		pos := x + i*cardWidth
 		g.drawCardOnScreen(pos, y, card, hidden)
+	}
+	// For wide mode: erase top/bottom thin border and add extra bars
+	// vertically so space around cards is even on height vs width (as pixels are 2x tall than wide)
+	if g.borderColor != "" && g.wideBorder {
+		g.ap.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.borderBG, true)
 	}
 }
 
@@ -367,7 +374,9 @@ func main() {
 	betAmount := flag.Int("bet", 10, "Bet amount in `dollars`")
 	numDecks := flag.Int("decks", 4, "Number of decks to use")
 	fps := flag.Float64("fps", 60, "Frames per second (for resize/refreshes/animations)")
-	greenFlag := flag.Bool("green", false, "Use green instead of dark grey around the cards")
+	greenFlag := flag.Bool("green", false, "Use green instead of black around the cards")
+	noBorder := flag.Bool("no-border", false, "Don't draw the border at all around the cards")
+	wideBorder := flag.Bool("wide", false, "Draw a wide border around the cards")
 	cli.Main()
 
 	ap := ansipixels.NewAnsiPixels(*fps)
@@ -382,10 +391,20 @@ func main() {
 		state:       StatePlayerTurn,
 		balance:     *initialBalance,
 		bet:         *betAmount,
-		borderColor: ansipixels.DarkGrayBG,
+		borderColor: ansipixels.Black,
+		borderBG:    ansipixels.BlackBG,
+		wideBorder:  *wideBorder,
+	}
+	if *wideBorder {
+		game.borderColor = ansipixels.BlackBG
 	}
 	if *greenFlag {
-		game.borderColor = ansipixels.GreenBG
+		game.borderColor = ansipixels.Green
+		game.borderBG = ansipixels.GreenBG
+	}
+	if *noBorder {
+		game.borderColor = ""
+		game.borderBG = ""
 	}
 	game.initDeck(*numDecks)
 
