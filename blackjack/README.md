@@ -16,7 +16,7 @@ go run fortio.org/terminal/blackjack@latest
 ## Usage
 
 ```
-blackjack 0.25.0 usage:
+blackjack 0.35.5 usage:
 	blackjack [flags]
 or 1 of the special arguments
 	blackjack {help|envhelp|version|buildinfo}
@@ -30,5 +30,9 @@ flags:
   -fps float
         Frames per second (for resize/refreshes/animations) (default 60)
   -green
-        Use green instead of dark grey around the cards
+        Use green instead of black around the cards
+  -no-border
+        Don't draw the border at all around the cards
+  -wide
+        Draw a wide border around the cards
 ```
