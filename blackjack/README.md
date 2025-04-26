@@ -2,6 +2,8 @@
 
 Game of blackjack demo using Ansipixels.
 
+Running with `blackjack -green`:
+
 ![screenshot](blackjack.png)
 
 ## Install/run
