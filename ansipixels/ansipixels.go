@@ -441,7 +441,7 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int,
 	if x+w <= ap.W {
 		ap.WriteString(horizontal + bottomRight)
 	} else {
-		ap.WriteString(topRight)
+		ap.WriteString(topRight) // used by brick in the top right corner.
 	}
 }
 
