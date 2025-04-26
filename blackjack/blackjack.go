@@ -177,7 +177,11 @@ func (g *Game) Run() {
 
 	for g.playing {
 		g.draw()
-
+		if g.state == StatePlayerTurn && g.calculateHand(g.player) == 21 {
+			g.state = StateDealerTurn
+			g.dealerTurn()
+			g.draw()
+		}
 		// Handle input
 		err := g.ap.ReadOrResizeOrSignal()
 		if err != nil {
@@ -287,7 +291,7 @@ func (g *Game) draw() {
 
 	// Draw balance and bet
 	g.ap.WriteAt(2, 1, "Balance: $%d", g.balance)
-	g.ap.WriteAt(g.ap.W-20, 1, "Bet: $%d", g.bet)
+	g.ap.WriteRight(1, "Bet: $%d   ", g.bet)
 
 	// Draw dealer's hand
 	g.ap.WriteCentered(2, "Dealer's Hand")
@@ -313,7 +317,7 @@ func (g *Game) draw() {
 	}
 
 	g.ap.WriteAt(2, g.ap.H-2, "Your Score: %d%s", playerScore, extraText)
-	g.ap.WriteAt(g.ap.W-20, g.ap.H-2, "Dealer's Score: %d", dealerScore)
+	g.ap.WriteRight(g.ap.H-2, "Dealer's Score: %d   ", dealerScore)
 
 	// Draw game message
 	if g.message != "" {
@@ -323,7 +327,7 @@ func (g *Game) draw() {
 	// Number of cards left in the deck:
 	cardsLeft := len(g.deck.Cards)
 	totalCards := 52 * g.deck.Decks
-	g.ap.WriteRight(g.ap.H-1, "%d/%d cards", cardsLeft, totalCards)
+	g.ap.WriteRight(g.ap.H-1, "%d cards   ", cardsLeft)
 
 	// Draw deck size indicator
 	percentage := float64(cardsLeft) / float64(totalCards)
