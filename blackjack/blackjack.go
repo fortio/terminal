@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"os"
+	"runtime"
 
 	"fortio.org/cli"
 	"fortio.org/terminal/ansipixels"
@@ -383,7 +384,7 @@ func main() {
 	noBorder := flag.Bool("no-border", false, "Don't draw the border at all around the cards")
 	wideBorder := flag.Bool("wide", false, "Draw a wide border around the cards")
 	cli.Main()
-	if os.Getenv("TERM") == "xterm-ghostty" {
+	if runtime.GOOS == "darwin" && os.Getenv("TERM") == "xterm-ghostty" {
 		Heart = "❤"
 	}
 
