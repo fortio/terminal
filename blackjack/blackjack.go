@@ -46,6 +46,7 @@ type Game struct {
 	borderColor string
 	borderBG    string
 	wideBorder  bool
+	first       bool
 }
 
 // Because of https://github.com/ghostty-org/ghostty/discussions/7204
@@ -192,9 +193,18 @@ func (g *Game) Run() {
 	// Initial deal
 	g.player = []Card{g.drawCard(), g.drawCard()}
 	g.dealer = []Card{g.drawCard(), g.drawCard()}
+	g.first = true
 
 	for g.playing {
 		g.draw()
+		if g.first {
+			g.first = false
+			helpText := `Blackjack! Get closest to 21 without going over.
+Aces are either 1pt or 11pts. Blackjack (21 in 2 cards) pays 3:2.
+Dealer always hits (gets another card) on 16pts or less,
+stands (no more card) on 17pts or more. Space to continue.`
+			g.ap.WriteBoxed(g.ap.H/2-1, "%s", helpText)
+		}
 		if g.state == StatePlayerTurn && g.calculateHand(g.player) == 21 {
 			g.state = StateDealerTurn
 			g.dealerTurn()
@@ -425,6 +435,5 @@ func main() {
 		ap.EndSyncMode()
 		return nil
 	}
-
 	game.Run()
 }
