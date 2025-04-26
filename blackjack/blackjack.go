@@ -9,19 +9,19 @@ import (
 	"fortio.org/terminal/ansipixels"
 )
 
-// Card represents a playing card with a suit and value
+// Card represents a playing card with a suit and value.
 type Card struct {
 	Suit  string
 	Value string
 }
 
-// Deck represents a deck of cards
+// Deck represents a deck of cards.
 type Deck struct {
 	Cards []Card
 	Decks int // Number of decks in play
 }
 
-// GameState represents the current state of the game
+// GameState represents the current state of the game.
 type GameState int
 
 const (
@@ -30,7 +30,7 @@ const (
 	StateGameOver
 )
 
-// Game represents the blackjack game state
+// Game represents the blackjack game state.
 type Game struct {
 	ap      *ansipixels.AnsiPixels
 	deck    *Deck
@@ -43,7 +43,7 @@ type Game struct {
 	bet     int
 }
 
-// initDeck initializes a new shuffled deck
+// initDeck initializes a new shuffled deck.
 func (g *Game) initDeck(numDecks int) {
 	suits := []string{"♠", "❤", "♦", "♣"}
 	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"}
@@ -54,7 +54,7 @@ func (g *Game) initDeck(numDecks int) {
 	}
 
 	// Create multiple decks
-	for d := 0; d < numDecks; d++ {
+	for range numDecks {
 		for _, suit := range suits {
 			for _, value := range values {
 				g.deck.Cards = append(g.deck.Cards, Card{Suit: suit, Value: value})
@@ -68,7 +68,7 @@ func (g *Game) initDeck(numDecks int) {
 	})
 }
 
-// drawCard draws a card from the deck
+// drawCard draws a card from the deck.
 func (g *Game) drawCard() Card {
 	card := g.deck.Cards[0]
 	g.deck.Cards = g.deck.Cards[1:]
@@ -79,7 +79,7 @@ func (g *Game) drawCard() Card {
 	return card
 }
 
-// drawCard draws a card on the screen at the specified position
+// drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border
 	g.ap.MoveCursor(x, y)
@@ -102,7 +102,7 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	g.ap.WriteString("└─────┘")
 }
 
-// drawHand draws a hand of cards at the specified position
+// drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
 	cardWidth := 7 // Width of a card including borders
 	for i, card := range cards {
@@ -111,7 +111,7 @@ func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
 	}
 }
 
-// calculateHand calculates the value of a hand
+// calculateHand calculates the value of a hand.
 func (g *Game) calculateHand(hand []Card) int {
 	value := 0
 	aces := 0
@@ -139,7 +139,7 @@ func (g *Game) calculateHand(hand []Card) int {
 	return value
 }
 
-// isBlackjack checks if a hand is a blackjack (21 with first two cards)
+// isBlackjack checks if a hand is a blackjack (21 with first two cards).
 func (g *Game) isBlackjack(hand []Card) bool {
 	if len(hand) != 2 {
 		return false
@@ -147,7 +147,7 @@ func (g *Game) isBlackjack(hand []Card) bool {
 	return g.calculateHand(hand) == 21
 }
 
-// Run starts the game loop
+// Run starts the game loop.
 func (g *Game) Run() {
 	defer func() {
 		g.ap.MoveCursor(0, g.ap.H-1)
@@ -192,13 +192,15 @@ func (g *Game) Run() {
 					if g.balance >= g.bet {
 						g.resetGame()
 					}
+				case StateDealerTurn:
+					panic("shouldn't be reached (played above)")
 				}
 			}
 		}
 	}
 }
 
-// dealerTurn handles the dealer's turn
+// dealerTurn handles the dealer's turn.
 func (g *Game) dealerTurn() {
 	// Reveal dealer's hidden card
 	dealerScore := g.calculateHand(g.dealer)
@@ -225,23 +227,24 @@ func (g *Game) dealerTurn() {
 	}
 
 	// Determine winner and update balance
-	if dealerScore > 21 {
+	switch {
+	case dealerScore > 21:
 		g.message = fmt.Sprintf("Dealer busts! You win $%d!", g.bet)
 		g.balance += g.bet
-	} else if dealerScore > playerScore {
+	case dealerScore > playerScore:
 		g.message = fmt.Sprintf("Dealer wins! You lose $%d!", g.bet)
 		g.balance -= g.bet
-	} else if dealerScore < playerScore {
+	case dealerScore < playerScore:
 		g.message = fmt.Sprintf("You win $%d!", g.bet)
 		g.balance += g.bet
-	} else {
+	default:
 		g.message = "Push! Your bet is returned."
 	}
 
 	g.state = StateGameOver
 }
 
-// resetGame resets the game state for a new round
+// resetGame resets the game state for a new round.
 func (g *Game) resetGame() {
 	// Check if player has enough balance
 	if g.balance < g.bet {
@@ -255,7 +258,7 @@ func (g *Game) resetGame() {
 	g.message = ""
 }
 
-// draw draws the current game state
+// draw draws the current game state.
 func (g *Game) draw() {
 	g.ap.ClearScreen()
 
