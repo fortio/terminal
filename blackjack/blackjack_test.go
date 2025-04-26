@@ -12,7 +12,7 @@ func TestCalculateHand(t *testing.T) {
 	}{
 		{
 			name:     "Simple hand",
-			cards:    []Card{{Value: "10", Suit: "♠"}, {Value: "5", Suit: "♥"}},
+			cards:    []Card{{Value: "1 0", Suit: "♠"}, {Value: "5", Suit: "♥"}},
 			expected: 15,
 		},
 		{

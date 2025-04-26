@@ -46,7 +46,7 @@ type Game struct {
 // initDeck initializes a new shuffled deck.
 func (g *Game) initDeck(numDecks int) {
 	suits := []string{"♠", "❤", "♦", "♣"}
-	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"}
+	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "1 0", "J", "Q", "K"}
 
 	g.deck = &Deck{
 		Cards: make([]Card, 0, 52*numDecks),
@@ -80,53 +80,51 @@ func (g *Game) drawCard() Card {
 }
 
 const (
-	cardBack = "░░░░░░░"
+	cardBack  = "░░░░░"
+	cardWidth = 6 // including the space in between cards/on the right of a card
 )
 
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border
-	g.ap.MoveCursor(x, y+1)
+	g.ap.MoveCursor(x, y)
 	// Draw card content
 	if hidden {
 		g.ap.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
-		for i := range 3 {
-			g.ap.MoveCursor(x, y+2+i)
-			g.ap.WriteString(cardBack)
-		}
-		g.ap.MoveCursor(x, y+5)
+		g.ap.MoveCursor(x, y+1)
+		g.ap.WriteString(cardBack)
+		g.ap.MoveCursor(x, y+2)
 		g.ap.WriteString(cardBack + ansipixels.Reset)
 		return
 	}
 	// Top suit
 	var cardContent string
 	if card.Suit == "❤" || card.Suit == "♦" {
-		cardContent = fmt.Sprintf("%s%s      ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
+		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
 	} else {
-		cardContent = fmt.Sprintf("%s%s      ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
+		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
 	}
 	g.ap.WriteString(cardContent)
-	// Blank line
-	g.ap.MoveCursor(x, y+2)
-	g.ap.WriteString("       ")
 	// Center value
-	g.ap.MoveCursor(x, y+3)
-	cardContent = fmt.Sprintf("   %-4s", card.Value)
+	g.ap.MoveCursor(x, y+1)
+	if len(card.Value) == 1 {
+		cardContent = fmt.Sprintf("  %s  ", card.Value)
+	} else { // "1 0"
+		cardContent = fmt.Sprintf(" %s ", card.Value)
+	}
 	g.ap.WriteString(cardContent)
-	g.ap.MoveCursor(x, y+4)
-	g.ap.WriteString("       ")
 	// Bottom suit
-	g.ap.MoveCursor(x, y+5)
-	cardContent = fmt.Sprintf("      %s%s", card.Suit, ansipixels.Reset)
+	g.ap.MoveCursor(x, y+2)
+	cardContent = fmt.Sprintf("    %s%s", card.Suit, ansipixels.Reset)
 	g.ap.WriteString(cardContent)
 }
 
 // drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
-	cardWidth := 8 // Width of a card including borders
 	for i, card := range cards {
 		hidden := hideFirst && i == 0
-		g.drawCardOnScreen(x+i*cardWidth, y, card, hidden)
+		pos := x + i*cardWidth
+		g.drawCardOnScreen(pos, y, card, hidden)
 	}
 }
 
@@ -142,7 +140,7 @@ func (g *Game) calculateHand(hand []Card) int {
 			value += 11
 		case "K", "Q", "J":
 			value += 10
-		case "10":
+		case "1 0":
 			value += 10
 		default:
 			value += int(card.Value[0] - '0')
@@ -179,7 +177,11 @@ func (g *Game) Run() {
 
 	for g.playing {
 		g.draw()
-
+		if g.state == StatePlayerTurn && g.calculateHand(g.player) == 21 {
+			g.state = StateDealerTurn
+			g.dealerTurn()
+			g.draw()
+		}
 		// Handle input
 		err := g.ap.ReadOrResizeOrSignal()
 		if err != nil {
@@ -277,24 +279,29 @@ func (g *Game) resetGame() {
 	g.message = ""
 }
 
+func (g *Game) LeftMostCardPos(numCards int) int {
+	// Calculate the starting horizontal position for the cards
+	width := cardWidth*numCards - 1 // -1 because of right space on last card
+	return (g.ap.W - width) / 2
+}
+
 // draw draws the current game state.
 func (g *Game) draw() {
 	g.ap.ClearScreen()
 
 	// Draw balance and bet
 	g.ap.WriteAt(2, 1, "Balance: $%d", g.balance)
-	g.ap.WriteAt(g.ap.W-20, 1, "Bet: $%d", g.bet)
+	g.ap.WriteRight(1, "Bet: $%d   ", g.bet)
 
 	// Draw dealer's hand
 	g.ap.WriteCentered(2, "Dealer's Hand")
-	cardWidth := 7
-	dealerOffset := (g.ap.W - cardWidth*len(g.dealer) - 1) / 2 // -1 because of right space on last card
-	g.drawHand(dealerOffset, 3, g.dealer, g.state == StatePlayerTurn)
+	dealerOffset := g.LeftMostCardPos(len(g.dealer))
+	g.drawHand(dealerOffset, 4, g.dealer, g.state == StatePlayerTurn)
 
 	// Draw player's hand
 	g.ap.WriteCentered(g.ap.H-11, "Your Hand")
-	playerOffset := (g.ap.W - cardWidth*len(g.player) - 1) / 2
-	g.drawHand(playerOffset, g.ap.H-10, g.player, false)
+	playerOffset := g.LeftMostCardPos(len(g.player))
+	g.drawHand(playerOffset, g.ap.H-9, g.player, false)
 
 	// Draw scores
 	dealerScore := g.calculateHand(g.dealer)
@@ -310,7 +317,7 @@ func (g *Game) draw() {
 	}
 
 	g.ap.WriteAt(2, g.ap.H-2, "Your Score: %d%s", playerScore, extraText)
-	g.ap.WriteAt(g.ap.W-20, g.ap.H-2, "Dealer's Score: %d", dealerScore)
+	g.ap.WriteRight(g.ap.H-2, "Dealer's Score: %d   ", dealerScore)
 
 	// Draw game message
 	if g.message != "" {
@@ -320,7 +327,7 @@ func (g *Game) draw() {
 	// Number of cards left in the deck:
 	cardsLeft := len(g.deck.Cards)
 	totalCards := 52 * g.deck.Decks
-	g.ap.WriteRight(g.ap.H-1, "%d/%d cards", cardsLeft, totalCards)
+	g.ap.WriteRight(g.ap.H-1, "%d cards   ", cardsLeft)
 
 	// Draw deck size indicator
 	percentage := float64(cardsLeft) / float64(totalCards)
@@ -354,9 +361,10 @@ func main() {
 	initialBalance := flag.Int("balance", 100, "Initial balance in `dollars`")
 	betAmount := flag.Int("bet", 10, "Bet amount in `dollars`")
 	numDecks := flag.Int("decks", 4, "Number of decks to use")
+	fps := flag.Float64("fps", 60, "Frames per second (for resize/refreshes/animations)")
 	cli.Main()
 
-	ap := ansipixels.NewAnsiPixels(10) // 10 FPS is plenty for this game
+	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
 	if err != nil {
 		panic(err)
