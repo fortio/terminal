@@ -14,7 +14,6 @@ go run fortio.org/terminal/blackjack@latest
 ## Usage
 
 ```
-
 blackjack 0.25.0 usage:
 	blackjack [flags]
 or 1 of the special arguments
@@ -26,4 +25,8 @@ flags:
         Bet amount in dollars (default 10)
   -decks int
         Number of decks to use (default 4)
+  -fps float
+        Frames per second (for resize/refreshes/animations) (default 60)
+  -green
+        Use green instead of dark grey around the cards
 ```

@@ -389,18 +389,22 @@ func (ap *AnsiPixels) ShowCursor() {
 }
 
 func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
+	ap.DrawBox(x, y, w, h, SquareTopLeft, Horizontal, SquareTopRight, Vertical, SquareBottomLeft, SquareBottomRight)
 }
 
 func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
+	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, RoundBottomRight)
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) {
+func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string) {
+	ap.DrawBox(x, y, w, h, color+" ", " ", " ", " ", " ", " "+Reset)
+}
+
+func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, horizontal, topRight, vertical, bottomLeft, bottomRight string) {
 	if y >= 0 {
 		ap.MoveCursor(x, y)
 		ap.WriteString(topLeft)
-		ap.WriteString(strings.Repeat(Horizontal, w-2))
+		ap.WriteString(strings.Repeat(horizontal, w-2))
 		ap.WriteString(topRight)
 	}
 	for i := 1; i < h-1; i++ {
@@ -412,16 +416,16 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bot
 				ap.WriteString(topLeft)
 			}
 		} else {
-			ap.WriteString(Vertical)
+			ap.WriteString(vertical)
 			ap.MoveHorizontally(x + w - 1)
-			ap.WriteString(Vertical)
+			ap.WriteString(vertical)
 		}
 	}
 	ap.MoveCursor(x, y+h-1)
 	ap.WriteString(bottomLeft)
-	ap.WriteString(strings.Repeat(Horizontal, w-3))
+	ap.WriteString(strings.Repeat(horizontal, w-3))
 	if x+w <= ap.W {
-		ap.WriteString(Horizontal + bottomRight)
+		ap.WriteString(horizontal + bottomRight)
 	} else {
 		ap.WriteString(topRight)
 	}
