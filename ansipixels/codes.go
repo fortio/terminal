@@ -28,6 +28,23 @@ const (
 	BrightPurple = "\033[95m"
 	BrightCyan   = "\033[96m"
 	White        = "\033[97m"
+	// Background Colors.
+	BlackBG        = "\033[40m"
+	RedBG          = "\033[41m"
+	GreenBG        = "\033[42m"
+	YellowBG       = "\033[43m"
+	BlueBG         = "\033[44m"
+	PurpleBG       = "\033[45m"
+	CyanBG         = "\033[46m"
+	GrayBG         = "\033[47m"
+	DarkGrayBG     = "\033[100m"
+	BrightRedBG    = "\033[101m"
+	BrightGreenBG  = "\033[102m"
+	BrightYellowBG = "\033[103m"
+	BrightBlueBG   = "\033[104m"
+	BrightPurpleBG = "\033[105m"
+	BrightCyanBG   = "\033[106m"
+	WhiteBG        = "\033[107m"
 
 	// Select colors from the 256 colors set that are missing from.
 	Orange = "\033[38;5;214m"
