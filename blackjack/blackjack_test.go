@@ -12,27 +12,27 @@ func TestCalculateHand(t *testing.T) {
 	}{
 		{
 			name:     "Simple hand",
-			cards:    []Card{{Value: "1 0", Suit: "♠"}, {Value: "5", Suit: "♥"}},
+			cards:    []Card{{Value: "1 0", Suit: "♠"}, {Value: "5", Suit: Heart}},
 			expected: 15,
 		},
 		{
 			name:     "Ace as 11",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: "♥"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: Heart}},
 			expected: 20,
 		},
 		{
 			name:     "Ace as 1",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: "♥"}, {Value: "2", Suit: "♦"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: Heart}, {Value: "2", Suit: "♦"}},
 			expected: 12,
 		},
 		{
 			name:     "Multiple aces",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "A", Suit: "♥"}, {Value: "9", Suit: "♦"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "A", Suit: Heart}, {Value: "9", Suit: "♦"}},
 			expected: 21,
 		},
 		{
 			name:     "Face cards",
-			cards:    []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: "♥"}},
+			cards:    []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: Heart}},
 			expected: 20,
 		},
 	}
@@ -56,17 +56,17 @@ func TestIsBlackjack(t *testing.T) {
 	}{
 		{
 			name:     "Blackjack",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: "♥"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: Heart}},
 			expected: true,
 		},
 		{
 			name:     "Not blackjack",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: "♥"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "9", Suit: Heart}},
 			expected: false,
 		},
 		{
 			name:     "Three cards",
-			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: "♥"}, {Value: "Q", Suit: "♦"}},
+			cards:    []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: Heart}, {Value: "Q", Suit: "♦"}},
 			expected: false,
 		},
 	}
@@ -94,8 +94,8 @@ func TestGameBalance(t *testing.T) {
 	}{
 		{
 			name:            "Player wins",
-			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: "♥"}},
-			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: "♥"}},
+			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: Heart}},
+			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: Heart}},
 			initialBalance:  100,
 			bet:             10,
 			expectedBalance: 110,
@@ -103,8 +103,8 @@ func TestGameBalance(t *testing.T) {
 		},
 		{
 			name:            "Player loses",
-			playerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: "♥"}},
-			dealerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: "♥"}},
+			playerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: Heart}},
+			dealerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: Heart}},
 			initialBalance:  100,
 			bet:             10,
 			expectedBalance: 90,
@@ -112,8 +112,8 @@ func TestGameBalance(t *testing.T) {
 		},
 		{
 			name:            "Player blackjack",
-			playerCards:     []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: "♥"}},
-			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: "♥"}},
+			playerCards:     []Card{{Value: "A", Suit: "♠"}, {Value: "K", Suit: Heart}},
+			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: Heart}},
 			initialBalance:  100,
 			bet:             10,
 			expectedBalance: 115,
@@ -121,8 +121,8 @@ func TestGameBalance(t *testing.T) {
 		},
 		{
 			name:            "Player busts",
-			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: "♥"}, {Value: "2", Suit: "♦"}},
-			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: "♥"}},
+			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: Heart}, {Value: "2", Suit: "♦"}},
+			dealerCards:     []Card{{Value: "9", Suit: "♠"}, {Value: "8", Suit: Heart}},
 			initialBalance:  100,
 			bet:             10,
 			expectedBalance: 90,
@@ -130,7 +130,7 @@ func TestGameBalance(t *testing.T) {
 		},
 		{
 			name:            "Push",
-			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: "♥"}},
+			playerCards:     []Card{{Value: "K", Suit: "♠"}, {Value: "Q", Suit: Heart}},
 			dealerCards:     []Card{{Value: "K", Suit: "♦"}, {Value: "Q", Suit: "♣"}},
 			initialBalance:  100,
 			bet:             10,

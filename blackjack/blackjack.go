@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand/v2"
+	"os"
 
 	"fortio.org/cli"
 	"fortio.org/terminal/ansipixels"
@@ -46,9 +47,13 @@ type Game struct {
 	wideBorder  bool
 }
 
+// Because of https://github.com/ghostty-org/ghostty/discussions/7204
+// we change ♥ to ❤ (the wrong one) for ghostty on macos.
+var Heart = "♥"
+
 // initDeck initializes a new shuffled deck.
 func (g *Game) initDeck(numDecks int) {
-	suits := []string{"♠", "♥", "♦", "♣"}
+	suits := []string{"♠", Heart, "♦", "♣"}
 	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "1 0", "J", "Q", "K"}
 
 	g.deck = &Deck{
@@ -106,7 +111,7 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	}
 	// Top suit
 	var cardContent string
-	if card.Suit == "♥" || card.Suit == "♦" {
+	if card.Suit == Heart || card.Suit == "♦" {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
 	} else {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
@@ -378,6 +383,9 @@ func main() {
 	noBorder := flag.Bool("no-border", false, "Don't draw the border at all around the cards")
 	wideBorder := flag.Bool("wide", false, "Draw a wide border around the cards")
 	cli.Main()
+	if os.Getenv("TERM") == "xterm-ghostty" {
+		Heart = "❤"
+	}
 
 	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
