@@ -84,22 +84,44 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border
 	g.ap.MoveCursor(x, y)
 	g.ap.WriteString("┌─────┐")
-
-	// Draw card content
+	defer func() {
+		g.ap.MoveCursor(x, y+4)
+		g.ap.WriteString("└─────┘")
+	}()
 	g.ap.MoveCursor(x, y+1)
+	// Draw card content
 	if hidden {
 		g.ap.WriteString("│░░░░░│")
-	} else {
-		// Add color for hearts and diamonds
-		cardContent := fmt.Sprintf("│%s%2s %s %s│", ansipixels.WhiteBG+ansipixels.Black, card.Value, card.Suit, ansipixels.Reset)
-		if card.Suit == "❤" || card.Suit == "♦" {
-			cardContent = fmt.Sprintf("│%s%2s %s %s│", ansipixels.WhiteBG+ansipixels.Red, card.Value, card.Suit, ansipixels.Reset)
-		}
-		g.ap.WriteString(cardContent)
+		g.ap.MoveCursor(x, y+2)
+		g.ap.WriteString("│░░░░░│")
+		g.ap.MoveCursor(x, y+3)
+		g.ap.WriteString("│░░░░░│")
+		return
 	}
+	// Top suit
+	cardContent := fmt.Sprintf("│%s%s    %s│", ansipixels.WhiteBG+ansipixels.Black, card.Suit, ansipixels.Reset)
+	red := false
+	if card.Suit == "❤" || card.Suit == "♦" {
+		red = true
+		cardContent = fmt.Sprintf("│%s%s    %s│", ansipixels.WhiteBG+ansipixels.Red, card.Suit, ansipixels.Reset)
+	}
+	g.ap.WriteString(cardContent)
 
+	// Center value
 	g.ap.MoveCursor(x, y+2)
-	g.ap.WriteString("└─────┘")
+	cardContent = fmt.Sprintf("│%s %2s  %s│", ansipixels.WhiteBG+ansipixels.Black, card.Value, ansipixels.Reset)
+	if red {
+		cardContent = fmt.Sprintf("│%s %2s  %s│", ansipixels.WhiteBG+ansipixels.Red, card.Value, ansipixels.Reset)
+	}
+	g.ap.WriteString(cardContent)
+
+	// Bottom suit
+	g.ap.MoveCursor(x, y+3)
+	cardContent = fmt.Sprintf("│%s    %s%s│", ansipixels.WhiteBG+ansipixels.Black, card.Suit, ansipixels.Reset)
+	if red {
+		cardContent = fmt.Sprintf("│%s    %s%s│", ansipixels.WhiteBG+ansipixels.Red, card.Suit, ansipixels.Reset)
+	}
+	g.ap.WriteString(cardContent)
 }
 
 // drawHand draws a hand of cards at the specified position.
@@ -295,7 +317,7 @@ func (g *Game) draw() {
 
 	// Draw game message
 	if g.message != "" {
-		g.ap.WriteCentered(g.ap.H-3, "%s", g.message)
+		g.ap.WriteCentered(g.ap.H-7, "%s", g.message)
 	}
 
 	// Number of cards left in the deck:
