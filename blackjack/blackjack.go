@@ -79,54 +79,51 @@ func (g *Game) drawCard() Card {
 	return card
 }
 
+const (
+	cardBack = "░░░░░░░"
+)
+
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border
-	g.ap.MoveCursor(x, y)
-	g.ap.WriteString("┌─────┐")
-	defer func() {
-		g.ap.MoveCursor(x, y+4)
-		g.ap.WriteString("└─────┘")
-	}()
 	g.ap.MoveCursor(x, y+1)
 	// Draw card content
 	if hidden {
-		g.ap.WriteString("│░░░░░│")
-		g.ap.MoveCursor(x, y+2)
-		g.ap.WriteString("│░░░░░│")
-		g.ap.MoveCursor(x, y+3)
-		g.ap.WriteString("│░░░░░│")
+		g.ap.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
+		for i := range 3 {
+			g.ap.MoveCursor(x, y+2+i)
+			g.ap.WriteString(cardBack)
+		}
+		g.ap.MoveCursor(x, y+5)
+		g.ap.WriteString(cardBack + ansipixels.Reset)
 		return
 	}
 	// Top suit
-	cardContent := fmt.Sprintf("│%s%s    %s│", ansipixels.WhiteBG+ansipixels.Black, card.Suit, ansipixels.Reset)
-	red := false
+	var cardContent string
 	if card.Suit == "❤" || card.Suit == "♦" {
-		red = true
-		cardContent = fmt.Sprintf("│%s%s    %s│", ansipixels.WhiteBG+ansipixels.Red, card.Suit, ansipixels.Reset)
+		cardContent = fmt.Sprintf("%s%s      ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
+	} else {
+		cardContent = fmt.Sprintf("%s%s      ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
 	}
 	g.ap.WriteString(cardContent)
-
-	// Center value
+	// Blank line
 	g.ap.MoveCursor(x, y+2)
-	cardContent = fmt.Sprintf("│%s %2s  %s│", ansipixels.WhiteBG+ansipixels.Black, card.Value, ansipixels.Reset)
-	if red {
-		cardContent = fmt.Sprintf("│%s %2s  %s│", ansipixels.WhiteBG+ansipixels.Red, card.Value, ansipixels.Reset)
-	}
-	g.ap.WriteString(cardContent)
-
-	// Bottom suit
+	g.ap.WriteString("       ")
+	// Center value
 	g.ap.MoveCursor(x, y+3)
-	cardContent = fmt.Sprintf("│%s    %s%s│", ansipixels.WhiteBG+ansipixels.Black, card.Suit, ansipixels.Reset)
-	if red {
-		cardContent = fmt.Sprintf("│%s    %s%s│", ansipixels.WhiteBG+ansipixels.Red, card.Suit, ansipixels.Reset)
-	}
+	cardContent = fmt.Sprintf("   %-4s", card.Value)
+	g.ap.WriteString(cardContent)
+	g.ap.MoveCursor(x, y+4)
+	g.ap.WriteString("       ")
+	// Bottom suit
+	g.ap.MoveCursor(x, y+5)
+	cardContent = fmt.Sprintf("      %s%s", card.Suit, ansipixels.Reset)
 	g.ap.WriteString(cardContent)
 }
 
 // drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
-	cardWidth := 7 // Width of a card including borders
+	cardWidth := 8 // Width of a card including borders
 	for i, card := range cards {
 		hidden := hideFirst && i == 0
 		g.drawCardOnScreen(x+i*cardWidth, y, card, hidden)
@@ -291,13 +288,13 @@ func (g *Game) draw() {
 	// Draw dealer's hand
 	g.ap.WriteCentered(2, "Dealer's Hand")
 	cardWidth := 7
-	dealerOffset := (g.ap.W - cardWidth*len(g.dealer)) / 2
-	g.drawHand(dealerOffset, 4, g.dealer, g.state == StatePlayerTurn)
+	dealerOffset := (g.ap.W - cardWidth*len(g.dealer) - 1) / 2 // -1 because of right space on last card
+	g.drawHand(dealerOffset, 3, g.dealer, g.state == StatePlayerTurn)
 
 	// Draw player's hand
-	g.ap.WriteCentered(g.ap.H-8, "Your Hand")
-	playerOffset := (g.ap.W - cardWidth*len(g.player)) / 2
-	g.drawHand(playerOffset, g.ap.H-6, g.player, false)
+	g.ap.WriteCentered(g.ap.H-11, "Your Hand")
+	playerOffset := (g.ap.W - cardWidth*len(g.player) - 1) / 2
+	g.drawHand(playerOffset, g.ap.H-10, g.player, false)
 
 	// Draw scores
 	dealerScore := g.calculateHand(g.dealer)
@@ -317,7 +314,7 @@ func (g *Game) draw() {
 
 	// Draw game message
 	if g.message != "" {
-		g.ap.WriteCentered(g.ap.H-7, "%s", g.message)
+		g.ap.WriteCentered(g.ap.H-3, "%s", g.message)
 	}
 
 	// Number of cards left in the deck:
