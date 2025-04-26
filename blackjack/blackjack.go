@@ -288,12 +288,12 @@ func (g *Game) draw() {
 	// Draw dealer's hand
 	g.ap.WriteCentered(2, "Dealer's Hand")
 	cardWidth := 7
-	dealerOffset := (g.ap.W - cardWidth*len(g.dealer)) / 2
+	dealerOffset := (g.ap.W - cardWidth*len(g.dealer) - 1) / 2 // -1 because of right space on last card
 	g.drawHand(dealerOffset, 3, g.dealer, g.state == StatePlayerTurn)
 
 	// Draw player's hand
 	g.ap.WriteCentered(g.ap.H-11, "Your Hand")
-	playerOffset := (g.ap.W - cardWidth*len(g.player)) / 2
+	playerOffset := (g.ap.W - cardWidth*len(g.player) - 1) / 2
 	g.drawHand(playerOffset, g.ap.H-10, g.player, false)
 
 	// Draw scores
