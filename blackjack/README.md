@@ -7,7 +7,7 @@ Game of blackjack demo using Ansipixels.
 ## Install/run
 Binary releases or tap or
 
-```
+```sh
 go run fortio.org/terminal/blackjack@latest
 ```
 

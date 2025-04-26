@@ -9,7 +9,7 @@ You now can use the mouse to add at any time.
 ## Install/run
 Binary releases or tap or
 
-```
+```sh
 go run fortio.org/terminal/life@latest
 ```
 
