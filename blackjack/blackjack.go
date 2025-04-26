@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"fortio.org/cli"
+	"fortio.org/log"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -191,8 +192,7 @@ func (g *Game) Run() {
 	}()
 
 	// Initial deal
-	g.player = []Card{g.drawCard(), g.drawCard()}
-	g.dealer = []Card{g.drawCard(), g.drawCard()}
+	g.resetGame()
 	g.first = true
 
 	for g.playing {
@@ -394,6 +394,21 @@ func main() {
 	noBorder := flag.Bool("no-border", false, "Don't draw the border at all around the cards")
 	wideBorder := flag.Bool("wide", false, "Draw a wide border around the cards")
 	cli.Main()
+	if *fps < 1 {
+		log.Fatalf("Invalid fps (%f) must be at least 1", *fps)
+	}
+	if *fps > 100000 {
+		log.Fatalf("Invalid fps (%f) must be less than 100000", *fps)
+	}
+	if *numDecks < 1 {
+		log.Fatalf("Invalid number of decks (%d) must be at least 1", *numDecks)
+	}
+	if *betAmount < 1 {
+		log.Fatalf("Invalid bet amount (%d) must be at least 1", *betAmount)
+	}
+	if *initialBalance < *betAmount {
+		log.Fatalf("Initial balance (%d) must be at least the bet amount (%d)", *initialBalance, *betAmount)
+	}
 	if runtime.GOOS == "darwin" && os.Getenv("TERM") == "xterm-ghostty" {
 		Heart = "❤"
 	}
