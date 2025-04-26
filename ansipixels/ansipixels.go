@@ -464,12 +464,18 @@ func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 		widths = append(widths, w)
 		maxw = max(maxw, w)
 	}
+	var cursorX int
+	var cursorY int
 	for i, l := range lines {
+		cursorY = y + i
 		x := (ap.W - widths[i]) / 2
-		ap.MoveCursor(x, y+i)
+		ap.MoveCursor(x, cursorY)
 		ap.WriteString(l)
+		cursorX = x + widths[i]
 	}
 	ap.DrawRoundBox((ap.W-maxw)/2-1, y-1, maxw+2, len(lines)+2)
+	// put back the cursor at the end of the last line (inside the box)
+	ap.MoveCursor(cursorX, cursorY)
 }
 
 func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
