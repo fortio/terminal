@@ -81,16 +81,17 @@ func (g *Game) drawCard() Card {
 }
 
 const (
-	cardBack  = "░░░░░"
-	cardWidth = 6 // including the space in between cards/on the right of a card
+	cardBack   = "░░░░░"
+	cardWidth  = 6 // including the space in between cards/on the right of a card
+	cardHeight = 4 // not including the border
 )
 
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
-	// Draw card border
-	g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, 5, g.borderColor)
-	g.ap.MoveCursor(x, y)
+	// Draw card border: mostly redundant with the outer one except for the middle in between cards
+	g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.borderColor, false)
 	// Draw card content
+	g.ap.MoveCursor(x, y)
 	if hidden {
 		g.ap.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
 		g.ap.MoveCursor(x, y+1)
@@ -124,7 +125,7 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 // drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
 	// Add extra bars vertically so space around cards is even on height vs width (as pixels are 2x tall than wide)
-	g.ap.DrawColoredBox(x-2, y-1, cardWidth*len(cards)+3, 5, g.borderColor)
+	g.ap.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.borderColor, true)
 	for i, card := range cards {
 		hidden := hideFirst && i == 0
 		pos := x + i*cardWidth

@@ -396,7 +396,11 @@ func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
 	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, RoundBottomRight)
 }
 
-func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string) {
+func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string, doubleWidth bool) {
+	// not very efficient as we redraw over the top and bottom again.
+	if doubleWidth {
+		ap.DrawBox(x-1, y, w+2, h, color+" ", " ", " ", " ", " ", " "+Reset)
+	}
 	ap.DrawBox(x, y, w, h, color+" ", " ", " ", " ", " ", " "+Reset)
 }
 
