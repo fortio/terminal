@@ -389,27 +389,33 @@ func (ap *AnsiPixels) ShowCursor() {
 }
 
 func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, SquareTopLeft, Horizontal, SquareTopRight, Vertical, SquareBottomLeft, SquareBottomRight)
+	ap.DrawBox(x, y, w, h, SquareTopLeft, Horizontal, SquareTopRight, Vertical, SquareBottomLeft, SquareBottomRight, false)
 }
 
 func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, RoundBottomRight)
+	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, RoundBottomRight, false)
 }
 
+// Draw a colored box with the given background color and double width option which means extra bars on the left and right.
 func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string, doubleWidth bool) {
-	// not very efficient as we redraw over the top and bottom again.
-	if doubleWidth {
-		ap.DrawBox(x-1, y, w+2, h, color+" ", " ", " ", " ", " ", " "+Reset)
-	}
-	ap.DrawBox(x, y, w, h, color+" ", " ", " ", " ", " ", " "+Reset)
+	ap.DrawBox(x, y, w, h, color+" ", " ", " ", " ", " ", " "+Reset, doubleWidth)
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, horizontal, topRight, vertical, bottomLeft, bottomRight string) {
+func (ap *AnsiPixels) DrawBox(x, y, w, h int,
+	topLeft, horizontal, topRight,
+	vertical, bottomLeft, bottomRight string,
+	doubleWidth bool,
+) {
 	if y >= 0 {
 		ap.MoveCursor(x, y)
 		ap.WriteString(topLeft)
 		ap.WriteString(strings.Repeat(horizontal, w-2))
 		ap.WriteString(topRight)
+	}
+	if doubleWidth {
+		w++
+		x--
+		vertical += vertical
 	}
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
@@ -424,6 +430,10 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, horizontal, topRight, ver
 			ap.MoveHorizontally(x + w - 1)
 			ap.WriteString(vertical)
 		}
+	}
+	if doubleWidth {
+		w--
+		x++
 	}
 	ap.MoveCursor(x, y+h-1)
 	ap.WriteString(bottomLeft)
