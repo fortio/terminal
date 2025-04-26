@@ -267,15 +267,13 @@ func (g *Game) draw() {
 	g.ap.WriteAt(g.ap.W-20, 1, "Bet: $%d", g.bet)
 
 	// Draw dealer's hand
-	dealerTitle := "Dealer's Hand"
-	g.ap.WriteCentered(2, dealerTitle)
+	g.ap.WriteCentered(2, "Dealer's Hand")
 	cardWidth := 7
 	dealerOffset := (g.ap.W - cardWidth*len(g.dealer)) / 2
 	g.drawHand(dealerOffset, 4, g.dealer, g.state == StatePlayerTurn)
 
 	// Draw player's hand
-	playerTitle := "Your Hand"
-	g.ap.WriteCentered(g.ap.H-8, playerTitle)
+	g.ap.WriteCentered(g.ap.H-8, "Your Hand")
 	playerOffset := (g.ap.W - cardWidth*len(g.player)) / 2
 	g.drawHand(playerOffset, g.ap.H-6, g.player, false)
 
@@ -287,23 +285,23 @@ func (g *Game) draw() {
 	playerScore := g.calculateHand(g.player)
 
 	// Add blackjack indicator if applicable
-	scoreText := fmt.Sprintf("Your Score: %d", playerScore)
+	extraText := ""
 	if g.isBlackjack(g.player) {
-		scoreText += " (Blackjack!)"
+		extraText = " (Blackjack!)"
 	}
 
-	g.ap.WriteAt(2, g.ap.H-2, scoreText)
+	g.ap.WriteAt(2, g.ap.H-2, "Your Score: %d%s", playerScore, extraText)
 	g.ap.WriteAt(g.ap.W-20, g.ap.H-2, "Dealer's Score: %d", dealerScore)
 
 	// Draw game message
 	if g.message != "" {
-		g.ap.WriteCentered(g.ap.H-3, g.message)
+		g.ap.WriteCentered(g.ap.H-3, "%s", g.message)
 	}
 
 	// Number of cards left in the deck:
 	cardsLeft := len(g.deck.Cards)
 	totalCards := 52 * g.deck.Decks
-	g.ap.WriteRight(g.ap.H-1, fmt.Sprintf("%d/%d cards", cardsLeft, totalCards))
+	g.ap.WriteRight(g.ap.H-1, "%d/%d cards", cardsLeft, totalCards)
 
 	// Draw deck size indicator
 	percentage := float64(cardsLeft) / float64(totalCards)
