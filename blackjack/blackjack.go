@@ -32,15 +32,16 @@ const (
 
 // Game represents the blackjack game state.
 type Game struct {
-	ap      *ansipixels.AnsiPixels
-	deck    *Deck
-	player  []Card
-	dealer  []Card
-	playing bool
-	state   GameState
-	message string
-	balance int
-	bet     int
+	ap          *ansipixels.AnsiPixels
+	deck        *Deck
+	player      []Card
+	dealer      []Card
+	playing     bool
+	state       GameState
+	message     string
+	balance     int
+	bet         int
+	borderColor string
 }
 
 // initDeck initializes a new shuffled deck.
@@ -80,15 +81,17 @@ func (g *Game) drawCard() Card {
 }
 
 const (
-	cardBack  = "░░░░░"
-	cardWidth = 6 // including the space in between cards/on the right of a card
+	cardBack   = "░░░░░"
+	cardWidth  = 6 // including the space in between cards/on the right of a card
+	cardHeight = 4 // not including the border
 )
 
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
-	// Draw card border
-	g.ap.MoveCursor(x, y)
+	// Draw card border: mostly redundant with the outer one except for the middle in between cards
+	g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.borderColor, false)
 	// Draw card content
+	g.ap.MoveCursor(x, y)
 	if hidden {
 		g.ap.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
 		g.ap.MoveCursor(x, y+1)
@@ -121,6 +124,8 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 
 // drawHand draws a hand of cards at the specified position.
 func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
+	// Add extra bars vertically so space around cards is even on height vs width (as pixels are 2x tall than wide)
+	g.ap.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.borderColor, true)
 	for i, card := range cards {
 		hidden := hideFirst && i == 0
 		pos := x + i*cardWidth
@@ -296,10 +301,10 @@ func (g *Game) draw() {
 	// Draw dealer's hand
 	g.ap.WriteCentered(2, "Dealer's Hand")
 	dealerOffset := g.LeftMostCardPos(len(g.dealer))
-	g.drawHand(dealerOffset, 4, g.dealer, g.state == StatePlayerTurn)
+	g.drawHand(dealerOffset, 5, g.dealer, g.state == StatePlayerTurn)
 
 	// Draw player's hand
-	g.ap.WriteCentered(g.ap.H-11, "Your Hand")
+	g.ap.WriteCentered(g.ap.H-12, "Your Hand")
 	playerOffset := g.LeftMostCardPos(len(g.player))
 	g.drawHand(playerOffset, g.ap.H-9, g.player, false)
 
@@ -362,6 +367,7 @@ func main() {
 	betAmount := flag.Int("bet", 10, "Bet amount in `dollars`")
 	numDecks := flag.Int("decks", 4, "Number of decks to use")
 	fps := flag.Float64("fps", 60, "Frames per second (for resize/refreshes/animations)")
+	greenFlag := flag.Bool("green", false, "Use green instead of dark grey around the cards")
 	cli.Main()
 
 	ap := ansipixels.NewAnsiPixels(*fps)
@@ -371,11 +377,15 @@ func main() {
 	}
 
 	game := &Game{
-		ap:      ap,
-		playing: true,
-		state:   StatePlayerTurn,
-		balance: *initialBalance,
-		bet:     *betAmount,
+		ap:          ap,
+		playing:     true,
+		state:       StatePlayerTurn,
+		balance:     *initialBalance,
+		bet:         *betAmount,
+		borderColor: ansipixels.DarkGrayBG,
+	}
+	if *greenFlag {
+		game.borderColor = ansipixels.GreenBG
 	}
 	game.initDeck(*numDecks)
 

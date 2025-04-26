@@ -389,19 +389,33 @@ func (ap *AnsiPixels) ShowCursor() {
 }
 
 func (ap *AnsiPixels) DrawSquareBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, SquareTopLeft, SquareTopRight, SquareBottomLeft, SquareBottomRight)
+	ap.DrawBox(x, y, w, h, SquareTopLeft, Horizontal, SquareTopRight, Vertical, SquareBottomLeft, SquareBottomRight, false)
 }
 
 func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
-	ap.DrawBox(x, y, w, h, RoundTopLeft, RoundTopRight, RoundBottomLeft, RoundBottomRight)
+	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, RoundBottomRight, false)
 }
 
-func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bottomRight string) {
+// Draw a colored box with the given background color and double width option which means extra bars on the left and right.
+func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string, doubleWidth bool) {
+	ap.DrawBox(x, y, w, h, color+" ", " ", " ", " ", " ", " "+Reset, doubleWidth)
+}
+
+func (ap *AnsiPixels) DrawBox(x, y, w, h int,
+	topLeft, horizontal, topRight,
+	vertical, bottomLeft, bottomRight string,
+	doubleWidth bool,
+) {
 	if y >= 0 {
 		ap.MoveCursor(x, y)
 		ap.WriteString(topLeft)
-		ap.WriteString(strings.Repeat(Horizontal, w-2))
+		ap.WriteString(strings.Repeat(horizontal, w-2))
 		ap.WriteString(topRight)
+	}
+	if doubleWidth {
+		w++
+		x--
+		vertical += vertical
 	}
 	for i := 1; i < h-1; i++ {
 		ap.MoveCursor(x, y+i)
@@ -412,18 +426,22 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int, topLeft, topRight, bottomLeft, bot
 				ap.WriteString(topLeft)
 			}
 		} else {
-			ap.WriteString(Vertical)
+			ap.WriteString(vertical)
 			ap.MoveHorizontally(x + w - 1)
-			ap.WriteString(Vertical)
+			ap.WriteString(vertical)
 		}
+	}
+	if doubleWidth {
+		w--
+		x++
 	}
 	ap.MoveCursor(x, y+h-1)
 	ap.WriteString(bottomLeft)
-	ap.WriteString(strings.Repeat(Horizontal, w-3))
+	ap.WriteString(strings.Repeat(horizontal, w-3))
 	if x+w <= ap.W {
-		ap.WriteString(Horizontal + bottomRight)
+		ap.WriteString(horizontal + bottomRight)
 	} else {
-		ap.WriteString(topRight)
+		ap.WriteString(topRight) // used by brick in the top right corner.
 	}
 }
 
