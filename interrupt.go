@@ -22,6 +22,7 @@ type InterruptReader struct {
 	mu      sync.Mutex
 	cond    sync.Cond
 	cancel  context.CancelFunc
+	timeout time.Duration
 	stopped bool
 }
 
@@ -58,10 +59,11 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // NewInterruptReader creates a new interrupt reader.
 // it needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
-func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
+func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
 		reader:  reader,
 		bufSize: bufSize,
+		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
 	}
 	ir.reset = ir.buf
@@ -112,6 +114,20 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 	for len(ir.buf) == 0 && ir.err == nil {
 		ir.cond.Wait()
 	}
+	n, err := ir.read(p)
+	ir.mu.Unlock()
+	return n, err
+}
+
+// ReadNonBlocking will read what is available already or return 0, nil if nothing is available.
+func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
+	ir.mu.Lock()
+	n, err := ir.read(p)
+	ir.mu.Unlock()
+	return n, err
+}
+
+func (ir *InterruptReader) read(p []byte) (int, error) {
 	n := copy(p, ir.buf)
 	if n == len(ir.buf) {
 		ir.buf = ir.reset // consumed all, reset to initial buffer
@@ -132,7 +148,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	// Check for signal and context every 250ms, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tr := NewTimeoutReader(ir.reader, 250*time.Millisecond)
+	tr := NewTimeoutReader(ir.reader, ir.timeout)
 	defer tr.Close()
 	defer ir.cond.Signal()
 	for {

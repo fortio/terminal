@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
@@ -21,13 +22,18 @@ type Terminal struct {
 	// the prompt and command edit is refresh as needed when input comes in.
 	Out io.Writer
 	// Cancellable context after Open(). Use it to cancel the terminal reading or check for done.
-	Context     context.Context //nolint:containedctx // To avoid Open() returning 4 values.
-	Cancel      context.CancelFunc
-	fd          int
-	fdOut       int
-	oldState    *term.State
-	term        *term.Terminal
-	intrReader  *InterruptReader
+	Context  context.Context //nolint:containedctx // To avoid Open() returning 4 values.
+	Cancel   context.CancelFunc
+	fd       int
+	fdOut    int
+	oldState *term.State
+	term     *term.Terminal
+	// [InterruptReader.Read] can read from the underlying terminal instead of a full line with history and prompt.
+	// Can be used to read single keystrokes or events still in raw mode, without waiting for a new line.
+	// [InterruptReader.ReadNonBlocking] reads from the underlying terminal if there is data available.
+	// Can be used to check for single keystrokes or events still in raw mode,
+	// while refreshing the output (ie without blocking).
+	IntrReader  *InterruptReader
 	historyFile string
 	capacity    int
 	history     *TermHistory // original implementation of new History + exposed constructor etc.
@@ -41,40 +47,47 @@ type Terminal struct {
 // to restore the terminal to its original state upon exit.
 // fortio.org/log (and thus stdlib "log") will be redirected
 // to the terminal in a manner that preserves the prompt.
-// New cancellable context is returned, use it to cancel the terminal
+// A default 250ms InterruptReader is used if not set already.
+// New cancellable context is set, use it to cancel the terminal
 // reading or check for done for control-c or signal.
+// You can also call [Setup] to customize the terminal with a custom InterruptReader
+// and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
-	intrReader := NewInterruptReader(os.Stdin, 256) // same as the internal x/term buffer size.
+	t := &Terminal{
+		IntrReader: NewInterruptReader(os.Stdin, 256, 250*time.Millisecond), // same buffer as the internal x/term buffer size.,
+		history:    NewHistory(DefaultHistoryCapacity),
+	}
+	err := t.Setup(ctx)
+	return t, err
+}
+
+func (t *Terminal) Setup(ctx context.Context) error {
+	t.Context = ctx
+	t.fd = safecast.MustConvert[int](os.Stdin.Fd())
+	t.fdOut = safecast.MustConvert[int](os.Stdout.Fd())
 	rw := struct {
 		io.Reader
 		io.Writer
-	}{intrReader, os.Stderr}
-	t := &Terminal{
-		fd:         safecast.MustConvert[int](os.Stdin.Fd()),
-		fdOut:      safecast.MustConvert[int](os.Stdout.Fd()),
-		intrReader: intrReader,
-		Context:    ctx,
-		history:    NewHistory(DefaultHistoryCapacity),
-	}
+	}{t.IntrReader, os.Stderr}
 	t.term = term.NewTerminal(rw, "")
 	t.term.History = t.history
 	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
 		t.ResetInterrupts(ctx)
-		return t, nil
+		return nil
 	}
 	var err error
 	t.oldState, err = term.MakeRaw(t.fd)
 	if err != nil {
-		return t, err
+		return err
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = DefaultHistoryCapacity
 	t.loggerSetup()
 	err = t.UpdateSize() // error already logged - tbd to return or not / not fatal
 	t.ResetInterrupts(ctx)
-	return t, err
+	return err
 }
 
 // UpdateSize refreshes the terminal size to current size (so wrapping works).
@@ -99,7 +112,7 @@ func (t *Terminal) UpdateSize() error {
 // If you want to reset and restart after an interrupt, call this.
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
-	t.Context, t.Cancel = t.intrReader.Start(ctx)
+	t.Context, t.Cancel = t.IntrReader.Start(ctx)
 	return t.Context, t.Cancel
 }
 
@@ -187,8 +200,10 @@ func (t *Terminal) NewHistory(capacity int) {
 		return
 	}
 	newHistory := NewHistory(capacity)
-	// Copy AutoHistory setting
-	newHistory.AutoHistory = t.history.AutoHistory
+	// Copy AutoHistory setting (if any)
+	if t.history != nil {
+		newHistory.AutoHistory = t.history.AutoHistory
+	}
 	t.history = newHistory
 	t.term.History = t.history
 }
@@ -265,7 +280,7 @@ func (t *Terminal) Suspend() {
 	if t.oldState == nil {
 		return
 	}
-	t.intrReader.Stop() // stop the interrupt reader
+	t.IntrReader.Stop() // stop the interrupt reader
 	err := term.Restore(t.fd, t.oldState)
 	if err != nil {
 		log.Errf("Error restoring terminal for suspend: %v", err)
