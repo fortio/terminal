@@ -136,7 +136,6 @@ func (ir *InterruptReader) read(p []byte) (int, error) {
 	}
 	err := ir.err
 	ir.err = nil
-	ir.mu.Unlock()
 	return n, err
 }
 
