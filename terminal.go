@@ -31,6 +31,10 @@ type Terminal struct {
 	historyFile string
 	capacity    int
 	history     *TermHistory // original implementation of new History + exposed constructor etc.
+	// Terminal (last updated) width.
+	Width int
+	// Terminal (last updated) height.
+	Height int
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -83,6 +87,7 @@ func (t *Terminal) UpdateSize() error {
 		return err
 	}
 	log.Debugf("Terminal size: %d x %d", w, h)
+	t.Width, t.Height = w, h
 	err = t.term.SetSize(w, h)
 	if err != nil {
 		log.Errf("Error setting terminal size (%d x %d): %v", w, h, err)
