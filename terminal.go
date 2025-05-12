@@ -345,7 +345,7 @@ func (t *Terminal) ReadLine() (string, error) {
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
 	if errors.Is(err, term.ErrPasteIndicator) {
-		log.Debugf("ReadLine got paste indicator, swalling that virtual error %v", err)
+		log.Debugf("ReadLine got paste indicator, swallowing that virtual error %v", err)
 		return c, nil
 	}
 	return c, err
