@@ -27,6 +27,7 @@ const bufSize = 1024
 type AnsiPixels struct {
 	fdOut         int
 	Out           *bufio.Writer
+	In            *os.File
 	InWithTimeout *terminal.InterruptReader
 	buf           [bufSize]byte
 	Data          []byte
@@ -52,6 +53,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap := &AnsiPixels{
 		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
 		Out:           bufio.NewWriter(os.Stdout),
+		In:            os.Stdin,
 		FPS:           fps,
 		InWithTimeout: terminal.GetSharedInput(time.Duration(1e9 / fps)),
 		C:             make(chan os.Signal, 1),
@@ -212,9 +214,9 @@ func (ap *AnsiPixels) Restore() {
 	if ap.restored {
 		return
 	}
-	_ = ap.InWithTimeout.NormalMode()
 	ap.ShowCursor()
 	ap.EndSyncMode()
+	_ = ap.InWithTimeout.NormalMode()
 	ap.restored = true
 }
 
@@ -338,7 +340,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		if i == bufSize {
 			return x, y, errors.New("buffer full, no cursor position found")
 		}
-		n, err = ap.InWithTimeout.Read(ap.buf[i:bufSize])
+		n, err = ap.In.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
