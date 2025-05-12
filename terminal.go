@@ -22,12 +22,11 @@ type Terminal struct {
 	// the prompt and command edit is refresh as needed when input comes in.
 	Out io.Writer
 	// Cancellable context after Open(). Use it to cancel the terminal reading or check for done.
-	Context  context.Context //nolint:containedctx // To avoid Open() returning 4 values.
-	Cancel   context.CancelFunc
-	fd       int
-	fdOut    int
-	oldState *term.State
-	term     *term.Terminal
+	Context context.Context //nolint:containedctx // To avoid Open() returning 4 values.
+	Cancel  context.CancelFunc
+	fd      int
+	fdOut   int
+	term    *term.Terminal
 	// [InterruptReader.Read] can read from the underlying terminal instead of a full line with history and prompt.
 	// Can be used to read single keystrokes or events still in raw mode, without waiting for a new line.
 	// [InterruptReader.ReadNonBlocking] reads from the underlying terminal if there is data available.
@@ -54,7 +53,7 @@ type Terminal struct {
 // and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
 	t := &Terminal{
-		IntrReader: NewInterruptReader(os.Stdin, 256, 250*time.Millisecond), // same buffer as the internal x/term buffer size.,
+		IntrReader: GetSharedInput(250 * time.Millisecond),
 		history:    NewHistory(DefaultHistoryCapacity),
 	}
 	err := t.Setup(ctx)
@@ -78,7 +77,7 @@ func (t *Terminal) Setup(ctx context.Context) error {
 		return nil
 	}
 	var err error
-	t.oldState, err = term.MakeRaw(t.fd)
+	err = t.IntrReader.RawMode()
 	if err != nil {
 		return err
 	}
@@ -277,21 +276,21 @@ func saveHistory(f string, h []string) {
 // Temporarily suspend/resume of the terminal back to normal (for example to run a sub process).
 // use defer t.Resume() after calling Suspend() to put the terminal back in raw mode.
 func (t *Terminal) Suspend() {
-	if t.oldState == nil {
+	if !t.IntrReader.Raw() {
 		return
 	}
 	t.IntrReader.Stop() // stop the interrupt reader
-	err := term.Restore(t.fd, t.oldState)
+	err := t.IntrReader.NormalMode()
 	if err != nil {
 		log.Errf("Error restoring terminal for suspend: %v", err)
 	}
 }
 
 func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelFunc) {
-	if t.oldState == nil {
+	if t.IntrReader.Raw() {
 		return nil, nil
 	}
-	_, err := term.MakeRaw(t.fd)
+	err := t.IntrReader.RawMode()
 	if err != nil {
 		log.Errf("Error for terminal resume: %v", err)
 	}
@@ -302,15 +301,16 @@ func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelF
 // the terminal in raw mode. Safe to call multiple times. Will save the history to the history file
 // if one was set using [SetHistoryFile] and the capacity is > 0.
 func (t *Terminal) Close() error {
-	if t.oldState == nil {
+	if t.IntrReader == nil {
 		return nil
 	}
 	// To avoid prompt being repeated on the last line (shouldn't be necessary but... is
 	// consider fixing in term instead)
 	t.term.SetPrompt("") // will still reprint the last command on ^C in middle of typing.
 	t.Cancel()           // cancel the interrupt reader
-	err := term.Restore(t.fd, t.oldState)
-	t.oldState = nil
+	err := t.IntrReader.NormalMode()
+	t.IntrReader.Close()
+	t.IntrReader = nil
 	t.Out = os.Stderr
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.

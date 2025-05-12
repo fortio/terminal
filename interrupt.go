@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fortio.org/log"
+	"golang.org/x/term"
 )
 
 type InterruptReader struct {
@@ -24,6 +25,9 @@ type InterruptReader struct {
 	cancel  context.CancelFunc
 	timeout time.Duration
 	stopped bool
+	tr      *TimeoutReader
+	// Terminal state (raw mode vs normal)
+	st *term.State
 }
 
 var (
@@ -59,17 +63,30 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // NewInterruptReader creates a new interrupt reader.
 // it needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
+// Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
 		reader:  reader,
 		bufSize: bufSize,
 		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
+		tr:      NewTimeoutReader(reader, timeout),
 	}
 	ir.reset = ir.buf
 	ir.cond = *sync.NewCond(&ir.mu)
 	log.Config.GoroutineID = true
 	return ir
+}
+
+func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
+	ir.mu.Lock()
+	ir.timeout = timeout
+	if ir.tr.IsClosed() {
+		ir.tr = NewTimeoutReader(ir.reader, timeout)
+	} else {
+		ir.tr.ChangeTimeout(timeout)
+	}
+	ir.mu.Unlock()
 }
 
 func (ir *InterruptReader) Stop() {
@@ -145,9 +162,15 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-	// Check for signal and context every 250ms, though signals should interrupt the select,
+	// Check for signal and context every ir.timeout, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tr := NewTimeoutReader(ir.reader, ir.timeout)
+	tr := ir.tr
+	if tr.IsClosed() {
+		tr = NewTimeoutReader(ir.reader, ir.timeout)
+		ir.tr = tr
+	} else {
+		tr.ChangeTimeout(ir.timeout)
+	}
 	defer tr.Close()
 	defer ir.cond.Signal()
 	for {

@@ -25,12 +25,9 @@ import (
 const bufSize = 1024
 
 type AnsiPixels struct {
-	FdIn          int
 	fdOut         int
 	Out           *bufio.Writer
-	In            *os.File
-	InWithTimeout *terminal.TimeoutReader
-	state         *term.State
+	InWithTimeout *terminal.InterruptReader
 	buf           [bufSize]byte
 	Data          []byte
 	W, H          int  // Width and Height
@@ -48,16 +45,15 @@ type AnsiPixels struct {
 	OnResize  func() error // Callback when terminal is resized
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
+	restored   bool
 }
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap := &AnsiPixels{
-		FdIn:          safecast.MustConvert[int](os.Stdin.Fd()),
 		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
 		Out:           bufio.NewWriter(os.Stdout),
-		In:            os.Stdin,
 		FPS:           fps,
-		InWithTimeout: terminal.NewTimeoutReader(os.Stdin, time.Duration(1e9/fps)),
+		InWithTimeout: terminal.GetSharedInput(time.Duration(1e9 / fps)),
 		C:             make(chan os.Signal, 1),
 		firstClear:    true,
 	}
@@ -69,12 +65,13 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 	ap.InWithTimeout.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
-func (ap *AnsiPixels) Open() (err error) {
-	ap.state, err = term.MakeRaw(ap.FdIn)
+func (ap *AnsiPixels) Open() error {
+	ap.restored = false
+	err := ap.InWithTimeout.RawMode()
 	if err == nil {
 		err = ap.GetSize()
 	}
-	return
+	return err
 }
 
 // So this handles both outgoing and incoming escape sequences, but maybe we should split them
@@ -212,16 +209,13 @@ func (ap *AnsiPixels) GetSize() (err error) {
 }
 
 func (ap *AnsiPixels) Restore() {
-	if ap.state == nil {
+	if ap.restored {
 		return
 	}
+	_ = ap.InWithTimeout.NormalMode()
 	ap.ShowCursor()
 	ap.EndSyncMode()
-	err := term.Restore(ap.FdIn, ap.state)
-	if err != nil {
-		log.Fatalf("Error restoring terminal: %v", err)
-	}
-	ap.state = nil
+	ap.restored = true
 }
 
 // ClearScreen erases the current frame/screen and positions the cursor in the top left.
@@ -344,7 +338,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		if i == bufSize {
 			return x, y, errors.New("buffer full, no cursor position found")
 		}
-		n, err = ap.In.Read(ap.buf[i:bufSize])
+		n, err = ap.InWithTimeout.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
