@@ -21,10 +21,10 @@ var sharedInput = NewInterruptReader(os.Stdin, 256, DefaultReaderTimeout)
 // It also changes the timeout for the timeout reader to the maxRead duration if different than before.
 func GetSharedInput(maxRead time.Duration) *InterruptReader {
 	sharedInput.mu.Lock()
-	if sharedInput.tr == nil {
-		sharedInput.tr = NewTimeoutReader(sharedInput.reader, maxRead) // same buffer as the internal x/term buffer size.
+	if sharedInput.TR == nil {
+		sharedInput.TR = NewTimeoutReader(sharedInput.In, maxRead) // same buffer as the internal x/term buffer size.
 	} else {
-		sharedInput.tr.ChangeTimeout(maxRead)
+		sharedInput.TR.ChangeTimeout(maxRead)
 	}
 	sharedInput.mu.Unlock()
 	return sharedInput
@@ -41,7 +41,7 @@ func (ir *InterruptReader) RawMode() error {
 		log.Debugf("RawMode already set - noop")
 		return nil
 	}
-	fd := ir.reader.Fd()
+	fd := ir.In.Fd()
 	var err error
 	ir.st, err = term.MakeRaw(int(fd))
 	ir.mu.Unlock()
@@ -61,7 +61,7 @@ func (ir *InterruptReader) NormalMode() error {
 		return nil
 	}
 	defer ir.mu.Unlock()
-	return term.Restore(int(ir.reader.Fd()), ir.st)
+	return term.Restore(int(ir.In.Fd()), ir.st)
 }
 
 // Raw returns true if the terminal is currentlyin raw mode.
@@ -76,6 +76,6 @@ func (ir *InterruptReader) Raw() bool {
 // It also returns the terminal to normal mode.
 func (ir *InterruptReader) Close() error {
 	err := ir.NormalMode()
-	ir.tr.Close()
+	ir.TR.Close()
 	return err
 }

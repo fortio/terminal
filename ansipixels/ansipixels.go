@@ -25,18 +25,17 @@ import (
 const bufSize = 1024
 
 type AnsiPixels struct {
-	fdOut         int
-	Out           *bufio.Writer
-	In            *os.File
-	InWithTimeout *terminal.InterruptReader
-	buf           [bufSize]byte
-	Data          []byte
-	W, H          int  // Width and Height
-	x, y          int  // Cursor last set position
-	Mouse         bool // Mouse event received
-	Mx, My        int  // Mouse last known position
-	Mbuttons      int  // Mouse buttons and modifier state
-	C             chan os.Signal
+	fdOut       int
+	Out         *bufio.Writer
+	SharedInput *terminal.InterruptReader
+	buf         [bufSize]byte
+	Data        []byte
+	W, H        int  // Width and Height
+	x, y        int  // Cursor last set position
+	Mouse       bool // Mouse event received
+	Mx, My      int  // Mouse last known position
+	Mbuttons    int  // Mouse buttons and modifier state
+	C           chan os.Signal
 	// Should image be monochrome, 256 or true color
 	TrueColor bool
 	Color     bool         // 256 (216) color mode
@@ -51,25 +50,24 @@ type AnsiPixels struct {
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap := &AnsiPixels{
-		fdOut:         safecast.MustConvert[int](os.Stdout.Fd()),
-		Out:           bufio.NewWriter(os.Stdout),
-		In:            os.Stdin,
-		FPS:           fps,
-		InWithTimeout: terminal.GetSharedInput(time.Duration(1e9 / fps)),
-		C:             make(chan os.Signal, 1),
-		firstClear:    true,
+		fdOut:       safecast.MustConvert[int](os.Stdout.Fd()),
+		Out:         bufio.NewWriter(os.Stdout),
+		FPS:         fps,
+		SharedInput: terminal.GetSharedInput(time.Duration(1e9 / fps)),
+		C:           make(chan os.Signal, 1),
+		firstClear:  true,
 	}
 	signal.Notify(ap.C, signalList...)
 	return ap
 }
 
 func (ap *AnsiPixels) ChangeFPS(fps float64) {
-	ap.InWithTimeout.ChangeTimeout(1 * time.Second / time.Duration(fps))
+	ap.SharedInput.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
 func (ap *AnsiPixels) Open() error {
 	ap.restored = false
-	err := ap.InWithTimeout.RawMode()
+	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
 	}
@@ -187,7 +185,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 			return 0, err
 		}
 	default:
-		n, err := ap.InWithTimeout.Read(ap.buf[0:bufSize])
+		n, err := ap.SharedInput.TR.Read(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		ap.MouseDecode()
 		return n, err
@@ -216,7 +214,7 @@ func (ap *AnsiPixels) Restore() {
 	}
 	ap.ShowCursor()
 	ap.EndSyncMode()
-	_ = ap.InWithTimeout.NormalMode()
+	_ = ap.SharedInput.NormalMode()
 	ap.restored = true
 }
 
@@ -340,7 +338,7 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		if i == bufSize {
 			return x, y, errors.New("buffer full, no cursor position found")
 		}
-		n, err = ap.In.Read(ap.buf[i:bufSize])
+		n, err = ap.SharedInput.In.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}

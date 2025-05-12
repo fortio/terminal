@@ -15,7 +15,7 @@ import (
 )
 
 type InterruptReader struct {
-	reader  *os.File // stdin typically
+	In      *os.File // stdin typically
 	buf     []byte
 	reset   []byte // original buffer start
 	bufSize int
@@ -25,7 +25,8 @@ type InterruptReader struct {
 	cancel  context.CancelFunc
 	timeout time.Duration
 	stopped bool
-	tr      *TimeoutReader
+	// TimeoutReader is the timeout reader for the interrupt reader. Do not access directly if also using Start/Stop.
+	TR *TimeoutReader
 	// Terminal state (raw mode vs normal)
 	st *term.State
 }
@@ -66,11 +67,11 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
-		reader:  reader,
+		In:      reader,
 		bufSize: bufSize,
 		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
-		tr:      NewTimeoutReader(reader, timeout),
+		TR:      NewTimeoutReader(reader, timeout),
 	}
 	ir.reset = ir.buf
 	ir.cond = *sync.NewCond(&ir.mu)
@@ -81,10 +82,10 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	ir.mu.Lock()
 	ir.timeout = timeout
-	if ir.tr.IsClosed() {
-		ir.tr = NewTimeoutReader(ir.reader, timeout)
+	if ir.TR.IsClosed() {
+		ir.TR = NewTimeoutReader(ir.In, timeout)
 	} else {
-		ir.tr.ChangeTimeout(timeout)
+		ir.TR.ChangeTimeout(timeout)
 	}
 	ir.mu.Unlock()
 }
@@ -164,10 +165,10 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	// Check for signal and context every ir.timeout, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tr := ir.tr
+	tr := ir.TR
 	if tr.IsClosed() {
-		tr = NewTimeoutReader(ir.reader, ir.timeout)
-		ir.tr = tr
+		tr = NewTimeoutReader(ir.In, ir.timeout)
+		ir.TR = tr
 	} else {
 		tr.ChangeTimeout(ir.timeout)
 	}
