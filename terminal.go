@@ -336,9 +336,16 @@ func (t *Terminal) Close() error {
 // Control-C or a signal is received.
 func (t *Terminal) ReadLine() (string, error) {
 	c, err := t.term.ReadLine()
+	// If Ctrl-D generated a synthetic EOF, we need to close the interrupt reader.
+	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
+		log.LogVf("ReadLine got artificial EOF, closing interrupt reader %q", c)
+		t.IntrReader.Stop()
+		t.IntrReader.TR.Close()
+	}
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
 	if errors.Is(err, term.ErrPasteIndicator) {
+		log.Debugf("ReadLine got paste indicator, swalling that virtual error %v", err)
 		return c, nil
 	}
 	return c, err

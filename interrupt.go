@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"sync"
@@ -109,6 +110,12 @@ func (ir *InterruptReader) Stop() {
 	ir.mu.Unlock()
 }
 
+func (ir *InterruptReader) InEOF() bool {
+	ir.mu.Lock()
+	defer ir.mu.Unlock()
+	return errors.Is(ir.err, io.EOF)
+}
+
 // Start or restart (after a cancel/interrupt) the interrupt reader.
 func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.CancelFunc) {
 	log.Debugf("InterruptReader starting")
@@ -153,7 +160,9 @@ func (ir *InterruptReader) read(p []byte) (int, error) {
 		ir.buf = ir.buf[n:] // partial read
 	}
 	err := ir.err
-	ir.err = nil
+	if !errors.Is(err, io.EOF) { // EOF is sticky.
+		ir.err = nil
+	}
 	return n, err
 }
 
@@ -182,7 +191,10 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			ir.cancel()
 			return
 		case <-ctx.Done():
-			if ir.stopped {
+			ir.mu.Lock()
+			stopped := ir.stopped
+			ir.mu.Unlock()
+			if stopped {
 				ir.setError(ErrStopped)
 				ir.cond.Broadcast()
 			} else {
