@@ -74,6 +74,7 @@ func (tr *TimeoutReader) Close() error {
 }
 
 // IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
+// Always false on unix/select mode because we can keep using it forever, unlike the goroutine based one.
 func (tr *TimeoutReader) IsClosed() bool {
 	return false
 }
