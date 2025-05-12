@@ -311,7 +311,7 @@ func (t *Terminal) Close() error {
 	err := t.IntrReader.NormalMode()
 	t.IntrReader.Close()
 	t.IntrReader = nil
-	t.Out = os.Stderr
+	// t.Out = os.Stderr // races during exit.
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.
 	if t.historyFile == "" || t.capacity <= 0 {
