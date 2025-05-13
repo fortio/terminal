@@ -41,6 +41,7 @@ type TimeoutReader struct {
 	wg         sync.WaitGroup  // To wait for the goroutine to exit
 	mu         sync.Mutex      // Protects inRead and lastErr
 	lastErr    error           // Stores persistent errors like EOF - TODO: probably not needed
+	closed     bool            // To signal if Close() has been called
 }
 
 // NewTimeoutReader creates a new TimeoutReader with a persistent background reader.
@@ -144,7 +145,8 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 }
 
 // ChangeTimeout updates the timeout duration for subsequent Read calls
-// when waiting for new data from the background reader.
+// when waiting for new data from the background reader. If called currently
+// it will block until the current read completes.
 func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 	log.LogVf("Changing non select based TimeoutReader to timeout: %v", newTimeout)
 	if newTimeout <= 0 {
@@ -160,6 +162,7 @@ func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 func (tr *TimeoutReader) Close() error {
 	log.LogVf("Closing non select based TimeoutReader")
 	tr.mu.Lock()
+	tr.closed = true
 	select {
 	case <-tr.stopChan:
 		tr.mu.Unlock()
@@ -172,4 +175,11 @@ func (tr *TimeoutReader) Close() error {
 	tr.mu.Unlock()
 	tr.wg.Wait()
 	return nil
+}
+
+// IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
+func (tr *TimeoutReader) IsClosed() bool {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	return tr.closed
 }

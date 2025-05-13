@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,10 +12,11 @@ import (
 	"time"
 
 	"fortio.org/log"
+	"golang.org/x/term"
 )
 
 type InterruptReader struct {
-	reader  *os.File // stdin typically
+	In      *os.File // stdin typically
 	buf     []byte
 	reset   []byte // original buffer start
 	bufSize int
@@ -22,7 +24,12 @@ type InterruptReader struct {
 	mu      sync.Mutex
 	cond    sync.Cond
 	cancel  context.CancelFunc
+	timeout time.Duration
 	stopped bool
+	// TimeoutReader is the timeout reader for the interrupt reader. Do not access directly if also using Start/Stop.
+	TR *TimeoutReader
+	// Terminal state (raw mode vs normal)
+	st *term.State
 }
 
 var (
@@ -58,16 +65,30 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // NewInterruptReader creates a new interrupt reader.
 // it needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
-func NewInterruptReader(reader *os.File, bufSize int) *InterruptReader {
+// Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
+func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
-		reader:  reader,
+		In:      reader,
 		bufSize: bufSize,
+		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
+		TR:      NewTimeoutReader(reader, timeout),
 	}
 	ir.reset = ir.buf
 	ir.cond = *sync.NewCond(&ir.mu)
 	log.Config.GoroutineID = true
 	return ir
+}
+
+func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
+	ir.mu.Lock()
+	ir.timeout = timeout
+	if ir.TR.IsClosed() {
+		ir.TR = NewTimeoutReader(ir.In, timeout)
+	} else {
+		ir.TR.ChangeTimeout(timeout)
+	}
+	ir.mu.Unlock()
 }
 
 func (ir *InterruptReader) Stop() {
@@ -87,6 +108,12 @@ func (ir *InterruptReader) Stop() {
 	ir.buf = ir.reset
 	ir.err = nil
 	ir.mu.Unlock()
+}
+
+func (ir *InterruptReader) InEOF() bool {
+	ir.mu.Lock()
+	defer ir.mu.Unlock()
+	return errors.Is(ir.err, io.EOF)
 }
 
 // Start or restart (after a cancel/interrupt) the interrupt reader.
@@ -112,6 +139,20 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 	for len(ir.buf) == 0 && ir.err == nil {
 		ir.cond.Wait()
 	}
+	n, err := ir.read(p)
+	ir.mu.Unlock()
+	return n, err
+}
+
+// ReadNonBlocking will read what is available already or return 0, nil if nothing is available.
+func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
+	ir.mu.Lock()
+	n, err := ir.read(p)
+	ir.mu.Unlock()
+	return n, err
+}
+
+func (ir *InterruptReader) read(p []byte) (int, error) {
 	n := copy(p, ir.buf)
 	if n == len(ir.buf) {
 		ir.buf = ir.reset // consumed all, reset to initial buffer
@@ -119,8 +160,9 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 		ir.buf = ir.buf[n:] // partial read
 	}
 	err := ir.err
-	ir.err = nil
-	ir.mu.Unlock()
+	if !errors.Is(err, io.EOF) { // EOF is sticky.
+		ir.err = nil
+	}
 	return n, err
 }
 
@@ -130,9 +172,15 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-	// Check for signal and context every 250ms, though signals should interrupt the select,
+	// Check for signal and context every ir.timeout, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tr := NewTimeoutReader(ir.reader, 250*time.Millisecond)
+	tr := ir.TR
+	if tr.IsClosed() {
+		tr = NewTimeoutReader(ir.In, ir.timeout)
+		ir.TR = tr
+	} else {
+		tr.ChangeTimeout(ir.timeout)
+	}
 	defer tr.Close()
 	defer ir.cond.Signal()
 	for {
@@ -143,7 +191,10 @@ func (ir *InterruptReader) start(ctx context.Context) {
 			ir.cancel()
 			return
 		case <-ctx.Done():
-			if ir.stopped {
+			ir.mu.Lock()
+			stopped := ir.stopped
+			ir.mu.Unlock()
+			if stopped {
 				ir.setError(ErrStopped)
 				ir.cond.Broadcast()
 			} else {
@@ -171,10 +222,20 @@ func (ir *InterruptReader) start(ctx context.Context) {
 				ir.mu.Unlock()
 				return
 			}
+			delay := false
+			if localBuf[n-1] == '\r' {
+				// We just ended on a new line (\r in raw mode). We will want to wait before the next read.
+				delay = true
+			}
 			ir.mu.Lock()
 			ir.buf = append(ir.buf, localBuf...) // Might grow unbounded if not read.
 			ir.cond.Signal()
 			ir.mu.Unlock()
+			if delay {
+				// This is a bit of a hack to give a chance to caller of ReadLine
+				// to stop the goroutine based timeout_reader before it enters the next read.
+				_ = SleepWithContext(ctx, ir.timeout/5)
+			}
 		}
 	}
 }

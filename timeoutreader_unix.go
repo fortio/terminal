@@ -63,6 +63,7 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
 }
 
+// ChangeTimeout on unix should be called from same goroutine as any Read* or not concurrently.
 func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 	tr.tv = TimeoutToTimeval(timeout)
 }
@@ -70,4 +71,10 @@ func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 // We don't really close the underlying but this is a chance to cleanup for the other implementation.
 func (tr *TimeoutReader) Close() error {
 	return nil
+}
+
+// IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
+// Always false on unix/select mode because we can keep using it forever, unlike the goroutine based one.
+func (tr *TimeoutReader) IsClosed() bool {
+	return false
 }

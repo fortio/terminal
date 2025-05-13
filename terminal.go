@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	"fortio.org/log"
 	"fortio.org/safecast"
@@ -21,56 +22,71 @@ type Terminal struct {
 	// the prompt and command edit is refresh as needed when input comes in.
 	Out io.Writer
 	// Cancellable context after Open(). Use it to cancel the terminal reading or check for done.
-	Context     context.Context //nolint:containedctx // To avoid Open() returning 4 values.
-	Cancel      context.CancelFunc
-	fd          int
-	fdOut       int
-	oldState    *term.State
-	term        *term.Terminal
-	intrReader  *InterruptReader
+	Context context.Context //nolint:containedctx // To avoid Open() returning 4 values.
+	Cancel  context.CancelFunc
+	fd      int
+	fdOut   int
+	term    *term.Terminal
+	// [InterruptReader.Read] can read from the underlying terminal instead of a full line with history and prompt.
+	// Can be used to read single keystrokes or events still in raw mode, without waiting for a new line.
+	// [InterruptReader.ReadNonBlocking] reads from the underlying terminal if there is data available.
+	// Can be used to check for single keystrokes or events still in raw mode,
+	// while refreshing the output (ie without blocking).
+	IntrReader  *InterruptReader
 	historyFile string
 	capacity    int
 	history     *TermHistory // original implementation of new History + exposed constructor etc.
+	// Terminal (last updated) width.
+	Width int
+	// Terminal (last updated) height.
+	Height int
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
 // to restore the terminal to its original state upon exit.
 // fortio.org/log (and thus stdlib "log") will be redirected
 // to the terminal in a manner that preserves the prompt.
-// New cancellable context is returned, use it to cancel the terminal
+// A default 250ms InterruptReader is used if not set already.
+// New cancellable context is set, use it to cancel the terminal
 // reading or check for done for control-c or signal.
+// You can also call [Setup] to customize the terminal with a custom InterruptReader
+// and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
-	intrReader := NewInterruptReader(os.Stdin, 256) // same as the internal x/term buffer size.
+	t := &Terminal{
+		IntrReader: GetSharedInput(250 * time.Millisecond),
+		history:    NewHistory(DefaultHistoryCapacity),
+	}
+	err := t.Setup(ctx)
+	return t, err
+}
+
+func (t *Terminal) Setup(ctx context.Context) error {
+	t.Context = ctx
+	t.fd = safecast.MustConvert[int](os.Stdin.Fd())
+	t.fdOut = safecast.MustConvert[int](os.Stdout.Fd())
 	rw := struct {
 		io.Reader
 		io.Writer
-	}{intrReader, os.Stderr}
-	t := &Terminal{
-		fd:         safecast.MustConvert[int](os.Stdin.Fd()),
-		fdOut:      safecast.MustConvert[int](os.Stdout.Fd()),
-		intrReader: intrReader,
-		Context:    ctx,
-		history:    NewHistory(DefaultHistoryCapacity),
-	}
+	}{t.IntrReader, os.Stderr}
 	t.term = term.NewTerminal(rw, "")
 	t.term.History = t.history
 	t.Out = t.term
 	if !t.IsTerminal() {
 		t.Out = os.Stderr // no need to add \r for non raw mode.
 		t.ResetInterrupts(ctx)
-		return t, nil
+		return nil
 	}
 	var err error
-	t.oldState, err = term.MakeRaw(t.fd)
+	err = t.IntrReader.RawMode()
 	if err != nil {
-		return t, err
+		return err
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = DefaultHistoryCapacity
 	t.loggerSetup()
 	err = t.UpdateSize() // error already logged - tbd to return or not / not fatal
 	t.ResetInterrupts(ctx)
-	return t, err
+	return err
 }
 
 // UpdateSize refreshes the terminal size to current size (so wrapping works).
@@ -83,6 +99,7 @@ func (t *Terminal) UpdateSize() error {
 		return err
 	}
 	log.Debugf("Terminal size: %d x %d", w, h)
+	t.Width, t.Height = w, h
 	err = t.term.SetSize(w, h)
 	if err != nil {
 		log.Errf("Error setting terminal size (%d x %d): %v", w, h, err)
@@ -94,7 +111,7 @@ func (t *Terminal) UpdateSize() error {
 // If you want to reset and restart after an interrupt, call this.
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
-	t.Context, t.Cancel = t.intrReader.Start(ctx)
+	t.Context, t.Cancel = t.IntrReader.Start(ctx)
 	return t.Context, t.Cancel
 }
 
@@ -182,8 +199,10 @@ func (t *Terminal) NewHistory(capacity int) {
 		return
 	}
 	newHistory := NewHistory(capacity)
-	// Copy AutoHistory setting
-	newHistory.AutoHistory = t.history.AutoHistory
+	// Copy AutoHistory setting (if any)
+	if t.history != nil {
+		newHistory.AutoHistory = t.history.AutoHistory
+	}
 	t.history = newHistory
 	t.term.History = t.history
 }
@@ -257,24 +276,19 @@ func saveHistory(f string, h []string) {
 // Temporarily suspend/resume of the terminal back to normal (for example to run a sub process).
 // use defer t.Resume() after calling Suspend() to put the terminal back in raw mode.
 func (t *Terminal) Suspend() {
-	if t.oldState == nil {
-		return
-	}
-	t.intrReader.Stop() // stop the interrupt reader
-	err := term.Restore(t.fd, t.oldState)
+	t.IntrReader.Stop() // stop the interrupt reader
+	err := t.IntrReader.NormalMode()
 	if err != nil {
 		log.Errf("Error restoring terminal for suspend: %v", err)
 	}
 }
 
 func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelFunc) {
-	if t.oldState == nil {
-		return nil, nil
-	}
-	_, err := term.MakeRaw(t.fd)
+	err := t.IntrReader.RawMode()
 	if err != nil {
 		log.Errf("Error for terminal resume: %v", err)
 	}
+	log.Debugf("Restarting term...")
 	return t.ResetInterrupts(ctx) // resume the interrupt reader
 }
 
@@ -282,16 +296,17 @@ func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelF
 // the terminal in raw mode. Safe to call multiple times. Will save the history to the history file
 // if one was set using [SetHistoryFile] and the capacity is > 0.
 func (t *Terminal) Close() error {
-	if t.oldState == nil {
+	if t.IntrReader == nil {
 		return nil
 	}
 	// To avoid prompt being repeated on the last line (shouldn't be necessary but... is
 	// consider fixing in term instead)
 	t.term.SetPrompt("") // will still reprint the last command on ^C in middle of typing.
 	t.Cancel()           // cancel the interrupt reader
-	err := term.Restore(t.fd, t.oldState)
-	t.oldState = nil
-	t.Out = os.Stderr
+	err := t.IntrReader.NormalMode()
+	t.IntrReader.Close()
+	t.IntrReader = nil
+	// t.Out = os.Stderr // races during exit.
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.
 	if t.historyFile == "" || t.capacity <= 0 {
@@ -316,9 +331,16 @@ func (t *Terminal) Close() error {
 // Control-C or a signal is received.
 func (t *Terminal) ReadLine() (string, error) {
 	c, err := t.term.ReadLine()
+	// If Ctrl-D generated a synthetic EOF, we need to close the interrupt reader.
+	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
+		log.LogVf("ReadLine got artificial EOF, closing interrupt reader %q", c)
+		t.IntrReader.Stop()
+		t.IntrReader.TR.Close()
+	}
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
 	if errors.Is(err, term.ErrPasteIndicator) {
+		log.Debugf("ReadLine got paste indicator, swallowing that virtual error %v", err)
 		return c, nil
 	}
 	return c, err
