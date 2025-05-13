@@ -60,8 +60,10 @@ func (ir *InterruptReader) NormalMode() error {
 		log.Debugf("NormalMode already set - noop")
 		return nil
 	}
-	defer ir.mu.Unlock()
-	return term.Restore(int(ir.In.Fd()), ir.st)
+	err := term.Restore(int(ir.In.Fd()), ir.st)
+	ir.st = nil
+	ir.mu.Unlock()
+	return err
 }
 
 // Raw returns true if the terminal is currentlyin raw mode.

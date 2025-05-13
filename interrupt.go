@@ -222,10 +222,20 @@ func (ir *InterruptReader) start(ctx context.Context) {
 				ir.mu.Unlock()
 				return
 			}
+			delay := false
+			if localBuf[n-1] == '\r' {
+				// We just ended on a new line (\r in raw mode). We will want to wait before the next read.
+				delay = true
+			}
 			ir.mu.Lock()
 			ir.buf = append(ir.buf, localBuf...) // Might grow unbounded if not read.
 			ir.cond.Signal()
 			ir.mu.Unlock()
+			if delay {
+				// This is a bit of a hack to give a chance to caller of ReadLine
+				// to stop the goroutine based timeout_reader before it enters the next read.
+				_ = SleepWithContext(ctx, ir.timeout/5)
+			}
 		}
 	}
 }

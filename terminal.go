@@ -276,9 +276,6 @@ func saveHistory(f string, h []string) {
 // Temporarily suspend/resume of the terminal back to normal (for example to run a sub process).
 // use defer t.Resume() after calling Suspend() to put the terminal back in raw mode.
 func (t *Terminal) Suspend() {
-	if !t.IntrReader.Raw() {
-		return
-	}
 	t.IntrReader.Stop() // stop the interrupt reader
 	err := t.IntrReader.NormalMode()
 	if err != nil {
@@ -287,13 +284,11 @@ func (t *Terminal) Suspend() {
 }
 
 func (t *Terminal) Resume(ctx context.Context) (context.Context, context.CancelFunc) {
-	if t.IntrReader.Raw() {
-		return nil, nil
-	}
 	err := t.IntrReader.RawMode()
 	if err != nil {
 		log.Errf("Error for terminal resume: %v", err)
 	}
+	log.Debugf("Restarting term...")
 	return t.ResetInterrupts(ctx) // resume the interrupt reader
 }
 
