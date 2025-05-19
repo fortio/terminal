@@ -152,52 +152,38 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	return n, err
 }
 
-// ReadLine reads until \r or \n (for use when not in rawmode).
-// It returns the line (without the \r, \n, or \r\n).
+// ReadLine reads until \r and/or \n (for use when not in rawmode)
+// and return the line (without the \r nor \n nor \r\n).
 func (ir *InterruptReader) ReadLine() (string, error) {
 	needAtLeast := 0
-	ir.mu.Lock()
-	defer ir.mu.Unlock()
 	for {
-		// log.Debugf("ReadLine before loop for input %d", needAtLeast)
-		for len(ir.buf) <= needAtLeast && ir.err == nil {
-			// log.Debugf("ReadLine waiting for input %d", needAtLeast)
+		ir.mu.Lock()
+		for len(ir.buf) < needAtLeast && ir.err == nil {
 			ir.cond.Wait()
 		}
-		// log.Debugf("ReadLine after loop for input %d, %v", len(ir.buf), ir.err)
 		err := ir.err
-		line := ""
 		for i, c := range ir.buf {
 			switch c {
 			case '\r':
-				line = string(ir.buf[:i])
+				line := string(ir.buf[:i])
 				// is there one more character and is it \n?
 				if i < len(ir.buf)-1 && ir.buf[i+1] == '\n' {
 					i++
 				}
-				fallthrough
-			case '\n':
-				if line == "" { // not fallthrough from \r
-					line = string(ir.buf[:i])
-				}
 				ir.buf = ir.buf[i+1:]
-				if len(ir.buf) == 0 {
-					ir.buf = ir.reset
-				}
+				ir.mu.Unlock()
+				return line, nil
+			case '\n':
+				line := string(ir.buf[:i])
+				ir.buf = ir.buf[i+1:]
+				ir.mu.Unlock()
 				return line, nil
 			}
 		}
 		needAtLeast = len(ir.buf)
-		eof := false
-		if errors.Is(err, io.EOF) && needAtLeast > 0 {
-			// keep eof for next readline, first return the buffer, without the EOF
-			eof = true
-			err = nil
-		}
-		if err != nil || eof {
-			line = string(ir.buf)
-			ir.buf = ir.reset
-			return line, err
+		ir.mu.Unlock()
+		if err != nil {
+			return "", err
 		}
 	}
 }
