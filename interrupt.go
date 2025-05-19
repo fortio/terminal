@@ -152,8 +152,8 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	return n, err
 }
 
-// ReadLine reads until \r and/or \n (for use when not in rawmode)
-// and return the line (without the \r nor \n nor \r\n).
+// ReadLine reads until \r or \n (for use when not in rawmode).
+// It returns the line (without the \r, \n, or \r\n).
 func (ir *InterruptReader) ReadLine() (string, error) {
 	needAtLeast := 0
 	for {
