@@ -157,6 +157,7 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 func (ir *InterruptReader) ReadLine() (string, error) {
 	needAtLeast := 0
 	ir.mu.Lock()
+	defer ir.mu.Unlock()
 	for {
 		// log.Debugf("ReadLine before loop for input %d", needAtLeast)
 		for len(ir.buf) <= needAtLeast && ir.err == nil {
@@ -183,21 +184,19 @@ func (ir *InterruptReader) ReadLine() (string, error) {
 				if len(ir.buf) == 0 {
 					ir.buf = ir.reset
 				}
-				ir.mu.Unlock()
 				return line, nil
 			}
 		}
 		needAtLeast = len(ir.buf)
-		if errors.Is(err, io.EOF) && needAtLeast > 0 { // keep it for later, first return the buffer, without the EOF
-			line = string(ir.buf)
-			ir.buf = ir.reset
-			ir.mu.Unlock()
-			return line, nil
+		eof := false
+		if errors.Is(err, io.EOF) && needAtLeast > 0 {
+			// keep eof for next readline, first return the buffer, without the EOF
+			eof = true
+			err = nil
 		}
-		if err != nil {
+		if err != nil || eof {
 			line = string(ir.buf)
 			ir.buf = ir.reset
-			ir.mu.Unlock()
 			return line, err
 		}
 	}
