@@ -334,7 +334,7 @@ func (t *Terminal) Close() error {
 // x/term.ReadLine unfortunately doesn't support \n, so we need to handle that ourselves.
 func (t *Terminal) ReadLine() (string, error) {
 	if !t.IntrReader.Raw() {
-		_, _ = t.Out.Write([]byte(t.lastPrompt))
+		_, _ = t.Out.Write(t.lastPrompt)
 		return t.IntrReader.ReadLine()
 	}
 	c, err := t.term.ReadLine()
