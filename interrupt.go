@@ -152,6 +152,42 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	return n, err
 }
 
+// ReadLine reads until \r and/or \n (for use when not in rawmode)
+// and return the line (without the \r nor \n nor \r\n).
+func (ir *InterruptReader) ReadLine() (string, error) {
+	needAtLeast := 0
+	for {
+		ir.mu.Lock()
+		for len(ir.buf) < needAtLeast && ir.err == nil {
+			ir.cond.Wait()
+		}
+		err := ir.err
+		for i, c := range ir.buf {
+			switch c {
+			case '\r':
+				line := string(ir.buf[:i])
+				// is there one more character and is it \n?
+				if i < len(ir.buf)-1 && ir.buf[i+1] == '\n' {
+					i++
+				}
+				ir.buf = ir.buf[i+1:]
+				ir.mu.Unlock()
+				return line, nil
+			case '\n':
+				line := string(ir.buf[:i])
+				ir.buf = ir.buf[i+1:]
+				ir.mu.Unlock()
+				return line, nil
+			}
+		}
+		needAtLeast = len(ir.buf)
+		ir.mu.Unlock()
+		if err != nil {
+			return "", err
+		}
+	}
+}
+
 func (ir *InterruptReader) read(p []byte) (int, error) {
 	n := copy(p, ir.buf)
 	if n == len(ir.buf) {
@@ -223,7 +259,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 				return
 			}
 			delay := false
-			if localBuf[n-1] == '\r' {
+			if localBuf[n-1] == '\r' || localBuf[n-1] == '\n' {
 				// We just ended on a new line (\r in raw mode). We will want to wait before the next read.
 				delay = true
 			}
