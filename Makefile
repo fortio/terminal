@@ -13,7 +13,8 @@ tinygo-demo:
 
 test:
 	CGO_ENABLED=0 go test -tags $(GO_BUILD_TAGS) ./...
-	(echo -e "help\rafter 1s hi\r"; sleep 2) | go run -race -tags $(GO_BUILD_TAGS) ./example -loglevel debug # check non terminal input
+	(printf "hel"; sleep 1 ; printf "p\rafter 1s hi\r\n"; sleep 2; printf "after 1s 2nd\nprompt new \r"; sleep 2) | \
+		go run -race -tags $(GO_BUILD_TAGS) ./example -loglevel debug # check non terminal input
 
 lint: .golangci.yml
 	CGO_ENABLED=0 golangci-lint run --build-tags $(GO_BUILD_TAGS)

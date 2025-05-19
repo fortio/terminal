@@ -39,7 +39,8 @@ type Terminal struct {
 	// Terminal (last updated) width.
 	Width int
 	// Terminal (last updated) height.
-	Height int
+	Height     int
+	lastPrompt []byte
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -329,7 +330,13 @@ func (t *Terminal) Close() error {
 // and edit capabilities. Returns the line and an error if any. io.EOF is returned
 // when the user presses Control-D. ErrInterrupted is returned when the user presses
 // Control-C or a signal is received.
+// We forward to term.ReadLine when in raw mode, otherwise we read until \n or \r.
+// x/term.ReadLine unfortunately doesn't support \n, so we need to handle that ourselves.
 func (t *Terminal) ReadLine() (string, error) {
+	if !t.IntrReader.Raw() {
+		_, _ = t.Out.Write(t.lastPrompt)
+		return t.IntrReader.ReadLine()
+	}
 	c, err := t.term.ReadLine()
 	// If Ctrl-D generated a synthetic EOF, we need to close the interrupt reader.
 	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
@@ -348,6 +355,7 @@ func (t *Terminal) ReadLine() (string, error) {
 
 // Sets or change the prompt.
 func (t *Terminal) SetPrompt(s string) {
+	t.lastPrompt = []byte(s)
 	t.term.SetPrompt(s)
 }
 
