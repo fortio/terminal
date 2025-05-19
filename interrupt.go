@@ -162,29 +162,42 @@ func (ir *InterruptReader) ReadLine() (string, error) {
 			ir.cond.Wait()
 		}
 		err := ir.err
+		line := ""
 		for i, c := range ir.buf {
 			switch c {
 			case '\r':
-				line := string(ir.buf[:i])
+				line = string(ir.buf[:i])
 				// is there one more character and is it \n?
 				if i < len(ir.buf)-1 && ir.buf[i+1] == '\n' {
 					i++
 				}
-				ir.buf = ir.buf[i+1:]
-				ir.mu.Unlock()
-				return line, nil
+				fallthrough
 			case '\n':
-				line := string(ir.buf[:i])
+				if line == "" { // not fallthrough from \r
+					line = string(ir.buf[:i])
+				}
 				ir.buf = ir.buf[i+1:]
+				if len(ir.buf) == 0 {
+					ir.buf = ir.reset
+				}
 				ir.mu.Unlock()
 				return line, nil
 			}
 		}
 		needAtLeast = len(ir.buf)
-		ir.mu.Unlock()
-		if err != nil {
-			return "", err
+		if errors.Is(err, io.EOF) && needAtLeast > 0 { // keep it for later, first return the buffer, without the EOF
+			line = string(ir.buf)
+			ir.buf = ir.reset
+			ir.mu.Unlock()
+			return line, nil
 		}
+		if err != nil {
+			line = string(ir.buf)
+			ir.buf = ir.reset
+			ir.mu.Unlock()
+			return line, err
+		}
+		ir.mu.Unlock()
 	}
 }
 
