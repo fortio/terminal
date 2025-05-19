@@ -156,11 +156,14 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 // It returns the line (without the \r, \n, or \r\n).
 func (ir *InterruptReader) ReadLine() (string, error) {
 	needAtLeast := 0
+	ir.mu.Lock()
 	for {
-		ir.mu.Lock()
-		for len(ir.buf) < needAtLeast && ir.err == nil {
+		// log.Debugf("ReadLine before loop for input %d", needAtLeast)
+		for len(ir.buf) <= needAtLeast && ir.err == nil {
+			// log.Debugf("ReadLine waiting for input %d", needAtLeast)
 			ir.cond.Wait()
 		}
+		// log.Debugf("ReadLine after loop for input %d, %v", len(ir.buf), ir.err)
 		err := ir.err
 		line := ""
 		for i, c := range ir.buf {
@@ -197,7 +200,6 @@ func (ir *InterruptReader) ReadLine() (string, error) {
 			ir.mu.Unlock()
 			return line, err
 		}
-		ir.mu.Unlock()
 	}
 }
 
