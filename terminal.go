@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"fortio.org/log"
@@ -41,6 +42,8 @@ type Terminal struct {
 	// Terminal (last updated) height.
 	Height     int
 	lastPrompt []byte
+	// Even if stdin is not a terminal, force the terminal mode to be used despite lack of ioctl detected.
+	ForceTerminal bool
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -53,14 +56,20 @@ type Terminal struct {
 // You can also call [Setup] to customize the terminal with a custom InterruptReader
 // and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
-	t := &Terminal{
-		IntrReader: GetSharedInput(250 * time.Millisecond),
-		history:    NewHistory(DefaultHistoryCapacity),
-	}
+	t := New()
 	err := t.Setup(ctx)
 	return t, err
 }
 
+// New creates a new terminal with default settings. You can change them and call [Setup] to customize it.
+func New() *Terminal {
+	return &Terminal{
+		IntrReader: GetSharedInput(250 * time.Millisecond),
+		history:    NewHistory(DefaultHistoryCapacity),
+	}
+}
+
+// Setup an already created terminal.
 func (t *Terminal) Setup(ctx context.Context) error {
 	t.Context = ctx
 	t.fd = safecast.MustConvert[int](os.Stdin.Fd())
@@ -73,9 +82,14 @@ func (t *Terminal) Setup(ctx context.Context) error {
 	t.term.History = t.history
 	t.Out = t.term
 	if !t.IsTerminal() {
-		t.Out = os.Stderr // no need to add \r for non raw mode.
-		t.ResetInterrupts(ctx)
-		return nil
+		if t.ForceTerminal {
+			log.Infof("Not a terminal, but ForceTerminal is set, continuing anyway")
+			t.IntrReader.IgnoreRaw = true
+		} else {
+			t.Out = os.Stderr // no need to add \r for non raw mode.
+			t.ResetInterrupts(ctx)
+			return nil
+		}
 	}
 	var err error
 	err = t.IntrReader.RawMode()
@@ -90,12 +104,38 @@ func (t *Terminal) Setup(ctx context.Context) error {
 	return err
 }
 
+func (t *Terminal) updateSizeFromEnv() (err error) {
+	w, h := 80, 24 // defaults.
+	lstr := os.Getenv("LINES")
+	if lstr != "" {
+		h, err = strconv.Atoi(strings.TrimSpace(lstr))
+		if err != nil {
+			log.Errf("Error parsing LINES: %v", err)
+			return err
+		}
+	}
+	lstr = os.Getenv("COLUMNS")
+	if lstr != "" {
+		w, err = strconv.Atoi(strings.TrimSpace(lstr))
+		if err != nil {
+			log.Errf("Error parsing COLUMNS: %v", err)
+			return err
+		}
+	}
+	log.Infof("Terminal size from env: %d x %d", w, h)
+	t.Width, t.Height = w, h
+	return nil
+}
+
 // UpdateSize refreshes the terminal size to current size (so wrapping works).
 // This is called automatically when the terminal is opened, but can be called
 // again if the terminal size changes (e.g. when resizing the window).
 func (t *Terminal) UpdateSize() error {
 	w, h, err := term.GetSize(t.fdOut)
 	if err != nil {
+		if t.ForceTerminal {
+			return t.updateSizeFromEnv()
+		}
 		log.Errf("Error getting terminal size: %v", err)
 		return err
 	}
@@ -142,7 +182,7 @@ func (t *Terminal) SetHistoryFile(f string) error {
 		log.Infof("No history capacity set, ignoring history file %s", f)
 		return nil
 	}
-	if !t.IsTerminal() {
+	if !t.ForceTerminal && !t.IsTerminal() {
 		log.Infof("Not a terminal, not setting history file")
 		return nil
 	}

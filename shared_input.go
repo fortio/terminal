@@ -36,6 +36,10 @@ func GetSharedInput(maxRead time.Duration) *InterruptReader {
 // avoid leaving the terminal in raw mode upon exit/panic.
 func (ir *InterruptReader) RawMode() error {
 	ir.mu.Lock()
+	if ir.IgnoreRaw {
+		ir.mu.Unlock()
+		return nil
+	}
 	if ir.st != nil {
 		ir.mu.Unlock() // unlock before logging/IOs.
 		log.Debugf("RawMode already set - noop")
@@ -55,6 +59,10 @@ func (ir *InterruptReader) RawMode() error {
 // It's a no-op if the terminal is already in normal mode.
 func (ir *InterruptReader) NormalMode() error {
 	ir.mu.Lock()
+	if ir.IgnoreRaw {
+		ir.mu.Unlock()
+		return nil
+	}
 	if ir.st == nil {
 		ir.mu.Unlock()
 		log.Debugf("NormalMode already set - noop")
