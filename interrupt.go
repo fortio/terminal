@@ -30,6 +30,9 @@ type InterruptReader struct {
 	TR *TimeoutReader
 	// Terminal state (raw mode vs normal)
 	st *term.State
+	// IgnoreRaw is set to true if the terminal doesn't support MakeRaw / ioctl,
+	// but the caller wants to force it to be used anyway.
+	IgnoreRaw bool
 }
 
 var (
