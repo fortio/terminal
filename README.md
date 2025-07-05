@@ -1,3 +1,4 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fortio/terminal)
 # terminal
 
 Fortio's terminal has 2 distinct components and a number of utilities built on the second one.
