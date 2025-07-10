@@ -46,6 +46,9 @@ type AnsiPixels struct {
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
 	restored   bool
+	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
+	// used for fortio.org/tev raw event dump.
+	NoDecode bool
 }
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
@@ -163,7 +166,9 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // will automatically call OnResize if set and if a resize signal is received and continue trying
 // to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
-	ap.EndSyncMode()
+	if !ap.NoDecode {
+		ap.EndSyncMode()
+	}
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -187,7 +192,9 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	default:
 		n, err := ap.SharedInput.TR.Read(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
-		ap.MouseDecode()
+		if !ap.NoDecode {
+			ap.MouseDecode()
+		}
 		return n, err
 	}
 	return 0, nil
