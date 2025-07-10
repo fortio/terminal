@@ -53,12 +53,10 @@ type AnsiPixels struct {
 
 func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap := &AnsiPixels{
-		fdOut:       safecast.MustConvert[int](os.Stdout.Fd()),
-		Out:         bufio.NewWriter(os.Stdout),
-		FPS:         fps,
-		SharedInput: terminal.GetSharedInput(time.Duration(1e9 / fps)),
-		C:           make(chan os.Signal, 1),
-		firstClear:  true,
+		fdOut: safecast.MustConvert[int](os.Stdout.Fd()),
+		Out:   bufio.NewWriter(os.Stdout),
+		FPS:   fps,
+		C:     make(chan os.Signal, 1),
 	}
 	signal.Notify(ap.C, signalList...)
 	return ap
@@ -68,7 +66,13 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 	ap.SharedInput.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
+// If SharedInput is not already set, it will be initialized with the FPS given during NewAnsiPixels.
+// the split between New and Open allows to change the input to a more direct/blocking os.Stdin.
 func (ap *AnsiPixels) Open() error {
+	if ap.SharedInput == nil {
+		ap.SharedInput = terminal.GetSharedInput(time.Duration(1e9 / ap.FPS))
+	}
+	ap.firstClear = true
 	ap.restored = false
 	err := ap.SharedInput.RawMode()
 	if err == nil {
