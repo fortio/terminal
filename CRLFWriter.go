@@ -19,7 +19,7 @@ func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
 			todo = i
 		}
 		var nn int
-		nn, err = w.Write(buf[:todo])
+		nn, err = w.Out.Write(buf[:todo])
 		n += nn
 		if err != nil {
 			return n, err

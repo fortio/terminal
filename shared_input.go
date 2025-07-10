@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"fortio.org/log"
@@ -14,19 +15,24 @@ var DefaultReaderTimeout = 250 * time.Millisecond
 // InterruptReader is global input that can be shared by multiple callers wanting to interact with the terminal in raw mode.
 // For instance both Terminal.ReadLine and AnsiPixels.ReadOrResizeOrSignal can share it.
 // InterruptReader is an InterruptReader (for terminal.ReadLine, only the TimeoutReader part is used by ansipixels).
-var sharedInput = NewInterruptReader(os.Stdin, 256, DefaultReaderTimeout)
+// We now delay creating it so a simple blocking mode can be achieved using 0 as the timeout.
+var sharedInput *InterruptReader
+
+var mu sync.Mutex // protects sharedInput, so that multiple calls to GetSharedInput() don't create multiple readers.
 
 // GetSharedInput returns a shared input that can be used by multiple callers wanting to interact with the terminal in raw mode.
 // For instance both Terminal.ReadLine and AnsiPixels.ReadOrResizeOrSignal can share it.
 // It also changes the timeout for the timeout reader to the maxRead duration if different than before.
+// If 0 timeout is used, it can't be changed later and the reader will block on reads (raw/simple os.Stdin mode).
 func GetSharedInput(maxRead time.Duration) *InterruptReader {
-	sharedInput.mu.Lock()
-	if sharedInput.TR == nil {
-		sharedInput.TR = NewTimeoutReader(sharedInput.In, maxRead) // same buffer as the internal x/term buffer size.
+	mu.Lock()
+	if sharedInput == nil {
+		log.LogVf("Creating first shared input reader with timeout: %v", maxRead)
+		sharedInput = NewInterruptReader(os.Stdin, 256, maxRead)
 	} else {
-		sharedInput.TR.ChangeTimeout(maxRead)
+		sharedInput.ChangeTimeout(maxRead)
 	}
-	sharedInput.mu.Unlock()
+	mu.Unlock()
 	return sharedInput
 }
 
@@ -66,7 +72,7 @@ func (ir *InterruptReader) NormalMode() error {
 	return err
 }
 
-// Raw returns true if the terminal is currentlyin raw mode.
+// Raw returns true if the terminal is currently in raw mode.
 func (ir *InterruptReader) Raw() bool {
 	ir.mu.Lock()
 	defer ir.mu.Unlock()

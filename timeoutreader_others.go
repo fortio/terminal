@@ -42,6 +42,7 @@ type TimeoutReader struct {
 	mu         sync.Mutex      // Protects inRead and lastErr
 	lastErr    error           // Stores persistent errors like EOF - TODO: probably not needed
 	closed     bool            // To signal if Close() has been called
+	blocking   bool            // true if the reader is blocking (timeout == 0), false if it has a timeout set
 }
 
 // NewTimeoutReader creates a new TimeoutReader with a persistent background reader.
@@ -49,19 +50,23 @@ type TimeoutReader struct {
 // A duration of 0 or less is invalid and will panic.
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 	log.LogVf("Creating non select based TimeoutReader with timeout: %v", timeout)
-	if timeout <= 0 {
-		panic("Timeout must be greater than 0")
+	if timeout < 0 {
+		panic("Timeout must be greater or equal to 0")
 	}
+	blocking := (timeout == 0)
 	tr := &TimeoutReader{
-		file:       stream,
-		timeout:    timeout,
-		inputChan:  make(chan []byte, 1),
-		resultChan: make(chan readResult),
-		stopChan:   make(chan struct{}),
+		file:     stream,
+		timeout:  timeout,
+		blocking: blocking,
 	}
 
-	tr.wg.Add(1)
-	go tr.readerLoop()
+	if !blocking {
+		tr.inputChan = make(chan []byte, 1)
+		tr.resultChan = make(chan readResult)
+		tr.stopChan = make(chan struct{})
+		tr.wg.Add(1)
+		go tr.readerLoop()
+	}
 
 	return tr
 }
@@ -105,6 +110,9 @@ func (tr *TimeoutReader) readerLoop() {
 // and thus could have more data than the new buffer, it will be lost/truncated in that case
 // and the error ErrDataTruncated will be returned.
 func (tr *TimeoutReader) Read(buf []byte) (int, error) {
+	if tr.blocking {
+		return tr.file.Read(buf)
+	}
 	sameBuf := false
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
@@ -149,8 +157,11 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 // it will block until the current read completes.
 func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 	log.LogVf("Changing non select based TimeoutReader to timeout: %v", newTimeout)
+	if tr.blocking && newTimeout != 0 {
+		panic("Cannot change from blocking to non-blocking mode")
+	}
 	if newTimeout <= 0 {
-		panic("Timeout must be greater than 0")
+		panic("Timeout must be greater than zero unless started and staying in blocking mode")
 	}
 	tr.mu.Lock()
 	tr.timeout = newTimeout
@@ -160,6 +171,11 @@ func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 // Close signals the background reader goroutine to stop and waits for it to exit.
 // It purposely doesn't close the underlying file.
 func (tr *TimeoutReader) Close() error {
+	if tr.blocking && tr.file != nil {
+		err := tr.file.Close()
+		tr.file = nil // Clear the stream reference
+		return err
+	}
 	log.LogVf("Closing non select based TimeoutReader")
 	tr.mu.Lock()
 	tr.closed = true
@@ -179,6 +195,9 @@ func (tr *TimeoutReader) Close() error {
 
 // IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
 func (tr *TimeoutReader) IsClosed() bool {
+	if tr.blocking {
+		return tr.file == nil
+	}
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 	return tr.closed
