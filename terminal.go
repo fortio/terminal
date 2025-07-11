@@ -82,12 +82,23 @@ func (t *Terminal) Setup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = DefaultHistoryCapacity
 	LoggerSetup(t.Out)
 	err = t.UpdateSize() // error already logged - tbd to return or not / not fatal
 	t.ResetInterrupts(ctx)
 	return err
+}
+
+// SetBracketedPasteMode enables or disables bracketed paste mode.
+// Non bracketed means each new line in what is paste will be returning a new command.
+// Bracketed paste mode means that the pasted text is treated as a single command but
+// with several terminal emulators, as raw LineFeed (LF) so 3 lines show as 1 command.
+//
+//	line1
+//	      line2
+//	            line3
+func (t *Terminal) SetBracketedPasteMode(enabled bool) {
+	t.term.SetBracketedPasteMode(enabled)
 }
 
 // UpdateSize refreshes the terminal size to current size (so wrapping works).

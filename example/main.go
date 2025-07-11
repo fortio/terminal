@@ -82,6 +82,7 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 	flagHistory := flag.String("history", ".history", "History `file` to use")
 	flagMaxHistory := flag.Int("max-history", 10, "Max number of history lines to keep")
 	flagOnlyValid := flag.Bool("only-valid", false, "Demonstrates filtering of history, only adding valid commands to it")
+	flagBracketedPaste := flag.Bool("bracketed-paste", false, "Enable bracketed paste mode")
 	cli.Main()
 	t, err := terminal.Open(context.Background())
 	if err != nil {
@@ -91,6 +92,10 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 		t.Close()
 		log.Infof("Terminal closed/restored")
 	}()
+	if *flagBracketedPaste {
+		t.SetBracketedPasteMode(true)
+		log.Infof("Bracketed paste mode enabled")
+	}
 	onlyValid := *flagOnlyValid
 	if onlyValid {
 		t.SetAutoHistory(false)
