@@ -499,6 +499,14 @@ func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
 	ap.DrawRoundBox(x-1, y-1, w+2, 3)
 }
 
+func (ap *AnsiPixels) SetBracketedPasteMode(on bool) {
+	if on {
+		ap.WriteString("\x1b[?2004h")
+	} else {
+		ap.WriteString("\x1b[?2004l")
+	}
+}
+
 func FormatDate(d *time.Time) string {
 	return fmt.Sprintf("%d-%02d-%02d-%02d%02d%02d", d.Year(), d.Month(), d.Day(),
 		d.Hour(), d.Minute(), d.Second())
