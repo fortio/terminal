@@ -51,7 +51,7 @@ type AnsiPixels struct {
 	NoDecode bool
 }
 
-// A 0 fps means bypassing the interrupt reader and using the underlying os.StdIn directly.
+// A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
 // Otherwise a non blocking reader is setup with 1/fps timeout. Reader is / can be shared
 // with Terminal.
 func NewAnsiPixels(fps float64) *AnsiPixels {
