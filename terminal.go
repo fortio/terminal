@@ -84,7 +84,7 @@ func (t *Terminal) Setup(ctx context.Context) error {
 	}
 	t.term.SetBracketedPasteMode(true) // Seems useful to have it on by default.
 	t.capacity = DefaultHistoryCapacity
-	t.loggerSetup()
+	LoggerSetup(t.Out)
 	err = t.UpdateSize() // error already logged - tbd to return or not / not fatal
 	t.ResetInterrupts(ctx)
 	return err
@@ -121,12 +121,12 @@ func (t *Terminal) IsTerminal() bool {
 }
 
 // Setups fortio logger (and thus stdlib "log" too)
-// to write to the terminal as needed to preserve prompt.
-func (t *Terminal) loggerSetup() {
+// to write to the terminal as needed to preserve prompt/work in raw mode (ie add \r before \n).
+func LoggerSetup(out io.Writer) {
 	// Keep same color logic as fortio logger, so flags like -logger-no-color work.
 	colormode := log.ColorMode()
 	// t.Out will add the needed \r for each \n when term is in raw mode
-	log.SetOutput(t.Out)
+	log.SetOutput(out)
 	log.Config.ForceColor = colormode
 	log.SetColorMode()
 }

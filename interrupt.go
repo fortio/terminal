@@ -66,6 +66,7 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // it needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
 // Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
+// Using 0 as the timeout disables most layers and uses the underlying reader directly (blocking IOs).
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
 		In:      reader,
@@ -75,20 +76,28 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 		TR:      NewTimeoutReader(reader, timeout),
 	}
 	ir.reset = ir.buf
-	ir.cond = *sync.NewCond(&ir.mu)
-	log.Config.GoroutineID = true
+	if timeout != 0 {
+		ir.cond = *sync.NewCond(&ir.mu)
+		log.Config.GoroutineID = true
+	}
 	return ir
 }
 
 func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	ir.mu.Lock()
+	defer ir.mu.Unlock()
+	if timeout == ir.timeout {
+		return // no change
+	}
+	if ir.timeout == 0 {
+		panic("Cannot change timeout from blocking to non-blocking mode")
+	}
 	ir.timeout = timeout
 	if ir.TR.IsClosed() {
 		ir.TR = NewTimeoutReader(ir.In, timeout)
 	} else {
 		ir.TR.ChangeTimeout(timeout)
 	}
-	ir.mu.Unlock()
 }
 
 func (ir *InterruptReader) Stop() {
@@ -102,6 +111,10 @@ func (ir *InterruptReader) Stop() {
 	ir.stopped = true
 	ir.cancel = nil
 	ir.mu.Unlock()
+	if ir.timeout == 0 {
+		// If we are in blocking mode, we don't need to wait for the read to finish.
+		return
+	}
 	_, _ = ir.Read([]byte{}) // wait for cancel.
 	log.Debugf("InterruptReader done stopping")
 	ir.mu.Lock()
@@ -127,14 +140,20 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	}
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
-	go func() {
-		ir.start(nctx)
-	}()
+	if ir.timeout != 0 {
+		go func() {
+			ir.start(nctx)
+		}()
+	}
 	return nctx, cancel
 }
 
 // Implement io.Reader interface.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
+	if ir.timeout == 0 {
+		// blocking mode, direct read.
+		return ir.TR.Read(p)
+	}
 	ir.mu.Lock()
 	for len(ir.buf) == 0 && ir.err == nil {
 		ir.cond.Wait()
@@ -146,6 +165,9 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 
 // ReadNonBlocking will read what is available already or return 0, nil if nothing is available.
 func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
+	if ir.timeout == 0 {
+		panic("ReadNonBlocking called in blocking mode")
+	}
 	ir.mu.Lock()
 	n, err := ir.read(p)
 	ir.mu.Unlock()
@@ -155,6 +177,9 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 // ReadLine reads until \r or \n (for use when not in rawmode).
 // It returns the line (without the \r, \n, or \r\n).
 func (ir *InterruptReader) ReadLine() (string, error) {
+	if ir.timeout == 0 {
+		panic("ReadLine called in blocking mode")
+	}
 	needAtLeast := 0
 	ir.mu.Lock()
 	defer ir.mu.Unlock()

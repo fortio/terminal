@@ -1,8 +1,6 @@
 module fortio.org/terminal
 
-go 1.23.8
-
-retract v0.28.0 // accidental tag, not sure where from
+go 1.23.0
 
 require (
 	fortio.org/cli v1.10.0

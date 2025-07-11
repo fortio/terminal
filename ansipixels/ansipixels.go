@@ -46,16 +46,25 @@ type AnsiPixels struct {
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
 	restored   bool
+	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
+	// used for fortio.org/tev raw event dump.
+	NoDecode bool
 }
 
+// A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
+// Otherwise a non blocking reader is setup with 1/fps timeout. Reader is / can be shared
+// with Terminal.
 func NewAnsiPixels(fps float64) *AnsiPixels {
+	var d time.Duration
+	if fps > 0 {
+		d = time.Duration(1e9 / fps)
+	}
 	ap := &AnsiPixels{
 		fdOut:       safecast.MustConvert[int](os.Stdout.Fd()),
 		Out:         bufio.NewWriter(os.Stdout),
 		FPS:         fps,
-		SharedInput: terminal.GetSharedInput(time.Duration(1e9 / fps)),
+		SharedInput: terminal.GetSharedInput(d),
 		C:           make(chan os.Signal, 1),
-		firstClear:  true,
 	}
 	signal.Notify(ap.C, signalList...)
 	return ap
@@ -66,6 +75,7 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 }
 
 func (ap *AnsiPixels) Open() error {
+	ap.firstClear = true
 	ap.restored = false
 	err := ap.SharedInput.RawMode()
 	if err == nil {
@@ -163,7 +173,9 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // will automatically call OnResize if set and if a resize signal is received and continue trying
 // to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
-	ap.EndSyncMode()
+	if !ap.NoDecode {
+		ap.EndSyncMode()
+	}
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -187,7 +199,9 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	default:
 		n, err := ap.SharedInput.TR.Read(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
-		ap.MouseDecode()
+		if !ap.NoDecode {
+			ap.MouseDecode()
+		}
 		return n, err
 	}
 	return 0, nil
@@ -483,6 +497,14 @@ func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
 	ap.MoveHorizontally(x)
 	ap.WriteString(s)
 	ap.DrawRoundBox(x-1, y-1, w+2, 3)
+}
+
+func (ap *AnsiPixels) SetBracketedPasteMode(on bool) {
+	if on {
+		ap.WriteString("\x1b[?2004h")
+	} else {
+		ap.WriteString("\x1b[?2004l")
+	}
 }
 
 func FormatDate(d *time.Time) string {

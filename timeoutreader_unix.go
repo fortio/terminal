@@ -45,36 +45,52 @@ func ReadWithTimeout(fd int, tv *unix.Timeval, buf []byte) (int, error) {
 }
 
 type TimeoutReader struct {
-	fd int
-	tv *unix.Timeval
+	fd       int
+	tv       *unix.Timeval
+	blocking bool     // true if the reader is blocking (timeout == 0), false if it has a timeout set
+	ostream  *os.File // not used on unix, but kept for interface compatibility
 }
 
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
-	if timeout <= 0 {
-		panic("Timeout must be greater than 0")
+	if timeout < 0 {
+		panic("Timeout must be greater or equal to 0")
 	}
 	return &TimeoutReader{
-		fd: safecast.MustConvert[int](stream.Fd()),
-		tv: TimeoutToTimeval(timeout),
+		fd:       safecast.MustConvert[int](stream.Fd()),
+		tv:       TimeoutToTimeval(timeout),
+		blocking: timeout == 0,
+		ostream:  stream,
 	}
 }
 
 func (tr *TimeoutReader) Read(buf []byte) (int, error) {
+	if tr.blocking {
+		return tr.ostream.Read(buf)
+	}
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
 }
 
 // ChangeTimeout on unix should be called from same goroutine as any Read* or not concurrently.
 func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
+	if tr.blocking && timeout > 0 {
+		panic("Cannot change from blocking to non-blocking mode")
+	}
 	tr.tv = TimeoutToTimeval(timeout)
 }
 
-// We don't really close the underlying but this is a chance to cleanup for the other implementation.
-func (tr *TimeoutReader) Close() error {
-	return nil
+// Unless we are in blocking mode, we don't really close the underlying
+// but this is a chance to cleanup for the other implementation.
+func (tr *TimeoutReader) Close() (err error) {
+	if tr.blocking && tr.ostream != nil {
+		err = tr.ostream.Close()
+		tr.ostream = nil // Clear the stream reference
+	}
+	return err
 }
 
 // IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
 // Always false on unix/select mode because we can keep using it forever, unlike the goroutine based one.
+// Unless we are in blocking mode and Close() was called.
 func (tr *TimeoutReader) IsClosed() bool {
-	return false
+	return tr.ostream == nil
 }
