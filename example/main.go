@@ -117,7 +117,7 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 		// Replace unless the previous command was valid.
 		AddOrReplaceHistory(t, !previousCommandWasValid, cmd)
 		cmd, err = t.ReadLine()
-		log.LogVf("Read line got: %q %v", cmd, err)
+		log.LogVf("Read line got: %q %v - paste %t", cmd, err, t.LastWasPaste())
 		switch {
 		case err == nil:
 			// no error is good, nothing in this switch.

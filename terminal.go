@@ -41,6 +41,8 @@ type Terminal struct {
 	// Terminal (last updated) height.
 	Height     int
 	lastPrompt []byte
+	// lastWasPaste is true if the last ReadLine was a paste.
+	lastWasPaste bool
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -338,6 +340,7 @@ func (t *Terminal) ReadLine() (string, error) {
 		return t.IntrReader.ReadLine()
 	}
 	c, err := t.term.ReadLine()
+	t.lastWasPaste = false // reset paste indicator
 	// If Ctrl-D generated a synthetic EOF, we need to close the interrupt reader.
 	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
 		log.LogVf("ReadLine got artificial EOF, closing interrupt reader %q", c)
@@ -347,10 +350,16 @@ func (t *Terminal) ReadLine() (string, error) {
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
 	if errors.Is(err, term.ErrPasteIndicator) {
+		t.lastWasPaste = true // If someone wants to know if this was a paste or not.
 		log.Debugf("ReadLine got paste indicator, swallowing that virtual error %v", err)
 		return c, nil
 	}
 	return c, err
+}
+
+// LastWasPaste returns true if the last ReadLine was a multiline paste.
+func (t *Terminal) LastWasPaste() bool {
+	return t.lastWasPaste
 }
 
 // Sets or change the prompt.
