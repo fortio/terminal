@@ -12,6 +12,8 @@ require (
 	golang.org/x/term v0.33.0
 )
 
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250711235745-76633e06ae1a
+
 require (
 	fortio.org/struct2env v0.4.2 // indirect
 	fortio.org/version v1.0.4 // indirect
