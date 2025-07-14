@@ -12,7 +12,7 @@ require (
 	golang.org/x/term v0.33.0
 )
 
-replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250712005731-bc5cb00b388e
+replace golang.org/x/term => github.com/ldemailly/term v0.0.0-20250714002748-3d202e8148fa
 
 require (
 	fortio.org/struct2env v0.4.2 // indirect
