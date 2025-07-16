@@ -14,7 +14,7 @@ import (
 
 	"fortio.org/log"
 	"fortio.org/safecast"
-	"golang.org/x/term"
+	"fortio.org/term"
 )
 
 type Terminal struct {

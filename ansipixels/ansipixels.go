@@ -17,9 +17,9 @@ import (
 
 	"fortio.org/log"
 	"fortio.org/safecast"
+	"fortio.org/term"
 	"fortio.org/terminal"
 	"github.com/rivo/uniseg"
-	"golang.org/x/term"
 )
 
 const bufSize = 1024
