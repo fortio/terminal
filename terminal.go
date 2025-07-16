@@ -14,7 +14,7 @@ import (
 
 	"fortio.org/log"
 	"fortio.org/safecast"
-	"golang.org/x/term"
+	"fortio.org/term"
 )
 
 type Terminal struct {
@@ -41,6 +41,8 @@ type Terminal struct {
 	// Terminal (last updated) height.
 	Height     int
 	lastPrompt []byte
+	// lastWasPaste is true if the last ReadLine was a paste.
+	lastWasPaste bool
 }
 
 // Open opens stdin as a terminal, do `defer terminal.Close()`
@@ -333,6 +335,7 @@ func (t *Terminal) Close() error {
 // We forward to term.ReadLine when in raw mode, otherwise we read until \n or \r.
 // x/term.ReadLine unfortunately doesn't support \n, so we need to handle that ourselves.
 func (t *Terminal) ReadLine() (string, error) {
+	t.lastWasPaste = false // reset paste indicator
 	if !t.IntrReader.Raw() {
 		_, _ = t.Out.Write(t.lastPrompt)
 		return t.IntrReader.ReadLine()
@@ -347,10 +350,16 @@ func (t *Terminal) ReadLine() (string, error) {
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.
 	if errors.Is(err, term.ErrPasteIndicator) {
+		t.lastWasPaste = true // If someone wants to know if this was a paste or not.
 		log.Debugf("ReadLine got paste indicator, swallowing that virtual error %v", err)
 		return c, nil
 	}
 	return c, err
+}
+
+// LastWasPaste returns true if the last ReadLine was a multiline paste.
+func (t *Terminal) LastWasPaste() bool {
+	return t.lastWasPaste
 }
 
 // Sets or change the prompt.

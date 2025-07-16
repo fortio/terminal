@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"fortio.org/log"
-	"golang.org/x/term"
+	"fortio.org/term"
 )
 
 type InterruptReader struct {
