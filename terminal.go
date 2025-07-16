@@ -335,12 +335,12 @@ func (t *Terminal) Close() error {
 // We forward to term.ReadLine when in raw mode, otherwise we read until \n or \r.
 // x/term.ReadLine unfortunately doesn't support \n, so we need to handle that ourselves.
 func (t *Terminal) ReadLine() (string, error) {
+	t.lastWasPaste = false // reset paste indicator
 	if !t.IntrReader.Raw() {
 		_, _ = t.Out.Write(t.lastPrompt)
 		return t.IntrReader.ReadLine()
 	}
 	c, err := t.term.ReadLine()
-	t.lastWasPaste = false // reset paste indicator
 	// If Ctrl-D generated a synthetic EOF, we need to close the interrupt reader.
 	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
 		log.LogVf("ReadLine got artificial EOF, closing interrupt reader %q", c)
