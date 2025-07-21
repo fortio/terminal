@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"fortio.org/log"
-	"fortio.org/term"
+	"golang.org/x/term"
 )
 
 // DefaultReaderTimeout is the default timeout for the timeout reader.
