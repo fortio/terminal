@@ -334,8 +334,8 @@ var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 // ReadCursorPosXY returns the current X,Y coordinates of the cursor or insertion point
 // using the same coordinate system as MoveCursor, WriteAt, etc. ie 0,0 is the top left corner.
 // it also synchronizes the display and ends the syncmode.
-// It replaces the original/lower level [ReadCursorPos] which returns 1,1 based coordinates
-// and x/y swapped (row, col terminal native coordinates).
+// It wraps the original/lower level [ReadCursorPos], which returns 1,1-based coordinates
+// and x/y swapped (row, col terminal native coordinates), and converts them to 0,0-based coordinates.
 func (ap *AnsiPixels) ReadCursorPosXY() (int, int, error) {
 	row, col, err := ap.ReadCursorPos()
 	if err != nil {
