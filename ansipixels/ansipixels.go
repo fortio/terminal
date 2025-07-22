@@ -334,11 +334,11 @@ var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 // This is the same as ReadCursorPos but returns the x,y coordinates
 // with 0,0 origin system.
 func (ap *AnsiPixels) ReadCursorPosXY() (int, int, error) {
-	y, x, err := ap.ReadCursorPos()
+	row, col, err := ap.ReadCursorPos()
 	if err != nil {
 		return -1, -1, err
 	}
-	return x - 1, y - 1, nil // convert to 0,0 based coordinates
+	return col - 1, row - 1, nil // convert to 0,0 based coordinates
 }
 
 // ReadCursorPos requests and read native coordinates of the cursor and
