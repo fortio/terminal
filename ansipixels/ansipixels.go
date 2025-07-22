@@ -248,6 +248,7 @@ func (ap *AnsiPixels) ClearScreen() {
 	}
 }
 
+// Moves the cursor to the given x,y position (0,0 is top left).
 func (ap *AnsiPixels) MoveCursor(x, y int) {
 	ap.x, ap.y = x, y
 	_, err := ap.Out.WriteString("\033[" + strconv.Itoa(y+1) + ";" + strconv.Itoa(x+1) + "H")
@@ -330,37 +331,54 @@ func (ap *AnsiPixels) ClearEndOfLine() {
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 
-// This also synchronizes the display and ends the syncmode.
+// This is the same as ReadCursorPos but returns the x,y coordinates
+// with 0,0 origin system.
+func (ap *AnsiPixels) ReadCursorPosXY() (int, int, error) {
+	y, x, err := ap.ReadCursorPos()
+	if err != nil {
+		return -1, -1, err
+	}
+	return x - 1, y - 1, nil // convert to 0,0 based coordinates
+}
+
+// ReadCursorPos requests and read native coordinates of the cursor and
+// also synchronizes the display and ends the syncmode.
+//
+// It returns row,col (y,x; line and column) and/or an error.
+// It's using the native terminal coordinates which start at 1,1 unlike
+// the AnsiPixels coordinates which start at 0,0.
+// Use ReadCursorPosXY to get 0,0 based coordinates usable with MoveCursor,
+// WriteAt, etc.
 func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 	x := -1
 	y := -1
 	reqPosStr := "\033[?2026l\033[6n" // also ends sync mode
 	n, err := ap.Out.WriteString(reqPosStr)
 	if err != nil {
-		return x, y, err
+		return y, x, err
 	}
 	if n != len(reqPosStr) {
-		return x, y, errors.New("short write")
+		return y, x, errors.New("short write")
 	}
 	err = ap.Out.Flush()
 	if err != nil {
-		return x, y, err
+		return y, x, err
 	}
 	i := 0
 	ap.Data = nil
 	for {
 		if i == bufSize {
-			return x, y, errors.New("buffer full, no cursor position found")
+			return y, x, errors.New("buffer full, no cursor position found")
 		}
 		n, err = ap.SharedInput.In.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return x, y, err
+			return y, x, err
 		}
 		if n == 0 {
-			return x, y, errors.New("no data read from cursor position")
+			return y, x, errors.New("no data read from cursor position")
 		}
 		res := cursPosRegexp.FindSubmatch(ap.buf[0 : i+n])
 		if log.LogVerbose() {
@@ -374,18 +392,18 @@ func (ap *AnsiPixels) ReadCursorPos() (int, int, error) {
 		}
 		x, err = strconv.Atoi(string(res[2]))
 		if err != nil {
-			return x, y, err
+			return y, x, err
 		}
 		y, err = strconv.Atoi(string(res[3]))
 		if err != nil {
-			return x, y, err
+			return y, x, err
 		}
 		ap.Data = append(ap.Data, res[1]...)
 		ap.Data = append(ap.Data, res[4]...)
 		break
 	}
 	ap.MouseDecode()
-	return x, y, err
+	return y, x, err
 }
 
 func (ap *AnsiPixels) HideCursor() {
