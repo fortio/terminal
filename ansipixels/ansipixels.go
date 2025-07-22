@@ -353,7 +353,7 @@ func (ap *AnsiPixels) ReadCursorPosXY() (int, int, error) {
 // Use [ReadCursorPosXY] to get 0,0 based coordinates usable with MoveCursor,
 // WriteAt, etc.
 //
-//nolint:nakedret // it's really the same return everywhere
+//nolint:nakedret // it's really the same return everywhere with error but the last one.
 func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	col = -1
 	row = -1
@@ -364,7 +364,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 		return
 	}
 	if n != len(reqPosStr) {
-		err = fmt.Errorf("short write requesting cursor position: %d", n)
+		err = errors.New("short write")
 		return
 	}
 	err = ap.Out.Flush()
