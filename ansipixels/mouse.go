@@ -1,6 +1,10 @@
 package ansipixels
 
-import "bytes"
+import (
+	"bytes"
+
+	"fortio.org/log"
+)
 
 func (ap *AnsiPixels) MouseClickOn() {
 	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
@@ -42,15 +46,27 @@ func (ap *AnsiPixels) MousePixelsOff() {
 
 var mouseDataPrefix = []byte{0x1b, '[', 'M'}
 
-func (ap *AnsiPixels) MouseDecode() {
+func (ap *AnsiPixels) MouseDecode() bool {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
 	if idx == -1 {
-		return
+		return false
 	}
 	start := idx + len(mouseDataPrefix)
 	if start+3 > len(ap.Data) {
-		return
+		// Read the missing bytes (eg windows terminal sends in 2 chunks).
+		need := start + 3 - len(ap.Data)
+		buf := [3]byte{}
+		n, err := ap.SharedInput.TR.Read(buf[:need])
+		if err != nil {
+			log.Errf("Error reading additional mouse data: %v", err)
+			return false
+		}
+		ap.Data = append(ap.Data, buf[:n]...)
+		if need-n > 0 {
+			log.Errf("Not enough bytes read for mouse data: %d, expected %d", n, need)
+			return false
+		}
 	}
 	b := ap.Data[start]
 	x := ap.Data[start+1]
@@ -59,8 +75,8 @@ func (ap *AnsiPixels) MouseDecode() {
 	ap.Mx = int(x) - 32
 	ap.My = int(y) - 32
 	ap.Mbuttons = int(b) - 32
-	ap.MouseDecode()
 	ap.Mouse = true
+	return true
 }
 
 const (
