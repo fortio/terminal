@@ -46,6 +46,15 @@ func (ap *AnsiPixels) MousePixelsOff() {
 
 var mouseDataPrefix = []byte{0x1b, '[', 'M'}
 
+// MouseDecode decodes the mouse data from the AnsiPixels.Data buffer.
+// It us automatically called by ReadOrResizeOrSignal and ReadOrResizeOrSignalOnce unless
+// NoDecode is set to true (so you typically don't need to call it directly and can just
+// check the Mouse, Mx, My, Mbuttons fields).
+// If there is more than one event you can consume them by calling
+//
+//	for ap.MouseDecode() {}
+//
+// (until it returns false, it returns true if there was something decoded).
 func (ap *AnsiPixels) MouseDecode() bool {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
