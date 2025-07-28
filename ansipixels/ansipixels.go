@@ -200,7 +200,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 		n, err := ap.SharedInput.TR.Read(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		if !ap.NoDecode {
-			ap.MouseDecode()
+			ap.MouseDecode(true)
 		}
 		return n, err
 	}
@@ -412,7 +412,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 		break
 	}
 	if !ap.NoDecode {
-		ap.MouseDecode()
+		ap.MouseDecode(true)
 	}
 	return
 }

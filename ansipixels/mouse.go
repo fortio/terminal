@@ -46,35 +46,52 @@ func (ap *AnsiPixels) MousePixelsOff() {
 
 var mouseDataPrefix = []byte{0x1b, '[', 'M'}
 
+type MouseStatus int
+
+const (
+	NoMouse MouseStatus = iota
+	MouseComplete
+	MousePrefix
+	MouseError
+)
+
 // MouseDecode decodes the mouse data from the AnsiPixels.Data buffer.
-// It us automatically called by ReadOrResizeOrSignal and ReadOrResizeOrSignalOnce unless
+// It is automatically called by ReadOrResizeOrSignal and ReadOrResizeOrSignalOnce unless
 // NoDecode is set to true (so you typically don't need to call it directly and can just
 // check the Mouse, Mx, My, Mbuttons fields).
 // If there is more than one event you can consume them by calling
 //
-//	for ap.MouseDecode() {}
+//	for ap.MouseDecode(true) != NoMouse {}
 //
-// (until it returns false, it returns true if there was something decoded).
-func (ap *AnsiPixels) MouseDecode() bool {
+// It returns one of the MouseStatus values:
+// - NoMouse if no mouse data was found
+// - MouseComplete if the mouse data was successfully decoded
+// - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfNeeded)
+// - MouseError if there was an error reading the additional mouse data
+// This complication is pretty much only needed for fortio.org/tev.
+func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
 	if idx == -1 {
-		return false
+		return NoMouse
 	}
 	start := idx + len(mouseDataPrefix)
 	if start+3 > len(ap.Data) {
+		if !readMoreIfNeeded {
+			return MousePrefix
+		}
 		// Read the missing bytes (eg windows terminal sends in 2 chunks).
 		need := start + 3 - len(ap.Data)
 		buf := [3]byte{}
 		n, err := ap.SharedInput.TR.Read(buf[:need])
 		if err != nil {
 			log.Errf("Error reading additional mouse data: %v", err)
-			return false
+			return MouseError
 		}
 		ap.Data = append(ap.Data, buf[:n]...)
 		if n < need {
 			log.Errf("Not enough bytes read for mouse data: %d, expected %d", n, need)
-			return false
+			return MouseError
 		}
 	}
 	b := ap.Data[start]
@@ -85,7 +102,7 @@ func (ap *AnsiPixels) MouseDecode() bool {
 	ap.My = int(y) - 32
 	ap.Mbuttons = int(b) - 32
 	ap.Mouse = true
-	return true
+	return MouseComplete
 }
 
 const (
