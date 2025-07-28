@@ -67,7 +67,7 @@ const (
 // - NoMouse if no mouse data was found
 // - MouseComplete if the mouse data was successfully decoded
 // - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfneeded
-// - MouseError if there was an error reading the additional mouse data
+// - MouseError if there was an error reading the additional mouse data.
 func (ap *AnsiPixels) MouseDecode(readMoreIfneeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
