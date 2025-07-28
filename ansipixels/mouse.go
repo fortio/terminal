@@ -66,9 +66,9 @@ const (
 // It returns one of the MouseStatus values:
 // - NoMouse if no mouse data was found
 // - MouseComplete if the mouse data was successfully decoded
-// - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfneeded
+// - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfNeeded)
 // - MouseError if there was an error reading the additional mouse data.
-func (ap *AnsiPixels) MouseDecode(readMoreIfneeded bool) MouseStatus {
+func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
 	if idx == -1 {
@@ -76,7 +76,7 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfneeded bool) MouseStatus {
 	}
 	start := idx + len(mouseDataPrefix)
 	if start+3 > len(ap.Data) {
-		if !readMoreIfneeded {
+		if !readMoreIfNeeded {
 			return MousePrefix
 		}
 		// Read the missing bytes (eg windows terminal sends in 2 chunks).
