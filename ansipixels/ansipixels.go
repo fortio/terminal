@@ -411,7 +411,9 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 		ap.Data = append(ap.Data, res[4]...)
 		break
 	}
-	ap.MouseDecode()
+	if !ap.NoDecode {
+		ap.MouseDecode()
+	}
 	return
 }
 
