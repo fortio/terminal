@@ -67,7 +67,8 @@ const (
 // - NoMouse if no mouse data was found
 // - MouseComplete if the mouse data was successfully decoded
 // - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfNeeded)
-// - MouseError if there was an error reading the additional mouse data.
+// - MouseError if there was an error reading the additional mouse data
+// This complication is pretty much only needed for fortio.org/tev.
 func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
