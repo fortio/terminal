@@ -63,7 +63,7 @@ func (ap *AnsiPixels) MouseDecode() bool {
 			return false
 		}
 		ap.Data = append(ap.Data, buf[:n]...)
-		if need-n > 0 {
+		if n < need {
 			log.Errf("Not enough bytes read for mouse data: %d, expected %d", n, need)
 			return false
 		}
