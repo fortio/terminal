@@ -33,7 +33,7 @@ type AnsiPixels struct {
 	W, H        int  // Width and Height
 	x, y        int  // Cursor last set position
 	Mouse       bool // Mouse event received
-	Mx, My      int  // Mouse last known position
+	Mx, My      int  // Mouse last known position, in 1,1 coordinate system
 	Mbuttons    int  // Mouse buttons and modifier state
 	C           chan os.Signal
 	// Should image be monochrome, 256 or true color
