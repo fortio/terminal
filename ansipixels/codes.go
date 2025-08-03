@@ -1,17 +1,24 @@
 package ansipixels
 
+import "fortio.org/terminal/ansipixels/tcolor"
+
 // Ansi codes.
 const (
-	Bold       = "\x1b[1m"
-	Dim        = "\x1b[2m"
-	Underlined = "\x1b[4m"
-	Blink      = "\x1b[5m"
-	Reverse    = "\x1b[7m"
+	// Use newer tcolor for these.
+	Bold       = tcolor.Bold
+	Dim        = tcolor.Dim
+	Underlined = tcolor.Underlined
+	Blink      = tcolor.Blink
+	// Inverse fg/bg colors. (was also called Reverse).
+	Inverse = tcolor.Inverse
 
 	MoveLeft = "\033[1D"
 
-	Reset = "\033[0m"
+	Reset = tcolor.Reset
+
 	// Foreground Colors.
+	// Deprecated: use [tcolor.BasicColor] constants instead
+	// and corresponding Foreground() and Background() methods.
 	Black        = "\033[30m"
 	Red          = "\033[31m"
 	Green        = "\033[32m"
@@ -46,10 +53,8 @@ const (
 	BrightCyanBG   = "\033[106m"
 	WhiteBG        = "\033[107m"
 
-	// Inverse fg/bg colors.
-	Inverse = "\033[7m"
-
-	// Select colors from the 256 colors set that are missing from.
+	// Select colors from the 256 colors set that are missing from above.
+	// Deprecated: use [tcolor.Orange.Foreground()] instead.
 	Orange = "\033[38;5;214m"
 
 	// Combo for RGB full pixel (used by fps).

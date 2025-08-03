@@ -1,4 +1,4 @@
-all: lint test demo
+all: generate lint test demo
 
 GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
@@ -22,5 +22,9 @@ lint: .golangci.yml
 .golangci.yml: Makefile
 	curl -fsS -o .golangci.yml https://raw.githubusercontent.com/fortio/workflows/main/golangci.yml
 
+ansipixels/tcolor/basiccolor_string.go: ansipixels/tcolor/colors.go
+	go generate ./ansipixels/tcolor # if this fails go install golang.org/x/tools/cmd/stringer@latest
 
-.PHONY: all lint test demo tinygo-demo
+generate: ansipixels/tcolor/basiccolor_string.go
+
+.PHONY: all lint test demo tinygo-demo generate
