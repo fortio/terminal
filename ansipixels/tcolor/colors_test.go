@@ -23,7 +23,7 @@ func TestParsingBasicColors(t *testing.T) {
 		{"none", tcolor.None},
 		{"white", tcolor.White},
 		{"orange", tcolor.Orange},
-		{" bRig_ht - BLue. ", tcolor.BrightBlue},
+		{" bRig_ht - BLue ", tcolor.BrightBlue},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {

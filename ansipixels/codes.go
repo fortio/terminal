@@ -9,7 +9,7 @@ const (
 	Dim        = tcolor.Dim
 	Underlined = tcolor.Underlined
 	Blink      = tcolor.Blink
-	// Inverse fg/bg colors. (was also called Reverse)
+	// Inverse fg/bg colors. (was also called Reverse).
 	Inverse = tcolor.Inverse
 
 	MoveLeft = "\033[1D"

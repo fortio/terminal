@@ -249,7 +249,7 @@ func FromHSLString(color string) (Color, error) {
 	}
 	v, err := strconv.ParseFloat(parts[2], 64)
 	if err != nil {
-		return Color{}, fmt.Errorf("invalid value '%s': %w", parts[2], err)
+		return Color{}, fmt.Errorf("invalid brightness '%s': %w", parts[2], err)
 	}
 	if v < 0 || v > 1 {
 		return Color{}, fmt.Errorf("brightness must be in [0,1], got %f", v)
