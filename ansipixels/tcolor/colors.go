@@ -1,6 +1,6 @@
 // Package tcolor provides ANSI color codes and utilities for terminal colors.
 // Initially partially from images.go and tclock and generalized.
-package tcolor // import "fortio.org/terminal/ansipixels/color"
+package tcolor // import "fortio.org/terminal/ansipixels/tcolor"
 
 import (
 	"fmt"
