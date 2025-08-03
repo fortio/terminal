@@ -13,6 +13,7 @@ func _() {
 	_ = x[Red-31]
 	_ = x[Green-32]
 	_ = x[Yellow-33]
+	_ = x[Orange-99]
 	_ = x[Blue-34]
 	_ = x[Purple-35]
 	_ = x[Cyan-36]
@@ -31,6 +32,7 @@ const (
 	_BasicColor_name_0 = "None"
 	_BasicColor_name_1 = "BlackRedGreenYellowBluePurpleCyanGray"
 	_BasicColor_name_2 = "DarkGrayBrightRedBrightGreenBrightYellowBrightBlueBrightPurpleBrightCyanWhite"
+	_BasicColor_name_3 = "Orange"
 )
 
 var (
@@ -48,6 +50,8 @@ func (i BasicColor) String() string {
 	case 90 <= i && i <= 97:
 		i -= 90
 		return _BasicColor_name_2[_BasicColor_index_2[i]:_BasicColor_index_2[i+1]]
+	case i == 99:
+		return _BasicColor_name_3
 	default:
 		return "BasicColor(" + strconv.FormatInt(int64(i), 10) + ")"
 	}

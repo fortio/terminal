@@ -19,6 +19,7 @@ const (
 	Red          BasicColor = 31
 	Green        BasicColor = 32
 	Yellow       BasicColor = 33
+	Orange       BasicColor = 99 // not in basic colors, but in 256 colors
 	Blue         BasicColor = 34
 	Purple       BasicColor = 35
 	Cyan         BasicColor = 36
@@ -31,6 +32,16 @@ const (
 	BrightPurple BasicColor = 95
 	BrightCyan   BasicColor = 96
 	White        BasicColor = 97
+
+	// Misc useful sequences.
+	Bold       = "\x1b[1m"
+	Dim        = "\x1b[2m"
+	Underlined = "\x1b[4m"
+	Blink      = "\x1b[5m"
+
+	Inverse = "\033[7m"
+
+	Reset = "\033[0m"
 )
 
 //go:generate stringer -type=BasicColor
@@ -38,18 +49,26 @@ var _ = White.String() // force compile error if go generate is missing.
 
 // Terminal foreground color string for the BasicColor.
 func (c BasicColor) Foreground() string {
-	if c == None {
+	switch c {
+	case None:
 		return ""
+	case Orange:
+		return "\033[38;5;214m" // Orange is not in the basic colors, but in 256 colors
+	default:
+		return fmt.Sprintf("\033[%dm", c)
 	}
-	return fmt.Sprintf("\033[%dm", c)
 }
 
 // Terminal background color string for the BasicColor.
 func (c BasicColor) Background() string {
-	if c == None {
+	switch c {
+	case None:
 		return ""
+	case Orange:
+		return "\033[48;5;214m" // Orange is not in the basic colors, but in 256 colors
+	default:
+		return fmt.Sprintf("\033[%dm", c+10)
 	}
-	return fmt.Sprintf("\033[%dm", c+10)
 }
 
 type RGBColor struct {
@@ -106,6 +125,9 @@ func init() {
 	BasicColorList = append(BasicColorList, None)
 	for i := Black; i <= Gray; i++ {
 		BasicColorList = append(BasicColorList, i)
+		if i == Yellow {
+			BasicColorList = append(BasicColorList, Orange)
+		}
 	}
 	for i := DarkGray; i <= White; i++ {
 		BasicColorList = append(BasicColorList, i)
@@ -138,7 +160,13 @@ func RGBFromString(color string) (RGBColor, error) {
 
 // FromString converts user input color string to a terminal color.
 func FromString(color string) (Color, error) {
-	color = strings.ToLower(strings.TrimSpace(color))
+	toRemove := " \t\r\n_-#" // can't remove . because of hsl
+	color = strings.ToLower(strings.Map(func(r rune) rune {
+		if strings.ContainsRune(toRemove, r) {
+			return -1
+		}
+		return r
+	}, color))
 	if c, ok := ColorMap[color]; ok {
 		return Color{Basic: true, BasicColor: c}, nil
 	}

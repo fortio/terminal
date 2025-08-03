@@ -23,9 +23,11 @@ The implementations currently is a wrapper fully encapsulating [golang.org/x/ter
 ## fortio.org/terminal/ansipixels
 [![Go Reference](https://pkg.go.dev/badge/fortio.org/terminal/ansipixels.svg)](https://pkg.go.dev/fortio.org/terminal/ansipixels)
 
-A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying and many functions to emit the corresponding [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code) (colors, cursor positioning etc).
+A much lower level library that allow direct control of both the input and the output of the terminal, including mouse tracking, clicks, drag events and modifiers, mousewheel decoding/querying and many functions to emit the corresponding [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code) (colors, cursor positioning etc). It include basic named colors, RGB colors, and Hue,Saturation,Luminance conversion to RGB as well as RGB to closest 256 color conversion for non truecolor terminals, in [ansipixels/tcolor](ansipixels/tcolor/) sub package.
 
 Do feel free to use [fortio.org/progressbar](https://github.com/fortio/progressbar) as well
+
+See [fortio.org/tclock](https://github.com/fortio/tclock) for an additional demo of what this can do.
 
 ## FPS
 
