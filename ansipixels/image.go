@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"fortio.org/log"
-	"fortio.org/safecast"
+	"fortio.org/terminal/ansipixels/tcolor"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/tiff" // Import tiff decoder
 	_ "golang.org/x/image/vp8"  // Import VP8 decoder
@@ -61,27 +61,6 @@ func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	return err
 }
 
-func convertColorTo216(pixel color.RGBA) uint8 {
-	// Check if grayscale
-	shift := 4
-	if (pixel.R>>shift) == (pixel.G>>shift) && (pixel.G>>shift) == (pixel.B>>shift) {
-		// Bugged:
-		// lum := safecast.MustConvert[uint8](max(255, math.Round(0.299*float64(pixel.R)+
-		// 0.587*float64(pixel.G)+0.114*float64(pixel.B))))
-		lum := (uint16(pixel.R) + uint16(pixel.G) + uint16(pixel.B)) / 3
-		if lum < 9 { // 0-9.8 but ... 0-8 9 levels
-			return 16 // -> black
-		}
-		if lum > 247 { // 248-255 (incl) 8 levels
-			return 231 // -> white
-		}
-		return safecast.MustConvert[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
-	}
-	// 6x6x6 color cube
-	col := 16 + 36*(pixel.R/51) + 6*(pixel.G/51) + pixel.B/51
-	return col
-}
-
 func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 	var err error
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
@@ -91,8 +70,8 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			pixel1 := img.RGBAAt(x, y)
 			pixel2 := img.RGBAAt(x, y+1)
-			fgColor := convertColorTo216(pixel1)
-			bgColor := convertColorTo216(pixel2)
+			fgColor := tcolor.RGBATo216(tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B})
+			bgColor := tcolor.RGBATo216(tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B})
 			switch {
 			case fgColor == prevFg && bgColor == prevBg:
 				ap.WriteRune('▄')

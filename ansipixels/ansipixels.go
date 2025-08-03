@@ -36,7 +36,7 @@ type AnsiPixels struct {
 	Mx, My      int  // Mouse last known position, in 1,1 coordinate system
 	Mbuttons    int  // Mouse buttons and modifier state
 	C           chan os.Signal
-	// Should image be monochrome, 256 or true color
+	// Should images be monochrome, 256 or true color
 	TrueColor bool
 	Color     bool         // 256 (216) color mode
 	Gray      bool         // grayscale mode
