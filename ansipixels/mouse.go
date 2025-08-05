@@ -55,13 +55,11 @@ const (
 	MouseError
 )
 
-// MouseDecode decodes the mouse data from the AnsiPixels.Data buffer.
-// It is automatically called by ReadOrResizeOrSignal and ReadOrResizeOrSignalOnce unless
-// NoDecode is set to true (so you typically don't need to call it directly and can just
-// check the Mouse, Mx, My, Mbuttons fields).
-// If there is more than one event you can consume them by calling
-//
-//	for ap.MouseDecode(true) != NoMouse {}
+// MouseDecode decodes a single mouse data event from the AnsiPixels.Data buffer.
+// It is automatically called through [MouseDecodeAll] by [ReadOrResizeOrSignal] and [ReadOrResizeOrSignalOnce]
+// unless NoDecode is set to true
+// (so you typically don't need to call it directly and can just check the Mouse, Mx, My, Mbuttons fields).
+// If there is more than one event you can consume them by calling [MouseDecodeAll].
 //
 // It returns one of the MouseStatus values:
 // - NoMouse if no mouse data was found
@@ -103,6 +101,18 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 	ap.Mbuttons = int(b) - 32
 	ap.Mouse = true
 	return MouseComplete
+}
+
+// MouseDecodeAll decodes all mouse events available,
+// useful at low fps where we may have multiple mouse events.
+// Internally used when ap.NoDecode is false.
+func (ap *AnsiPixels) MouseDecodeAll() {
+	gotMouse := false
+	for ap.MouseDecode(true) == MouseComplete {
+		// keep decoding mouse events until we have no more.
+		gotMouse = true
+	}
+	ap.Mouse = gotMouse
 }
 
 const (
