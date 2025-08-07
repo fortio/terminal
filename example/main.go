@@ -205,7 +205,8 @@ func Main() int { //nolint:funlen // long but simple (and some amount of copy pa
 			t.Suspend()
 			args := strings.Fields(cmd[len(runCmd):])
 			// First element is the command, rest are arguments
-			cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // this is a demo
+			// Note: new context.Background() is needed to avoid using the terminal's context which we suspended.
+			cmd := exec.CommandContext(context.Background(), args[0], args[1:]...) //nolint:gosec // this is a demo
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
