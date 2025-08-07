@@ -372,14 +372,17 @@ func (g *Game) draw() {
 	}
 
 	// Draw instructions
-	if g.state == StatePlayerTurn {
+	switch g.state {
+	case StatePlayerTurn:
 		g.ap.WriteCentered(g.ap.H-1, "Press 'h' to hit, 's' to stand, 'q' to quit")
-	} else if g.state == StateGameOver {
+	case StateGameOver:
 		if g.balance >= g.bet {
 			g.ap.WriteCentered(g.ap.H-1, "Any key for new game, 'q' to quit")
 		} else {
 			g.ap.WriteCentered(g.ap.H-1, "Press 'q' to quit")
 		}
+	case StateDealerTurn:
+		// nothing
 	}
 
 	g.ap.EndSyncMode()

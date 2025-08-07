@@ -116,10 +116,10 @@ func Draw(ap *ansipixels.AnsiPixels, c *Conway) {
 			switch {
 			case p1 == p2:
 				ap.WriteRune(ansipixels.FullPixel)
-			case p1 == 1:
-				ap.WriteRune(ansipixels.TopHalfPixel)
-			default:
+			case p2 == 1:
 				ap.WriteRune(ansipixels.BottomHalfPixel)
+			default:
+				ap.WriteRune(ansipixels.TopHalfPixel)
 			}
 			adjacent = true
 		}
