@@ -8,8 +8,8 @@ require (
 	fortio.org/safecast v1.0.0
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.29.0
-	golang.org/x/sys v0.34.0
-	golang.org/x/term v0.33.1-0.20250721191329-4f53e0cd3924
+	golang.org/x/sys v0.35.0
+	golang.org/x/term v0.34.0
 )
 
 require (
