@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"math"
@@ -424,7 +425,8 @@ func Main() int { //nolint:funlen // many flags etc...
 		return 0
 	}
 	death := false
-	for {
+	result := 0
+	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
 		restarted = false
 		ap.StartSyncMode()
 		ap.ClearScreen()
@@ -434,37 +436,38 @@ func Main() int { //nolint:funlen // many flags etc...
 			DeathInfo(ap, b)
 			if b.Lives == 0 {
 				atEnd(ap, b)
-				return 0
+				return false // exit the loop
 			}
 			death = false
-			continue
+			return true
 		}
 		if b.NumBricks == 0 {
-			return handleWin(ap, b)
+			handleWin(ap, b)
+			return false // exit the loop
 		}
 		ap.EndSyncMode()
-		_, err := ap.ReadOrResizeOrSignalOnce()
-		if err != nil {
-			return log.FErrf("Error reading: %v", err)
-		}
 		if restarted {
 			_ = ap.ReadOrResizeOrSignal()
 		}
 		if handleKeys(ap, b, restarted /* handle pauses */) {
 			if !*noSave {
-				return b.SaveGame()
+				result = b.SaveGame()
 			}
-			return 0
+			return false
 		}
 		death = b.Next()
+		return true // continue the ticks/loop
+	})
+	if err != nil {
+		return log.FErrf("Error reading: %v", err)
 	}
+	return result
 }
 
-func handleWin(ap *ansipixels.AnsiPixels, b *Brick) int {
+func handleWin(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteBoxed(ap.H/2, " 🏆✨ You won! ✨🏆 ")
 	_ = ap.ReadOrResizeOrSignal()
 	atEnd(ap, b)
-	return 0
 }
 
 func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
