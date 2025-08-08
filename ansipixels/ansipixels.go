@@ -187,8 +187,43 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 	}
 }
 
+// FPSTicks is a main program loop for fixed FPS applications: You pass a callback
+// which will be called at fixed fps rate (outside of resize events which can call your OnResize callback asap).
+// data available if any (or mouse events decoded) will be set in ap.Data and the callback will be called every tick.
+// The callback should return false to stop the loop.
+func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
+	if ap.FPS <= 0 {
+		panic("FPSTicks called with non-positive FPS")
+	}
+	timer := time.NewTicker(time.Second / time.Duration(ap.FPS))
+	defer timer.Stop()
+	for {
+		select {
+		case s := <-ap.C:
+			err := ap.HandleSignal(s)
+			if err != nil {
+				return err
+			}
+		case <-timer.C:
+			n, err := ap.SharedInput.ReadNonBlocking(ap.buf[0:bufSize])
+			ap.Data = ap.buf[0:n]
+			if !ap.NoDecode {
+				ap.MouseDecodeAll()
+			}
+			if err != nil {
+				return err
+			}
+			if !callback() {
+				return nil
+			}
+		}
+	}
+}
+
 // This will return either because of signal, or something read or the timeout (fps) passed.
-// ap.Data is (re)set to the read data.
+// ap.Data is (re)set to the read data. Note that if there is a lot of data produced (eg. mouse movements)
+// this will return more often than the fps. Use [FPSTicks] with a callback for a fixed fps (outside of resize events)
+// Where data available will be set in ap.Data and the callback will be called every tick.
 func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	select {
 	case s := <-ap.C:
