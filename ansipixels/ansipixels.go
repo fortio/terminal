@@ -191,7 +191,11 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 // FPSTicks is a main program loop for fixed FPS applications: You pass a callback
 // which will be called at fixed fps rate (outside of resize events which can call your OnResize callback asap).
 // data available if any (or mouse events decoded) will be set in ap.Data and the callback will be called every tick.
-// The callback should return false to stop the loop.
+// The callback should return false to stop the loop, true to continue it.
+// Note this is using and 'starting' ap.SharedInput unlike ReadOrResizeOrSignal which is using the underlying
+// InterruptReader directly. Data can be lost if you mix the 2 modes (so don't).
+// StartSyncMode and EndSyncMode are called around the callback to ensure the display is synchronized so you don't
+// have to do it in the callback.
 func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Context) bool) error {
 	if ap.FPS <= 0 {
 		panic("FPSTicks called with non-positive FPS")
@@ -216,8 +220,11 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 			if !ap.NoDecode {
 				ap.MouseDecodeAll()
 			}
-			if !callback(nctx) {
-				return nil
+			ap.StartSyncMode()
+			cont := callback(nctx)
+			ap.EndSyncMode()
+			if !cont {
+				return nil // exit the loop
 			}
 		}
 	}

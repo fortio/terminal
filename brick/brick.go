@@ -50,6 +50,7 @@ type Brick struct {
 	Auto            bool
 	JustBounced     bool
 	MoveRecords     []MoveRecord
+	Paused          bool // true if paused, false if running
 	rnd             *rand.Rand
 }
 
@@ -115,6 +116,7 @@ func (b *Brick) ResetBall() {
 	b.BallSpeed = .98
 	b.PaddlePos = b.Width / 2
 	b.PaddleDirection = 0
+	b.Paused = false
 }
 
 func (b *Brick) Has(x, y int) bool {
@@ -409,26 +411,48 @@ func Main() int { //nolint:funlen // many flags etc...
 		b.Auto = *autoPlay
 		b.ShowInfo = prevInfo
 		Draw(ap, b)
-		ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
-		ap.WriteCentered(ap.H/2+2, "Left A, Stop: S, Right: D - Quit: ^C or Q")
+		ap.WriteCentered(ap.H/2+1, "Any key to start...")
+		ap.WriteCentered(ap.H/2+2, "🕹️ controls: Left A, Stop: S, Right: D")
+		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q")
 		showInfo(ap, b)
 		ap.EndSyncMode()
 		restarted = true
 		return nil
 	}
 	_ = ap.OnResize()
-	err = ap.ReadOrResizeOrSignal()
-	if err != nil {
-		return log.FErrf("Error reading: %v", err)
-	}
-	if handleKeys(ap, b, true /* no pauses just at the start */) {
-		return 0
-	}
 	death := false
 	result := 0
+	n := 0
+
 	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
+		if restarted && len(ap.Data) == 0 {
+			// pause mode after resize
+			return true
+		}
 		restarted = false
-		ap.StartSyncMode()
+		if handleKeys(ap, b) {
+			if !*noSave {
+				result = b.SaveGame()
+			}
+			return false // exit the loop
+		}
+		if b.Paused {
+			msg := "⏱️ Paused, any key to resume... ⏱️"
+			mlen := ap.ScreenWidth(msg)
+			erase := strings.Repeat(" ", mlen)
+			x := (ap.W - mlen) / 2
+			y := ap.H/2 - 3
+			switch n % 20 {
+			case 0:
+				ap.MoveCursor(x, y)
+				ap.WriteString(msg)
+			case 10:
+				ap.MoveCursor(x, y)
+				ap.WriteString(erase)
+			}
+			n++
+			return true // continue the loop
+		}
 		ap.ClearScreen()
 		Draw(ap, b)
 		showInfo(ap, b)
@@ -439,23 +463,15 @@ func Main() int { //nolint:funlen // many flags etc...
 				return false // exit the loop
 			}
 			death = false
-			return true
+			return true // continue the loop
 		}
 		if b.NumBricks == 0 {
 			handleWin(ap, b)
-			return false // exit the loop
-		}
-		ap.EndSyncMode()
-		if restarted {
-			_ = ap.ReadOrResizeOrSignal()
-		}
-		if handleKeys(ap, b, restarted /* handle pauses */) {
-			if !*noSave {
-				result = b.SaveGame()
-			}
 			return false
 		}
+		n = 0 // reset pause counter
 		death = b.Next()
+
 		return true // continue the ticks/loop
 	})
 	if err != nil {
@@ -492,11 +508,13 @@ func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
 }
 
 // returns true if should exit.
-func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
+func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 	if len(ap.Data) == 0 {
 		return false
 	}
-	switch ap.Data[0] {
+	c := ap.Data[0]
+	ap.Data = ap.Data[:0] // consider it all consumed (multi bytes arrow keys for instance etc..)
+	switch c {
 	case 'a':
 		b.Left()
 	case 's':
@@ -509,33 +527,9 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 		atEnd(ap, b)
 		return true
 	case ' ':
-		if noPause {
-			return false
-		}
-		n := 0
-		for {
-			msg := "⏱️ Paused, any key to resume... ⏱️"
-			mlen := ap.ScreenWidth(msg)
-			erase := strings.Repeat(" ", mlen)
-			x := (ap.W - mlen) / 2
-			y := ap.H/2 - 1
-			switch n % 20 {
-			case 0:
-				ap.MoveCursor(x, y)
-				ap.WriteString(msg)
-			case 10:
-				ap.MoveCursor(x, y)
-				ap.WriteString(erase)
-			}
-			ap.EndSyncMode()
-			r, _ := ap.ReadOrResizeOrSignalOnce()
-			if r != 0 {
-				return handleKeys(ap, b, true) // no pause loop.
-			}
-			n++
-		}
+		b.Paused = !b.Paused
 	}
-	return false
+	return false // continue the loop
 }
 
 func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
