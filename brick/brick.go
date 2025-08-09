@@ -374,7 +374,7 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
-func Main() int { //nolint:funlen // many flags etc...
+func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
