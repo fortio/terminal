@@ -399,7 +399,7 @@ func Main() int {
 		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
 	var b *Brick
-	restarted := false
+	waitForInput := false
 	ap.OnResize = func() error {
 		ap.ClearScreen()
 		ap.StartSyncMode()
@@ -416,7 +416,7 @@ func Main() int {
 		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q; Pause: Space")
 		showInfo(ap, b)
 		ap.EndSyncMode()
-		restarted = true
+		waitForInput = true
 		return nil
 	}
 	_ = ap.OnResize()
@@ -425,11 +425,11 @@ func Main() int {
 	n := 0
 
 	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
-		if restarted && len(ap.Data) == 0 {
+		if waitForInput && len(ap.Data) == 0 {
 			// pause mode after resize
 			return true
 		}
-		restarted = false
+		waitForInput = false
 		if handleKeys(ap, b) {
 			if !*noSave {
 				result = b.SaveGame()
@@ -465,6 +465,7 @@ func Main() int {
 				return false // exit the loop
 			}
 			death = false
+			waitForInput = true
 			return true // continue the loop
 		}
 		if b.NumBricks == 0 {
@@ -482,7 +483,6 @@ func Main() int {
 
 func handleWin(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteBoxed(ap.H/2, " 🏆✨ You won! ✨🏆 ")
-	_ = ap.ReadOrResizeOrSignal()
 	atEnd(ap, b)
 }
 
@@ -496,7 +496,6 @@ func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
 			ap.WriteBoxed(ap.H/2, " ☠️ Lost a life, %d left 💔 ", b.Lives)
 		}
 	}
-	_ = ap.ReadOrResizeOrSignal()
 }
 
 func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -537,4 +536,5 @@ func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
 	showInfo(ap, b)
 	ap.MoveCursor(0, ap.H-PaddleYDelta) // so 0,1 is great for shells that don't clear the bottom of the screen... yet zsh does that.
 	ap.Out.Flush()
+	_ = ap.ReadOrResizeOrSignal()
 }
