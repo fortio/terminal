@@ -77,3 +77,27 @@ func TestParsingAdvancedColor(t *testing.T) {
 		})
 	}
 }
+
+func TestHSLRGBExactRoundTrip(t *testing.T) {
+	var mismatches int
+	for r := range 256 {
+		for g := range 256 {
+			for b := range 256 {
+				in := tcolor.RGBColor{uint8(r), uint8(g), uint8(b)}
+				h, s, l := tcolor.RGBToHSL(in)
+				out := tcolor.HSLToRGB(h, s, l)
+
+				if out.R != in.R || out.G != in.G || out.B != in.B {
+					mismatches++
+					if mismatches <= 10 { // log only first few
+						t.Errorf("Mismatch: in=%v hsl=(%.10f,%.10f,%.10f) out=%v",
+							in, h, s, l, out)
+					}
+				}
+			}
+		}
+	}
+	if mismatches > 0 {
+		t.Fatalf("Total mismatches: %d", mismatches)
+	}
+}

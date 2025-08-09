@@ -261,7 +261,7 @@ func FromHSLString(color string) (Color, error) {
 // Initially from grol's image extension.
 func HSLToRGB(h, s, l float64) RGBColor {
 	var r, g, b float64
-	// h = math.Mod(h, 360.) / 360.
+	// h = math.Mod(h, 360.) / 360. if we wanted in degrees.
 	if s == 0 {
 		r, g, b = l, l, l
 	} else {
@@ -300,4 +300,39 @@ func hueToRGB(p, q, t float64) float64 {
 		return p + (q-p)*(2/3.-t)*6
 	}
 	return p
+}
+
+func RGBToHSL(c RGBColor) (h, s, l float64) {
+	r := float64(c.R) / 255.
+	g := float64(c.G) / 255.
+	b := float64(c.B) / 255.
+
+	maxv := max(r, g, b)
+	minv := min(r, g, b)
+	l = (maxv + minv) / 2
+
+	if maxv == minv {
+		h, s = 0, 0 // achromatic
+		return h, s, l
+	}
+	d := maxv - minv
+	if l > 0.5 {
+		s = d / (2 - maxv - minv)
+	} else {
+		s = d / (maxv + minv)
+	}
+
+	switch maxv {
+	case r:
+		h = (g - b) / d
+		if g < b {
+			h += 6
+		}
+	case g:
+		h = (b-r)/d + 2
+	case b:
+		h = (r-g)/d + 4
+	}
+	h /= 6
+	return h, s, l
 }
