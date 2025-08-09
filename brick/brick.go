@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"math"
@@ -49,6 +50,7 @@ type Brick struct {
 	Auto            bool
 	JustBounced     bool
 	MoveRecords     []MoveRecord
+	Paused          bool // true if paused, false if running
 	rnd             *rand.Rand
 }
 
@@ -114,6 +116,7 @@ func (b *Brick) ResetBall() {
 	b.BallSpeed = .98
 	b.PaddlePos = b.Width / 2
 	b.PaddleDirection = 0
+	b.Paused = false
 }
 
 func (b *Brick) Has(x, y int) bool {
@@ -371,7 +374,7 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
-func Main() int { //nolint:funlen // many flags etc...
+func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
 	noDeath := flag.Bool("nodeath", false, "No death mode")
@@ -396,7 +399,7 @@ func Main() int { //nolint:funlen // many flags etc...
 		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
 	var b *Brick
-	restarted := false
+	waitForInput := false
 	ap.OnResize = func() error {
 		ap.ClearScreen()
 		ap.StartSyncMode()
@@ -408,25 +411,50 @@ func Main() int { //nolint:funlen // many flags etc...
 		b.Auto = *autoPlay
 		b.ShowInfo = prevInfo
 		Draw(ap, b)
-		ap.WriteCentered(ap.H/2+1, "Any key to start... 🕹️ controls:")
-		ap.WriteCentered(ap.H/2+2, "Left A, Stop: S, Right: D - Quit: ^C or Q")
+		ap.WriteCentered(ap.H/2+1, "Any key to start...")
+		ap.WriteCentered(ap.H/2+2, "🕹️ controls: Left A, Stop: S, Right: D")
+		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q; Pause: Space")
 		showInfo(ap, b)
 		ap.EndSyncMode()
-		restarted = true
+		waitForInput = true
 		return nil
 	}
 	_ = ap.OnResize()
-	err = ap.ReadOrResizeOrSignal()
-	if err != nil {
-		return log.FErrf("Error reading: %v", err)
-	}
-	if handleKeys(ap, b, true /* no pauses just at the start */) {
-		return 0
-	}
 	death := false
-	for {
-		restarted = false
-		ap.StartSyncMode()
+	result := 0
+	n := 0
+
+	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
+		if waitForInput && len(ap.Data) == 0 {
+			// Pause mode after resize or death.
+			return true
+		}
+		waitForInput = false
+		if handleKeys(ap, b) {
+			if !*noSave {
+				result = b.SaveGame()
+			}
+			return false // exit the loop
+		}
+		if b.Paused {
+			// User issued Pause (space bar): make the message blink (without flickering/clearing the screen: in place)
+			msg := "⏱️ Paused, any key to resume... ⏱️"
+			mlen := ap.ScreenWidth(msg)
+			erase := strings.Repeat(" ", mlen)
+			x := (ap.W - mlen) / 2
+			y := ap.H/2 - 3
+			switch n % 20 {
+			case 0:
+				ap.MoveCursor(x, y)
+				ap.WriteString(msg)
+			case 10:
+				ap.MoveCursor(x, y)
+				ap.WriteString(erase)
+			}
+			n++
+			return true // continue the loop
+		}
+		n = 0 // reset pause counter (for next time we pause if any)
 		ap.ClearScreen()
 		Draw(ap, b)
 		showInfo(ap, b)
@@ -434,37 +462,28 @@ func Main() int { //nolint:funlen // many flags etc...
 			DeathInfo(ap, b)
 			if b.Lives == 0 {
 				atEnd(ap, b)
-				return 0
+				return false // exit the loop
 			}
 			death = false
-			continue
+			waitForInput = true
+			return true // continue the loop
 		}
 		if b.NumBricks == 0 {
-			return handleWin(ap, b)
+			handleWin(ap, b)
+			return false
 		}
-		ap.EndSyncMode()
-		_, err := ap.ReadOrResizeOrSignalOnce()
-		if err != nil {
-			return log.FErrf("Error reading: %v", err)
-		}
-		if restarted {
-			_ = ap.ReadOrResizeOrSignal()
-		}
-		if handleKeys(ap, b, restarted /* handle pauses */) {
-			if !*noSave {
-				return b.SaveGame()
-			}
-			return 0
-		}
-		death = b.Next()
+		death = b.Next() // process a turn/tick.
+		return true      // continue the ticks/loop
+	})
+	if err != nil {
+		return log.FErrf("Error reading: %v", err)
 	}
+	return result
 }
 
-func handleWin(ap *ansipixels.AnsiPixels, b *Brick) int {
+func handleWin(ap *ansipixels.AnsiPixels, b *Brick) {
 	ap.WriteBoxed(ap.H/2, " 🏆✨ You won! ✨🏆 ")
-	_ = ap.ReadOrResizeOrSignal()
 	atEnd(ap, b)
-	return 0
 }
 
 func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -477,7 +496,6 @@ func DeathInfo(ap *ansipixels.AnsiPixels, b *Brick) {
 			ap.WriteBoxed(ap.H/2, " ☠️ Lost a life, %d left 💔 ", b.Lives)
 		}
 	}
-	_ = ap.ReadOrResizeOrSignal()
 }
 
 func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -489,7 +507,7 @@ func showInfo(ap *ansipixels.AnsiPixels, b *Brick) {
 }
 
 // returns true if should exit.
-func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
+func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 	if len(ap.Data) == 0 {
 		return false
 	}
@@ -506,33 +524,11 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick, noPause bool) bool {
 		atEnd(ap, b)
 		return true
 	case ' ':
-		if noPause {
-			return false
-		}
-		n := 0
-		for {
-			msg := "⏱️ Paused, any key to resume... ⏱️"
-			mlen := ap.ScreenWidth(msg)
-			erase := strings.Repeat(" ", mlen)
-			x := (ap.W - mlen) / 2
-			y := ap.H/2 - 1
-			switch n % 20 {
-			case 0:
-				ap.MoveCursor(x, y)
-				ap.WriteString(msg)
-			case 10:
-				ap.MoveCursor(x, y)
-				ap.WriteString(erase)
-			}
-			ap.EndSyncMode()
-			r, _ := ap.ReadOrResizeOrSignalOnce()
-			if r != 0 {
-				return handleKeys(ap, b, true) // no pause loop.
-			}
-			n++
-		}
+		b.Paused = !b.Paused
+		return false // continue the loop
 	}
-	return false
+	b.Paused = false // unpause if we were paused.
+	return false     // continue the loop
 }
 
 func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
@@ -540,4 +536,5 @@ func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
 	showInfo(ap, b)
 	ap.MoveCursor(0, ap.H-PaddleYDelta) // so 0,1 is great for shells that don't clear the bottom of the screen... yet zsh does that.
 	ap.Out.Flush()
+	_ = ap.ReadOrResizeOrSignal()
 }

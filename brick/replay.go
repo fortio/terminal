@@ -60,7 +60,7 @@ func ReplayGame(ap *ansipixels.AnsiPixels, fname string) int {
 	log.Infof("GameSave: %dx%d from %s (we are %s)\r", gs.Width+2, gs.Height+2, gs.Version, cli.LongVersion)
 	for {
 		err := ap.ReadOrResizeOrSignal()
-		if err != nil || handleKeys(ap, b, true) {
+		if err != nil || handleKeys(ap, b) {
 			ap.WriteAt(0, 1, "%sReplay aborted", ansipixels.Reset)
 			ap.MoveCursor(0, 2)
 			ap.Out.Flush()
@@ -89,7 +89,7 @@ func replayGame(ap *ansipixels.AnsiPixels, b *Brick, numFrames uint64) int {
 			ap.Out.Flush()
 			return log.FErrf("Error: %v\r", err)
 		}
-		if handleKeys(ap, b, false /* pauses ok */) {
+		if handleKeys(ap, b) {
 			return 0
 		}
 		if b.Frames <= numFrames {

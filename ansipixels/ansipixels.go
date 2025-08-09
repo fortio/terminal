@@ -5,6 +5,7 @@ package ansipixels
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -187,8 +188,52 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 	}
 }
 
+// FPSTicks is a main program loop for fixed FPS applications: You pass a callback
+// which will be called at fixed fps rate (outside of resize events which can call your OnResize callback asap).
+// Data available if any (or mouse events decoded) will be set in ap.Data and the callback will be called every tick.
+// The callback should return false to stop the loop (typically to exit the program), true to continue it.
+// Note this is using and 'starting' ap.SharedInput unlike ReadOrResizeOrSignal which is using the underlying
+// InterruptReader directly. Data can be lost if you mix the 2 modes (so don't).
+// StartSyncMode and EndSyncMode are called around the callback to ensure the display is synchronized so you don't
+// have to do it in the callback.
+func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Context) bool) error {
+	if ap.FPS <= 0 {
+		panic("FPSTicks called with non-positive FPS")
+	}
+	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
+	nctx, cancel := ap.SharedInput.Start(ctx)
+	defer timer.Stop()
+	defer cancel()
+	for {
+		select {
+		case s := <-ap.C:
+			err := ap.HandleSignal(s)
+			if err != nil {
+				return err
+			}
+		case <-timer.C:
+			n, err := ap.SharedInput.ReadNonBlocking(ap.buf[0:bufSize])
+			if err != nil {
+				return err
+			}
+			ap.Data = ap.buf[0:n]
+			if !ap.NoDecode {
+				ap.MouseDecodeAll()
+			}
+			ap.StartSyncMode()
+			cont := callback(nctx)
+			ap.EndSyncMode()
+			if !cont {
+				return nil // exit the loop
+			}
+		}
+	}
+}
+
 // This will return either because of signal, or something read or the timeout (fps) passed.
-// ap.Data is (re)set to the read data.
+// ap.Data is (re)set to the read data. Note that if there is a lot of data produced (eg. mouse movements)
+// this will return more often than the fps. Use [FPSTicks] with a callback for a fixed fps (outside of resize events)
+// where data available will be set in ap.Data and the callback will be called every tick.
 func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	select {
 	case s := <-ap.C:
