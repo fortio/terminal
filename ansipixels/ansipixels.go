@@ -200,7 +200,7 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 	if ap.FPS <= 0 {
 		panic("FPSTicks called with non-positive FPS")
 	}
-	timer := time.NewTicker(time.Second / time.Duration(ap.FPS))
+	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
 	nctx, cancel := ap.SharedInput.Start(ctx)
 	defer timer.Stop()
 	defer cancel()
