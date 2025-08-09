@@ -413,7 +413,7 @@ func Main() int {
 		Draw(ap, b)
 		ap.WriteCentered(ap.H/2+1, "Any key to start...")
 		ap.WriteCentered(ap.H/2+2, "🕹️ controls: Left A, Stop: S, Right: D")
-		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q")
+		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q; Pause: Space")
 		showInfo(ap, b)
 		ap.EndSyncMode()
 		restarted = true
@@ -437,6 +437,7 @@ func Main() int {
 			return false // exit the loop
 		}
 		if b.Paused {
+			// Make the message blink (without flickering/clearing the screen: in place)
 			msg := "⏱️ Paused, any key to resume... ⏱️"
 			mlen := ap.ScreenWidth(msg)
 			erase := strings.Repeat(" ", mlen)
@@ -453,6 +454,7 @@ func Main() int {
 			n++
 			return true // continue the loop
 		}
+		n = 0 // reset pause counter (for next time we pause if any)
 		ap.ClearScreen()
 		Draw(ap, b)
 		showInfo(ap, b)
@@ -469,10 +471,8 @@ func Main() int {
 			handleWin(ap, b)
 			return false
 		}
-		n = 0 // reset pause counter
-		death = b.Next()
-
-		return true // continue the ticks/loop
+		death = b.Next() // process a turn/tick.
+		return true      // continue the ticks/loop
 	})
 	if err != nil {
 		return log.FErrf("Error reading: %v", err)
@@ -512,9 +512,7 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 	if len(ap.Data) == 0 {
 		return false
 	}
-	c := ap.Data[0]
-	ap.Data = ap.Data[:0] // consider it all consumed (multi bytes arrow keys for instance etc..)
-	switch c {
+	switch ap.Data[0] {
 	case 'a':
 		b.Left()
 	case 's':
