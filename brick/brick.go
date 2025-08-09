@@ -426,7 +426,7 @@ func Main() int {
 
 	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
 		if waitForInput && len(ap.Data) == 0 {
-			// pause mode after resize
+			// Pause mode after resize or death.
 			return true
 		}
 		waitForInput = false
@@ -437,7 +437,7 @@ func Main() int {
 			return false // exit the loop
 		}
 		if b.Paused {
-			// Make the message blink (without flickering/clearing the screen: in place)
+			// User issued Pause (space bar): make the message blink (without flickering/clearing the screen: in place)
 			msg := "⏱️ Paused, any key to resume... ⏱️"
 			mlen := ap.ScreenWidth(msg)
 			erase := strings.Repeat(" ", mlen)
