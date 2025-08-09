@@ -526,8 +526,10 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 		return true
 	case ' ':
 		b.Paused = !b.Paused
+		return false // continue the loop
 	}
-	return false // continue the loop
+	b.Paused = false // unpause if we were paused.
+	return false     // continue the loop
 }
 
 func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
