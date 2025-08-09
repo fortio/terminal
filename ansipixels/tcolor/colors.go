@@ -1,4 +1,10 @@
 // Package tcolor provides ANSI color codes and utilities for terminal colors.
+// You can see a good demo/use of it the tcolor CLI at
+// [github.com/fortio/tcolor](https://github.com/fortio/tcolor) or by running
+// ```shell
+// go install fortio.org/tcolor@latest
+// tcolor
+// ```
 // Initially partially from images.go and tclock and generalized.
 package tcolor // import "fortio.org/terminal/ansipixels/tcolor"
 
@@ -85,31 +91,120 @@ func (c RGBColor) Background() string {
 	return fmt.Sprintf("\033[48;2;%d;%d;%dm", c.R, c.G, c.B)
 }
 
-type Color struct {
-	Basic bool // Selector between BasicColor and RGBColor
-	BasicColor
-	RGBColor
+type Color uint32 // high byte is type, rest is RGB or HSL or BasicColor.
+
+type ColorType uint8 // 0 for RGB, 1 for HSL, 2 for BasicColor
+const (
+	ColorTypeRGB   ColorType = 1 // RGBColor
+	ColorTypeHSL   ColorType = 2 // HSLColor
+	ColorTypeBasic ColorType = 3 // BasicColor
+)
+
+//nolint:gosec // no overflow possible
+func (c Color) Decode() (ColorType, [3]uint8) {
+	u := uint32(c)
+	switch u & 0xFF000000 {
+	case uint32(ColorTypeRGB) << 24:
+		return ColorTypeRGB, [3]uint8{uint8(u >> 16 & 0xFF), uint8(u >> 8 & 0xFF), uint8(u & 0xFF)} // RGB
+	case uint32(ColorTypeHSL) << 24:
+		return ColorTypeHSL, [3]uint8{uint8(u >> 16 & 0xFF), uint8(u >> 8 & 0xFF), uint8(u & 0xFF)} // HSL
+	case uint32(ColorTypeBasic) << 24:
+		return ColorTypeBasic, [3]uint8{uint8(u & 0xFF)}
+	default:
+		panic(fmt.Sprintf("Invalid color type %d", c&0xFF000000))
+	}
+}
+
+func Basic(c BasicColor) Color {
+	return Color(uint32(ColorTypeBasic)<<24 | uint32(c))
+}
+
+func RGB(c RGBColor) Color {
+	return Color(uint32(ColorTypeRGB)<<24 | uint32(c.R)<<16 | uint32(c.G)<<8 | uint32(c.B))
+}
+
+// HSLf creates a Color from HSL float values in [0,1] range.
+func HSLf(h, s, l float64) Color {
+	return Color(uint32(ColorTypeHSL)<<24 |
+		uint32(math.Round(h*255))<<16 | // h in [0,1]
+		uint32(math.Round(s*255))<<8 | // s in [0,1]
+		uint32(math.Round(l*255))) // l in [0,1]
+}
+
+// HSL creates a Color from HSLColor.
+func HSL(hsl HSLColor) Color {
+	return Color(uint32(ColorTypeHSL)<<24 |
+		uint32(hsl.H)<<16 | // h in [0,255]
+		uint32(hsl.S)<<8 | // s in [0,255]
+		uint32(hsl.L)) // l in [0,255]
 }
 
 func (c Color) String() string {
-	if c.Basic {
-		return c.BasicColor.String()
+	t, components := c.Decode()
+	switch t {
+	case ColorTypeRGB:
+		return fmt.Sprintf("#%02X%02X%02X", components[0], components[1], components[2])
+	case ColorTypeHSL:
+		return fmt.Sprintf("HSL_%02X%02X%02X", components[0], components[1], components[2])
+	case ColorTypeBasic:
+		return BasicColor(components[0]).String()
+	default:
+		panic(fmt.Sprintf("Invalid color type %d", t))
 	}
-	return fmt.Sprintf("%02x%02x%02x", c.R, c.G, c.B)
+}
+
+func (c Color) BasicColor() (BasicColor, bool) {
+	t, components := c.Decode()
+	if t == ColorTypeBasic {
+		return BasicColor(components[0]), true
+	}
+	return None, false
+}
+
+func ToRGB(t ColorType, components [3]uint8) RGBColor {
+	switch t {
+	case ColorTypeRGB:
+		return RGBColor{components[0], components[1], components[2]}
+	case ColorTypeHSL:
+		return HSLColor{components[0], components[1], components[2]}.RGB()
+	default:
+		panic(fmt.Sprintf("ToRGB on invalid color type %d", t))
+	}
+}
+
+func ToHSL(t ColorType, components [3]uint8) HSLColor {
+	switch t {
+	case ColorTypeRGB:
+		return RGBColor{components[0], components[1], components[2]}.HSL()
+	case ColorTypeHSL:
+		return HSLColor{components[0], components[1], components[2]}
+	default:
+		panic(fmt.Sprintf("ToHSL on invalid color type %d", t))
+	}
 }
 
 func (c Color) Foreground() string {
-	if c.Basic {
-		return c.BasicColor.Foreground()
+	t, components := c.Decode()
+	switch t {
+	case ColorTypeBasic:
+		return BasicColor(components[0]).Foreground()
+	case ColorTypeRGB, ColorTypeHSL:
+		return ToRGB(t, components).Foreground()
+	default:
+		panic(fmt.Sprintf("Invalid color type %d", t))
 	}
-	return c.RGBColor.Foreground()
 }
 
 func (c Color) Background() string {
-	if c.Basic {
-		return c.BasicColor.Background()
+	t, components := c.Decode()
+	switch t {
+	case ColorTypeBasic:
+		return BasicColor(components[0]).Background()
+	case ColorTypeRGB, ColorTypeHSL:
+		return ToRGB(t, components).Background()
+	default:
+		panic(fmt.Sprintf("Invalid color type %d", t))
 	}
-	return c.RGBColor.Background()
 }
 
 // Ordered list of the basic colors.
@@ -159,6 +254,7 @@ func RGBFromString(color string) (RGBColor, error) {
 }
 
 // FromString converts user input color string to a terminal color.
+// Supports basic color names, RGB hex format (RRGGBB), HSL float format (h,s,l in [0,1]), and HSL hex format (HSL#HHSSLL).
 func FromString(color string) (Color, error) {
 	toRemove := " \t\r\n_-#" // can't remove . because of hsl
 	color = strings.ToLower(strings.Map(func(r rune) rune {
@@ -168,19 +264,22 @@ func FromString(color string) (Color, error) {
 		return r
 	}, color))
 	if c, ok := ColorMap[color]; ok {
-		return Color{Basic: true, BasicColor: c}, nil
+		return Basic(c), nil
 	}
 	if strings.IndexByte(color, ',') != -1 {
-		return FromHSLString(color)
+		return From3floatHSLString(color)
+	}
+	if hex, ok := strings.CutPrefix(color, "hsl"); ok {
+		return FromHexHSLString(hex)
 	}
 	if len(color) == 6 {
 		rgbColor, err := RGBFromString(color)
 		if err != nil {
-			return Color{}, err
+			return 0, err
 		}
-		return Color{Basic: false, RGBColor: rgbColor}, nil
+		return RGB(rgbColor), nil
 	}
-	return Color{}, fmt.Errorf("invalid color '%s', must be RRGGBB or h,s,l or one of: %s", color, ColorHelp)
+	return 0, fmt.Errorf("invalid color '%s', must be RRGGBB or h,s,l or one of: %s", color, ColorHelp)
 }
 
 func RGBATo216(pixel RGBColor) uint8 {
@@ -211,50 +310,99 @@ type ColorOutput struct {
 }
 
 func (co ColorOutput) Foreground(c Color) string {
-	if co.TrueColor || c.Basic {
+	if co.TrueColor {
 		return c.Foreground()
 	}
-	return fmt.Sprintf("\033[38;5;%dm", RGBATo216(c.RGBColor))
+	t, components := c.Decode()
+	switch t {
+	case ColorTypeBasic:
+		return BasicColor(components[0]).Foreground()
+	case ColorTypeRGB, ColorTypeHSL:
+		rgb := ToRGB(t, components)
+		return fmt.Sprintf("\033[38;5;%dm", RGBATo216(rgb))
+	default:
+		panic(fmt.Sprintf("Foreground on invalid color type %d", t))
+	}
 }
 
 func (co ColorOutput) Background(c Color) string {
-	if co.TrueColor || c.Basic {
+	if co.TrueColor {
 		return c.Background()
 	}
-	return fmt.Sprintf("\033[48;5;%dm", RGBATo216(c.RGBColor))
+	t, components := c.Decode()
+	switch t {
+	case ColorTypeBasic:
+		return BasicColor(components[0]).Background()
+	case ColorTypeRGB, ColorTypeHSL:
+		rgb := ToRGB(t, components)
+		return fmt.Sprintf("\033[48;5;%dm", RGBATo216(rgb))
+	default:
+		panic(fmt.Sprintf("Background on invalid color type %d", t))
+	}
 }
 
 // HSL colors.
 
-// FromHSLString converts a string in the format "h,s,l" [0,1] each, to a (rgb) Color.
-func FromHSLString(color string) (Color, error) {
+// HSLColor is the hex version of h,s,l, each in [0,255].
+type HSLColor struct {
+	H, S, L uint8
+}
+
+// FromHSLString converts a string in the format "h,s,l" [0,1] each, to a 3 bytes Color.
+func From3floatHSLString(color string) (Color, error) {
 	parts := strings.SplitN(color, ",", 3)
 	if len(parts) != 3 {
-		return Color{}, fmt.Errorf("invalid HSL color '%s', must be h,s,l", color)
+		return 0, fmt.Errorf("invalid HSL color '%s', must be h,s,l", color)
 	}
 	// H,S,L format
 	h, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
-		return Color{}, fmt.Errorf("invalid hue '%s': %w", parts[0], err)
+		return 0, fmt.Errorf("invalid hue '%s': %w", parts[0], err)
 	}
 	if h < 0 || h > 1 {
-		return Color{}, fmt.Errorf("hue must be in [0,1], got %f", h)
+		return 0, fmt.Errorf("hue must be in [0,1], got %f", h)
 	}
 	s, err := strconv.ParseFloat(parts[1], 64)
 	if err != nil {
-		return Color{}, fmt.Errorf("invalid saturation '%s': %w", parts[1], err)
+		return 0, fmt.Errorf("invalid saturation '%s': %w", parts[1], err)
 	}
 	if s < 0 || s > 1 {
-		return Color{}, fmt.Errorf("saturation must be in [0,1], got %f", s)
+		return 0, fmt.Errorf("saturation must be in [0,1], got %f", s)
 	}
 	v, err := strconv.ParseFloat(parts[2], 64)
 	if err != nil {
-		return Color{}, fmt.Errorf("invalid brightness '%s': %w", parts[2], err)
+		return 0, fmt.Errorf("invalid brightness '%s': %w", parts[2], err)
 	}
 	if v < 0 || v > 1 {
-		return Color{}, fmt.Errorf("brightness must be in [0,1], got %f", v)
+		return 0, fmt.Errorf("brightness must be in [0,1], got %f", v)
 	}
-	return Color{RGBColor: HSLToRGB(h, s, v)}, nil
+	return HSLf(h, s, v), nil
+}
+
+// Extract RGB values from a hex color string (HHSSLL) or error.
+// (Same as RGBFromString but bytes being HSL instead of RGB).
+func FromHexHSLString(color string) (Color, error) {
+	var i int
+	_, err := fmt.Sscanf(color, "%x", &i)
+	if err != nil {
+		return 0, fmt.Errorf("invalid HSL hex color '%s', must be hex HHSSLL: %w", color, err)
+	}
+	h := (i >> 16) & 0xFF
+	s := (i >> 8) & 0xFF
+	l := i & 0xFF
+	return HSL(HSLColor{H: uint8(h), S: uint8(s), L: uint8(l)}), nil //nolint:gosec // no overflow here
+}
+
+func (hsl HSLColor) String() string {
+	return fmt.Sprintf("HSL#%02X%02X%02X", hsl.H, hsl.S, hsl.L)
+}
+
+func (hsl HSLColor) RGB() RGBColor {
+	return HSLToRGB(float64(hsl.H)/255., float64(hsl.S)/255., float64(hsl.L)/255.)
+}
+
+func (hsl HSLColor) Color() Color {
+	return HSL(hsl)
 }
 
 // HSLToRGB converts HSL values to RGB. h, s and l in [0,1].
@@ -300,6 +448,19 @@ func hueToRGB(p, q, t float64) float64 {
 		return p + (q-p)*(2/3.-t)*6
 	}
 	return p
+}
+
+func (c RGBColor) HSL() HSLColor {
+	h, s, l := RGBToHSL(c)
+	return HSLColor{
+		H: uint8(math.Round(h * 255)),
+		S: uint8(math.Round(s * 255)),
+		L: uint8(math.Round(l * 255)),
+	}
+}
+
+func (c RGBColor) Color() Color {
+	return RGB(c)
 }
 
 func RGBToHSL(c RGBColor) (h, s, l float64) {
