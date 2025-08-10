@@ -119,13 +119,13 @@ func (ap *AnsiPixels) DrawMonoImage(sx, sy int, img *image.Gray, color string) e
 	return err
 }
 
-func grayScaleImage(rgbaImg *image.RGBA) *image.Gray {
+func GrayScaleImage(rgbaImg *image.RGBA) *image.Gray {
 	grayImg := image.NewGray(rgbaImg.Bounds())
-	toGrey(rgbaImg, grayImg)
+	ToGray(rgbaImg, grayImg)
 	return grayImg
 }
 
-func toGrey(rgbaImg *image.RGBA, img image.Image) {
+func ToGray(rgbaImg *image.RGBA, img image.Image) {
 	// Iterate through the pixels of the NRGBA image and convert to grayscale
 	for y := rgbaImg.Bounds().Min.Y; y < rgbaImg.Bounds().Max.Y; y++ {
 		for x := rgbaImg.Bounds().Min.X; x < rgbaImg.Bounds().Max.X; x++ {
@@ -271,7 +271,7 @@ func (ap *AnsiPixels) ShowImages(imagesRGBA *Image, zoom float64, offsetX, offse
 // It must already have the right size to fit exactly in width/height within margins.
 func (ap *AnsiPixels) ShowScaledImage(img *image.RGBA) error {
 	if ap.Gray {
-		toGrey(img, img)
+		ToGray(img, img)
 	}
 	var err error
 	switch {
@@ -280,7 +280,7 @@ func (ap *AnsiPixels) ShowScaledImage(img *image.RGBA) error {
 	case ap.Color256:
 		err = ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
 	default:
-		err = ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), ap.MonoColor.Foreground())
+		err = ap.DrawMonoImage(ap.Margin, ap.Margin, GrayScaleImage(img), ap.MonoColor.Foreground())
 	}
 	return err
 }
