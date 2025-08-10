@@ -29,7 +29,21 @@ const (
 	bufSize   = 1024
 )
 
+// ColorMode determines if images be monochrome, 256 or true color.
+// Additionally there is the option to convert to grayscale.
+type ColorMode struct {
+	TrueColor bool
+	Color256  bool // 256 (216) color mode
+	Gray      bool // grayscale mode
+	// Fallback color to use for image display in mono/when Color or TrueColor are both false.
+	// Defaults to [tcolor.Blue] unless NO_COLOR is found in the environment.
+	MonoColor tcolor.BasicColor
+	// Name of the terminal, from TERM env.
+	TermEnv string
+}
+
 type AnsiPixels struct {
+	ColorMode
 	fdOut       int
 	Out         *bufio.Writer
 	SharedInput *terminal.InterruptReader
@@ -41,23 +55,15 @@ type AnsiPixels struct {
 	Mx, My      int  // Mouse last known position, in 1,1 coordinate system
 	Mbuttons    int  // Mouse buttons and modifier state
 	C           chan os.Signal
-	// Should images be monochrome, 256 or true color
-	TrueColor bool
-	Color256  bool         // 256 (216) color mode
-	Gray      bool         // grayscale mode
-	Margin    int          // Margin around the image (image is smaller by 2*margin)
-	FPS       float64      // (Target) Frames per second used for Reading with timeout
-	OnResize  func() error // Callback when terminal is resized
+	Margin      int          // Margin around the image (image is smaller by 2*margin)
+	FPS         float64      // (Target) Frames per second used for Reading with timeout
+	OnResize    func() error // Callback when terminal is resized
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
 	restored   bool
 	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
 	// used for fortio.org/tev raw event dump.
 	NoDecode bool
-	// Fallback color to use for image display in mono/when Color or TrueColor are both false.
-	MonoColor tcolor.BasicColor
-	// Name of the terminal, from TERM env.
-	TermEnv string
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -75,7 +81,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		SharedInput: terminal.GetSharedInput(d),
 		C:           make(chan os.Signal, 1),
 	}
-	ap.DetectColorMode()
+	ap.ColorMode = DetectColorMode()
 	signal.Notify(ap.C, signalList...)
 	return ap
 }
@@ -90,30 +96,35 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 // This is called by [NewAnsiPixels] but values can be changed based on flags
 // before [Open]. Can also be called on a temporary empty AnsiPixels to
 // extract flag default values (see usage in fps and tcolor demos for instance).
-func (ap *AnsiPixels) DetectColorMode() {
+// Example of use:
+//
+//	defaultTrueColor := ansipixels.DetectColorMode().TrueColor
+func DetectColorMode() (cm ColorMode) {
+	cm.MonoColor = tcolor.Blue // default mono (16) color
 	if os.Getenv("NO_COLOR") != "" {
-		ap.Color256 = false
-		ap.TrueColor = false
-		ap.MonoColor = tcolor.White
-		return
+		cm.Color256 = false
+		cm.TrueColor = false
+		cm.MonoColor = tcolor.White
+		return cm
 	}
 	if os.Getenv("COLORTERM") != "" {
-		ap.TrueColor = true
+		cm.TrueColor = true
 	}
-	ap.TermEnv = os.Getenv("TERM")
-	switch ap.TermEnv {
+	cm.TermEnv = os.Getenv("TERM")
+	switch cm.TermEnv {
 	case "xterm-256color":
-		ap.Color256 = true
-	case "xterm-truecolor", "xterm-kitty", "alacritty", "wezterm", "xterm-ghostty":
-		ap.TrueColor = true
+		cm.Color256 = true
+	case "xterm-truecolor", "xterm-kitty", "alacritty", "wezterm", "xterm-ghostty", "ghostty":
+		cm.TrueColor = true
 	case "":
-		ap.TermEnv = TermNoSet
+		cm.TermEnv = TermNoSet
 	}
 	// TODO: how to find out we're inside windows terminal which also supports true color
 	// but doesn't advertise it.
-	if ap.TrueColor {
-		ap.Color256 = true // if we have true color, we also have 256 color.
+	if cm.TrueColor {
+		cm.Color256 = true // if we have true color, we also have 256 color.
 	}
+	return cm
 }
 
 func (ap *AnsiPixels) Open() error {
