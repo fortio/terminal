@@ -1,5 +1,7 @@
 package ansipixels
 
+// Tests/exercising for this code is mostly in `fps`: https://github.com/fortio/fps
+
 import (
 	"bytes"
 	"fmt"
@@ -242,23 +244,14 @@ func (ap *AnsiPixels) DecodeImage(inp io.Reader) (*Image, error) {
 	return res, nil
 }
 
-// Color string is the fallback mono color to use when AnsiPixels.TrueColor is false.
-func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, zoom float64, offsetX, offsetY int, colorString string) error {
+// ShowImages a series of images (eg from decoding animated gif), scaling them to fit given the zoom and offsets.
+// Color used depends on TrueColor, Color or Gray settings. MonoColor is the default if no color is desired.
+// See the `fps` image viewer for example of use.
+func (ap *AnsiPixels) ShowImages(imagesRGBA *Image, zoom float64, offsetX, offsetY int) error {
 	// GetSize done in Open and Resize handler.
 	for i, imgRGBA := range imagesRGBA.Images {
 		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-4*ap.Margin, zoom, offsetX, offsetY)
-		if ap.Gray {
-			toGrey(img, img)
-		}
-		var err error
-		switch {
-		case ap.TrueColor:
-			err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
-		case ap.Color:
-			err = ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
-		default:
-			err = ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), colorString)
-		}
+		err := ap.ShowScaledImage(img)
 		if err != nil {
 			return err
 		}
@@ -272,4 +265,62 @@ func (ap *AnsiPixels) ShowImage(imagesRGBA *Image, zoom float64, offsetX, offset
 		}
 	}
 	return nil
+}
+
+// ShowScaledImage writes an image to the terminal.
+// It must already have the right size to fit exactly in width/height within margins.
+func (ap *AnsiPixels) ShowScaledImage(img *image.RGBA) error {
+	if ap.Gray {
+		toGrey(img, img)
+	}
+	var err error
+	switch {
+	case ap.TrueColor:
+		err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
+	case ap.Color256:
+		err = ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
+	default:
+		err = ap.DrawMonoImage(ap.Margin, ap.Margin, grayScaleImage(img), ap.MonoColor.Foreground())
+	}
+	return err
+}
+
+// NRGBA to RGBA (from grol images extension initially)
+
+// NRGBAtoRGBA converts a non-premultiplied alpha color to a premultiplied alpha color.
+//
+//nolint:gosec // gosec not smart enough to see this stays in range.
+func NRGBAtoRGBA(c color.NRGBA) color.RGBA {
+	if c.A == 0xFF {
+		return color.RGBA(c)
+	}
+	if c.A == 0 {
+		return color.RGBA{0, 0, 0, 0}
+	}
+	// Convert non-premultiplied alpha to premultiplied alpha
+	// RGBA = (R * A/255, G * A/255, B * A/255, A)
+	return color.RGBA{
+		R: uint8(uint16(c.R) * uint16(c.A) / 255),
+		G: uint8(uint16(c.G) * uint16(c.A) / 255),
+		B: uint8(uint16(c.B) * uint16(c.A) / 255),
+		A: c.A,
+	}
+}
+
+//nolint:gosec // gosec not smart enough to see the range checks with min - https://github.com/securego/gosec/issues/1212
+func AddPixel(img *image.RGBA, x, y int, c color.RGBA) {
+	p1 := img.RGBAAt(x, y)
+	if p1.R == 0 && p1.G == 0 && p1.B == 0 { // black is no change
+		img.SetRGBA(x, y, c)
+		return
+	}
+	if c.R == 0 && c.G == 0 && c.B == 0 { // black is no change
+		return
+	}
+	p1.R = uint8(min(255, uint16(p1.R)+uint16(c.R)))
+	p1.G = uint8(min(255, uint16(p1.G)+uint16(c.G)))
+	p1.B = uint8(min(255, uint16(p1.B)+uint16(c.B)))
+	// p1.A = uint8(min(255, uint16(p1.A)+uint16(p2.A))) // summing transparency yield non transparent quickly
+	p1.A = max(p1.A, c.A)
+	img.SetRGBA(x, y, p1)
 }

@@ -19,11 +19,15 @@ import (
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal"
+	"fortio.org/terminal/ansipixels/tcolor"
 	"github.com/rivo/uniseg"
 	"golang.org/x/term"
 )
 
-const bufSize = 1024
+const (
+	TermNoSet = "TERM not set"
+	bufSize   = 1024
+)
 
 type AnsiPixels struct {
 	fdOut       int
@@ -39,7 +43,7 @@ type AnsiPixels struct {
 	C           chan os.Signal
 	// Should images be monochrome, 256 or true color
 	TrueColor bool
-	Color     bool         // 256 (216) color mode
+	Color256  bool         // 256 (216) color mode
 	Gray      bool         // grayscale mode
 	Margin    int          // Margin around the image (image is smaller by 2*margin)
 	FPS       float64      // (Target) Frames per second used for Reading with timeout
@@ -50,6 +54,10 @@ type AnsiPixels struct {
 	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
 	// used for fortio.org/tev raw event dump.
 	NoDecode bool
+	// Fallback color to use for image display in mono/when Color or TrueColor are both false.
+	MonoColor tcolor.BasicColor
+	// Name of the terminal, from TERM env.
+	TermEnv string
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -67,12 +75,45 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		SharedInput: terminal.GetSharedInput(d),
 		C:           make(chan os.Signal, 1),
 	}
+	ap.DetectColorMode()
 	signal.Notify(ap.C, signalList...)
 	return ap
 }
 
 func (ap *AnsiPixels) ChangeFPS(fps float64) {
 	ap.SharedInput.ChangeTimeout(1 * time.Second / time.Duration(fps))
+}
+
+// DetectColorMode uses environment variables COLORTERM,
+// TERM and NO_COLOR to guess good starting values for Color and TrueColor.
+// Use flags to give the option to user to override these settings.
+// This is called by [NewAnsiPixels] but values can be changed based on flags
+// before [Open]. Can also be called on a temporary empty AnsiPixels to
+// extract flag default values (see usage in fps and tcolor demos for instance).
+func (ap *AnsiPixels) DetectColorMode() {
+	if os.Getenv("NO_COLOR") != "" {
+		ap.Color256 = false
+		ap.TrueColor = false
+		ap.MonoColor = tcolor.White
+		return
+	}
+	if os.Getenv("COLORTERM") != "" {
+		ap.TrueColor = true
+	}
+	ap.TermEnv = os.Getenv("TERM")
+	switch ap.TermEnv {
+	case "xterm-256color":
+		ap.Color256 = true
+	case "xterm-truecolor", "xterm-kitty", "alacritty", "wezterm", "xterm-ghostty":
+		ap.TrueColor = true
+	case "":
+		ap.TermEnv = TermNoSet
+	}
+	// TODO: how to find out we're inside windows terminal which also supports true color
+	// but doesn't advertise it.
+	if ap.TrueColor {
+		ap.Color256 = true // if we have true color, we also have 256 color.
+	}
 }
 
 func (ap *AnsiPixels) Open() error {
