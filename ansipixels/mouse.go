@@ -74,7 +74,7 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 		return NoMouse
 	}
 	start := idx + len(mouseDataPrefix)
-	if start+3 > len(ap.Data) {
+	if start+3 > len(ap.Data) { //nolint:nestif // the 2 possible read sources made this go over.
 		if !readMoreIfNeeded {
 			return MousePrefix
 		}
