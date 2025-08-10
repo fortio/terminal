@@ -58,6 +58,7 @@ type AnsiPixels struct {
 	Margin      int          // Margin around the image (image is smaller by 2*margin)
 	FPS         float64      // (Target) Frames per second used for Reading with timeout
 	OnResize    func() error // Callback when terminal is resized
+	OnMouse     func()       // Callback when mouse event is received
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
 	restored   bool

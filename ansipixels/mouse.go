@@ -112,6 +112,9 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 // MouseDecodeAll decodes all mouse events available,
 // useful at low fps where we may have multiple mouse events.
 // Internally used when ap.NoDecode is false.
+// The last event if more than one has been accumulated/sent will win.
+// If you need to keep track of each you can have an OnMouse callback.
+// Or set NoDecode to true and call MouseDecode yourself.
 func (ap *AnsiPixels) MouseDecodeAll() {
 	gotMouse := false
 	for ap.MouseDecode(true) == MouseComplete {
@@ -119,6 +122,9 @@ func (ap *AnsiPixels) MouseDecodeAll() {
 		// TODO: consider keeping a list of all the events or saving the left/right clicks in priority
 		// over mouse movements.
 		gotMouse = true
+		if ap.OnMouse != nil {
+			ap.OnMouse()
+		}
 	}
 	ap.Mouse = gotMouse
 }
