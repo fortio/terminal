@@ -104,11 +104,17 @@ const (
 	ColorTypeBasic ColorType = 3 // BasicColor
 )
 
-// 30 bits, used for 10 bits color v in Color.
-type Uint30 int32
+// 30 bits, used for 12,8,10 bits HSL color components in HSLColor.
+type Uint30 uint32
 
-// 10 bits for each component in HSL or RGB.
-type Uint10 int16
+// 12 bits for Hue component in HSL.
+type Uint12 uint16
+
+// 8 bits for Saturation component in HSL.
+type Uint8 = uint8
+
+// 10 bits for Luminance component in HSL.
+type Uint10 uint16
 
 //nolint:gosec // no overflow possible
 func (c Color) Decode() (ColorType, Uint30) {
@@ -130,35 +136,33 @@ func Basic(c BasicColor) Color {
 }
 
 func RGB(c RGBColor) Color {
-	return Color(uint32(ColorTypeRGB)<<30 | uint32(c.R)<<22 | uint32(c.G)<<12 | uint32(c.B)<<2)
+	return Color(uint32(ColorTypeRGB)<<30 | uint32(c.R)<<16 | uint32(c.G)<<8 | uint32(c.B))
 }
 
 // HSLf creates a Color from HSL float values in [0,1] range.
 func HSLf(h, s, l float64) Color {
 	return Color(uint32(ColorTypeHSL)<<30 |
-		uint32(math.Round(h*1023))<<20 | // h in [0,1]
-		uint32(math.Round(s*1023))<<10 | // s in [0,1]
+		uint32(math.Round(h*4095))<<18 | // h in [0,1]
+		uint32(math.Round(s*255))<<10 | // s in [0,1]
 		uint32(math.Round(l*1023))) // l in [0,1]
 }
 
 // HSL creates a Color from HSLColor.
-//
-//nolint:gosec // no overflow possible
 func HSL(hsl HSLColor) Color {
 	return Color(uint32(ColorTypeHSL)<<30 |
-		uint32(hsl.H)<<20 | // h in [0,1023]
-		uint32(hsl.S)<<10 | // s in [0,1023]
+		uint32(hsl.H)<<18 | // h in [0,4095]
+		uint32(hsl.S)<<10 | // s in [0,255]
 		uint32(hsl.L)) // l in [0,1023]
 }
 
 //nolint:gosec // no overflow possible
-func Int30To10bits(val Uint30) (Uint10, Uint10, Uint10) {
-	return Uint10((val >> 20) & 0x3FF), Uint10((val >> 10) & 0x3FF), Uint10(val & 0x3FF)
+func Int30ToHSL(val Uint30) (Uint12, Uint8, Uint10) {
+	return Uint12((val >> 18) & 0xFFF), Uint8((val >> 10) & 0xFF), Uint10(val & 0x3FF)
 }
 
 //nolint:gosec // no overflow possible
 func Int30To8bits(val Uint30) (uint8, uint8, uint8) {
-	return uint8((val >> 22) & 0xFF), uint8((val >> 12) & 0xFF), uint8(val >> 2 & 0xFF)
+	return uint8((val >> 16) & 0xFF), uint8((val >> 8) & 0xFF), uint8(val & 0xFF)
 }
 
 func (c Color) String() string {
@@ -168,8 +172,8 @@ func (c Color) String() string {
 		v1, v2, v3 := Int30To8bits(val)
 		return fmt.Sprintf("#%02X%02X%02X", v1, v2, v3)
 	case ColorTypeHSL:
-		v1, v2, v3 := Int30To10bits(val)
-		return fmt.Sprintf("HSL_%03X%03X%03X", v1, v2, v3)
+		v1, v2, v3 := Int30ToHSL(val)
+		return fmt.Sprintf("HSL_%03X_%02X_%03X", v1, v2, v3)
 	case ColorTypeBasic:
 		return BasicColor(val).String() //nolint:gosec // no overflow possible
 	default:
@@ -191,7 +195,7 @@ func ToRGB(t ColorType, v Uint30) RGBColor {
 		r, g, b := Int30To8bits(v)
 		return RGBColor{R: r, G: g, B: b}
 	case ColorTypeHSL:
-		h, s, l := Int30To10bits(v)
+		h, s, l := Int30ToHSL(v)
 		hsl := HSLColor{H: h, S: s, L: l}
 		rgb := hsl.RGB()
 		// log.Printf("Converting HSL(%d,%d,%d) -> %#v to RGB: %x, %x, %x", h, s, l, hsl, rgb.R, rgb.G, rgb.B)
@@ -207,7 +211,7 @@ func ToHSL(t ColorType, v Uint30) HSLColor {
 		r, g, b := Int30To8bits(v)
 		return RGBColor{R: r, G: g, B: b}.HSL()
 	case ColorTypeHSL:
-		h, s, l := Int30To10bits(v)
+		h, s, l := Int30ToHSL(v)
 		return HSLColor{H: h, S: s, L: l}
 	default:
 		panic(fmt.Sprintf("ToHSL on invalid color type %d", t))
@@ -377,7 +381,9 @@ func (co ColorOutput) Background(c Color) string {
 
 // HSLColor is the hex version of h,s,l, each in [0,1023] (10 bits).
 type HSLColor struct {
-	H, S, L Uint10
+	H Uint12
+	S Uint8
+	L Uint10
 }
 
 // FromHSLString converts a string in the format "h,s,l" [0,1] each, to a 3 bytes Color.
@@ -411,6 +417,30 @@ func From3floatHSLString(color string) (Color, error) {
 	return HSLf(h, s, v), nil
 }
 
+func HexStrToUint12(hex string) (Uint12, error) {
+	var i uint32
+	_, err := fmt.Sscanf(hex, "%x", &i)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 12 bits hex '%s', must be hex 000-FFF: %w", hex, err)
+	}
+	if i > 0xFFF {
+		return 0, fmt.Errorf("invalid 12 bits hex '%s', must be hex 000-FFF: %w", hex, err)
+	}
+	return Uint12(i), nil
+}
+
+func HexStrToUint8(hex string) (Uint8, error) {
+	var i uint32
+	_, err := fmt.Sscanf(hex, "%x", &i)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 8 bits hex '%s', must be hex 00-FF: %w", hex, err)
+	}
+	if i > 0xFF {
+		return 0, fmt.Errorf("invalid 8 bits hex '%s', must be hex 00-FF: %w", hex, err)
+	}
+	return Uint8(i), nil
+}
+
 func HexStrToUint10(hex string) (Uint10, error) {
 	var i uint32
 	_, err := fmt.Sscanf(hex, "%x", &i)
@@ -423,10 +453,8 @@ func HexStrToUint10(hex string) (Uint10, error) {
 	return Uint10(i), nil
 }
 
-// Extract RGB values from a hex color string (HHSSLL) or error.
+// Extract RGB values from a hex color string (HHH_SS_LLL or HHSSLL) or error.
 // (Same as RGBFromString but bytes being HSL instead of RGB).
-//
-//nolint:gosec // no overflow possible
 func FromHexHSLString(color string) (Color, error) {
 	if len(color) == 6 {
 		// reuse 6 digit RGB parsing
@@ -434,21 +462,21 @@ func FromHexHSLString(color string) (Color, error) {
 		if err != nil {
 			return 0, err
 		}
-		hsl := HSLColor{H: Uint10(rgbColor.R) << 2, S: Uint10(rgbColor.G) << 2, L: Uint10(rgbColor.B) << 2}
+		hsl := HSLColor{H: Uint12(rgbColor.R) << 4, S: rgbColor.G, L: Uint10(rgbColor.B) << 2}
 		return HSL(hsl), nil
 	}
-	if len(color) != 9 {
-		return 0, fmt.Errorf("invalid HSL hex color '%s', must be hex HHHSSSLLL or HHSSLL", color)
+	if len(color) != 8 {
+		return 0, fmt.Errorf("invalid HSL hex color '%s', must be hex HHH_SS_LLL or HHSSLL", color)
 	}
-	h, err := HexStrToUint10(color[:3])
+	h, err := HexStrToUint12(color[:3])
 	if err != nil {
 		return 0, err
 	}
-	s, err := HexStrToUint10(color[3:6])
+	s, err := HexStrToUint8(color[3:5])
 	if err != nil {
 		return 0, err
 	}
-	l, err := HexStrToUint10(color[6:])
+	l, err := HexStrToUint10(color[5:])
 	if err != nil {
 		return 0, err
 	}
@@ -456,11 +484,11 @@ func FromHexHSLString(color string) (Color, error) {
 }
 
 func (hsl HSLColor) String() string {
-	return fmt.Sprintf("HSL#%03X%03X%03X", hsl.H, hsl.S, hsl.L)
+	return fmt.Sprintf("HSL#%03X_%02X_%03X", hsl.H, hsl.S, hsl.L)
 }
 
 func (hsl HSLColor) RGB() RGBColor {
-	return HSLToRGB(float64(hsl.H)/1023., float64(hsl.S)/1023., float64(hsl.L)/1023.)
+	return HSLToRGB(float64(hsl.H)/4096., float64(hsl.S)/255., float64(hsl.L)/1023.)
 }
 
 func (hsl HSLColor) Color() Color {
@@ -515,8 +543,8 @@ func hueToRGB(p, q, t float64) float64 {
 func (c RGBColor) HSL() HSLColor {
 	h, s, l := RGBToHSL(c)
 	return HSLColor{
-		H: Uint10(math.Round(h * 1023)),
-		S: Uint10(math.Round(s * 1023)),
+		H: Uint12(math.Round(h * 4096)),
+		S: Uint8(math.Round(s * 255)),
 		L: Uint10(math.Round(l * 1023)),
 	}
 }
