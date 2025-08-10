@@ -119,7 +119,7 @@ type Uint10 uint16
 
 const (
 	MaxHSLHue        = 4095 // 12 bits
-	MaxHLSSaturation = 255  // 8 bits
+	MaxHSLSaturation = 255  // 8 bits
 	MaxHSLLightness  = 1023 // 10 bits
 )
 
@@ -150,7 +150,7 @@ func RGB(c RGBColor) Color {
 func HSLf(h, s, l float64) Color {
 	return Color(uint32(ColorTypeHSL)<<30 |
 		uint32(math.Round(h*MaxHSLHue))<<18 | // h in [0,1]
-		uint32(math.Round(s*MaxHLSSaturation))<<10 | // s in [0,1]
+		uint32(math.Round(s*MaxHSLSaturation))<<10 | // s in [0,1]
 		uint32(math.Round(l*MaxHSLLightness))) // l in [0,1]
 }
 
@@ -496,7 +496,7 @@ func (hsl HSLColor) String() string {
 }
 
 func (hsl HSLColor) RGB() RGBColor {
-	return HSLToRGB(float64(hsl.H)/MaxHSLHue, float64(hsl.S)/MaxHLSSaturation, float64(hsl.L)/MaxHSLLightness)
+	return HSLToRGB(float64(hsl.H)/MaxHSLHue, float64(hsl.S)/MaxHSLSaturation, float64(hsl.L)/MaxHSLLightness)
 }
 
 func (hsl HSLColor) Color() Color {
@@ -552,7 +552,7 @@ func (c RGBColor) HSL() HSLColor {
 	h, s, l := RGBToHSL(c)
 	return HSLColor{
 		H: Uint12(math.Round(h * MaxHSLHue)),
-		S: Uint8(math.Round(s * MaxHLSSaturation)),
+		S: Uint8(math.Round(s * MaxHSLSaturation)),
 		L: Uint10(math.Round(l * MaxHSLLightness)),
 	}
 }
