@@ -55,12 +55,12 @@ func TestParsingAdvancedColor(t *testing.T) {
 		{"#33FF57", tcolor.RGBColor{R: 51, G: 255, B: 87}},
 		{"#3357FF", tcolor.RGBColor{R: 51, G: 87, B: 255}},
 		// HSL are not really verified but seem to make sense (matched what was returned)
-		{"0.5,0.5,0.5", tcolor.RGBColor{R: 64, G: 190, B: 192}},
-		{"0.1,1,0.5", tcolor.RGBColor{R: 255, G: 156, B: 1}},
-		{"0.1,1,0.75", tcolor.RGBColor{R: 255, G: 205, B: 127}},
-		{"0.1,1,0.25", tcolor.RGBColor{R: 128, G: 78, B: 0}},
-		{"0.7,1,0.5", tcolor.RGBColor{R: 55, G: 1, B: 255}},
-		{"0.7,0.5,0.5", tcolor.RGBColor{R: 91, G: 64, B: 192}},
+		{"0.5,0.5,0.5", tcolor.RGBColor{R: 64, G: 191, B: 191}},
+		{"0.1,1,0.5", tcolor.RGBColor{R: 255, G: 153, B: 0}},
+		{"0.1,1,0.75", tcolor.RGBColor{R: 255, G: 204, B: 127}},
+		{"0.1,1,0.25", tcolor.RGBColor{R: 128, G: 76, B: 0}},
+		{"0.7,1,0.5", tcolor.RGBColor{R: 51, G: 0, B: 255}},
+		{"0.7,0.5,0.5", tcolor.RGBColor{R: 89, G: 64, B: 191}},
 		{"1.0,1,0.75", tcolor.RGBColor{R: 255, G: 127, B: 127}},
 	}
 	for _, test := range tests {
@@ -70,14 +70,14 @@ func TestParsingAdvancedColor(t *testing.T) {
 				t.Errorf("Failed to parse %q: %v", test.input, err)
 				return
 			}
-			ct, components := parsedColor.Decode()
+			ct, v := parsedColor.Decode()
 			if ct == tcolor.ColorTypeBasic {
 				t.Errorf("Expected advanced color for %q, got %s", test.input, parsedColor.String())
 				return
 			}
-			rgb := tcolor.ToRGB(ct, components)
+			rgb := tcolor.ToRGB(ct, v)
 			if rgb != test.expected {
-				t.Errorf("Parsed %q as %s - %v %v -> %v, expected %v", test.input, parsedColor.String(), ct, components, rgb, test.expected)
+				t.Errorf("Parsed %q as %s - %v %X -> %v, expected %v", test.input, parsedColor.String(), ct, v, rgb, test.expected)
 			}
 		})
 	}
@@ -88,11 +88,10 @@ func TestParsingHSLHex(t *testing.T) {
 		input    string
 		expected tcolor.HSLColor
 	}{
-		{"HSL#010203", tcolor.HSLColor{H: 1, S: 2, L: 3}},
-		{"HSL#FFFFFF", tcolor.HSLColor{H: 0xFF, S: 0xFF, L: 0xFF}},
-		{"HSL#FF5733", tcolor.HSLColor{H: 0xFF, S: 0x57, L: 0x33}},
-		{"HSL#33FF57", tcolor.HSLColor{H: 0x33, S: 0xFF, L: 0x57}},
-		{"HSL#BEDEAD", tcolor.HSLColor{H: 0xBE, S: 0xDE, L: 0xAD}},
+		{"HSL#001002003", tcolor.HSLColor{H: 1, S: 2, L: 3}},
+		{"HSL#010203", tcolor.HSLColor{H: 4, S: 8, L: 12}},
+		{"HSL#3F03F13F2", tcolor.HSLColor{H: 0x3F0, S: 0x3F1, L: 0x3F2}},
+		{"HSL#FF5733", tcolor.HSLColor{H: 0x3FC, S: 0x15C, L: 0xCC}},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
@@ -101,12 +100,12 @@ func TestParsingHSLHex(t *testing.T) {
 				t.Errorf("Failed to parse %q: %v", test.input, err)
 				return
 			}
-			ct, components := parsedColor.Decode()
+			ct, v := parsedColor.Decode()
 			if ct != tcolor.ColorTypeHSL {
 				t.Errorf("Expected advanced color for %q, got %s", test.input, parsedColor.String())
 				return
 			}
-			hsl := tcolor.ToHSL(ct, components)
+			hsl := tcolor.ToHSL(ct, v)
 			if hsl != test.expected {
 				t.Errorf("Parsed %q as %v, expected %v", test.input, hsl, test.expected)
 			}
@@ -114,7 +113,7 @@ func TestParsingHSLHex(t *testing.T) {
 	}
 }
 
-func TestHSLRGBExactRoundTrip(t *testing.T) {
+func TestHSLRGBExactRoundTripFloats(t *testing.T) {
 	var mismatches int
 	for r := range 256 {
 		for g := range 256 {
@@ -129,6 +128,41 @@ func TestHSLRGBExactRoundTrip(t *testing.T) {
 						t.Errorf("Mismatch: in=%v hsl=(%.10f,%.10f,%.10f) out=%v",
 							in, h, s, l, out)
 					}
+				}
+			}
+		}
+	}
+	if mismatches > 0 {
+		t.Fatalf("Total mismatches: %d", mismatches)
+	}
+}
+
+func dist(a, b uint8) uint32 {
+	if a < b {
+		return uint32(b - a)
+	}
+	return uint32(a - b)
+}
+
+func rgbDistance(a, b tcolor.RGBColor) uint32 {
+	return dist(a.R, b.R) + dist(a.G, b.G) + dist(a.B, b.B)
+}
+
+func TestHSLRGBExactRoundTrip3Bytes(t *testing.T) {
+	var mismatches int
+	for r := range 256 {
+		for g := range 256 {
+			for b := range 256 {
+				in := tcolor.RGBColor{uint8(r), uint8(g), uint8(b)}
+				hsl := in.HSL()
+				out := hsl.RGB()
+				dist := rgbDistance(in, out)
+				if dist > 0 {
+					if mismatches%997 == 0 { // log random few
+						t.Errorf("Mismatch: %d in=%v hsl=%s out=%v",
+							dist, in, hsl.String(), out)
+					}
+					mismatches++
 				}
 			}
 		}
