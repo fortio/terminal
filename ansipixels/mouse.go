@@ -74,14 +74,20 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 		return NoMouse
 	}
 	start := idx + len(mouseDataPrefix)
-	if start+3 > len(ap.Data) {
+	if start+3 > len(ap.Data) { //nolint:nestif // the 2 possible read sources made this go over.
 		if !readMoreIfNeeded {
 			return MousePrefix
 		}
 		// Read the missing bytes (eg windows terminal sends in 2 chunks).
 		need := start + 3 - len(ap.Data)
 		buf := [3]byte{}
-		n, err := ap.SharedInput.TR.Read(buf[:need])
+		var n int
+		var err error
+		if ap.readSharedMode {
+			n, err = ap.SharedInput.Read(buf[:need])
+		} else {
+			n, err = ap.SharedInput.TR.Read(buf[:need])
+		}
 		if err != nil {
 			log.Errf("Error reading additional mouse data: %v", err)
 			return MouseError
@@ -106,11 +112,19 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 // MouseDecodeAll decodes all mouse events available,
 // useful at low fps where we may have multiple mouse events.
 // Internally used when ap.NoDecode is false.
+// The last event if more than one has been accumulated/sent will win.
+// If you need to keep track of each you can have an OnMouse callback.
+// Or set NoDecode to true and call MouseDecode yourself.
 func (ap *AnsiPixels) MouseDecodeAll() {
 	gotMouse := false
 	for ap.MouseDecode(true) == MouseComplete {
 		// keep decoding mouse events until we have no more.
+		// TODO: consider keeping a list of all the events or saving the left/right clicks in priority
+		// over mouse movements.
 		gotMouse = true
+		if ap.OnMouse != nil {
+			ap.OnMouse()
+		}
 	}
 	ap.Mouse = gotMouse
 }
