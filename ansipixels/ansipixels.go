@@ -19,13 +19,31 @@ import (
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal"
+	"fortio.org/terminal/ansipixels/tcolor"
 	"github.com/rivo/uniseg"
 	"golang.org/x/term"
 )
 
-const bufSize = 1024
+const (
+	TermNoSet = "TERM not set"
+	bufSize   = 1024
+)
+
+// ColorMode determines if images be monochrome, 256 or true color.
+// Additionally there is the option to convert to grayscale.
+type ColorMode struct {
+	TrueColor bool
+	Color256  bool // 256 (216) color mode
+	Gray      bool // grayscale mode
+	// Fallback color to use for image display in mono/when Color or TrueColor are both false.
+	// Defaults to [tcolor.Blue] unless NO_COLOR is found in the environment.
+	MonoColor tcolor.BasicColor
+	// Name of the terminal, from TERM env.
+	TermEnv string
+}
 
 type AnsiPixels struct {
+	ColorMode
 	fdOut       int
 	Out         *bufio.Writer
 	SharedInput *terminal.InterruptReader
@@ -37,13 +55,9 @@ type AnsiPixels struct {
 	Mx, My      int  // Mouse last known position, in 1,1 coordinate system
 	Mbuttons    int  // Mouse buttons and modifier state
 	C           chan os.Signal
-	// Should images be monochrome, 256 or true color
-	TrueColor bool
-	Color     bool         // 256 (216) color mode
-	Gray      bool         // grayscale mode
-	Margin    int          // Margin around the image (image is smaller by 2*margin)
-	FPS       float64      // (Target) Frames per second used for Reading with timeout
-	OnResize  func() error // Callback when terminal is resized
+	Margin      int          // Margin around the image (image is smaller by 2*margin)
+	FPS         float64      // (Target) Frames per second used for Reading with timeout
+	OnResize    func() error // Callback when terminal is resized
 	// First time we clear the screen, we use 2J to push old content to scrollback buffer, otherwise we use H+0J
 	firstClear bool
 	restored   bool
@@ -67,12 +81,50 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		SharedInput: terminal.GetSharedInput(d),
 		C:           make(chan os.Signal, 1),
 	}
+	ap.ColorMode = DetectColorMode()
 	signal.Notify(ap.C, signalList...)
 	return ap
 }
 
 func (ap *AnsiPixels) ChangeFPS(fps float64) {
 	ap.SharedInput.ChangeTimeout(1 * time.Second / time.Duration(fps))
+}
+
+// DetectColorMode uses environment variables COLORTERM,
+// TERM and NO_COLOR to guess good starting values for Color and TrueColor.
+// Use flags to give the option to user to override these settings.
+// This is called by [NewAnsiPixels] but values can be changed based on flags
+// before [Open]. Can also be called on a temporary empty AnsiPixels to
+// extract flag default values (see usage in fps and tcolor demos for instance).
+// Example of use:
+//
+//	defaultTrueColor := ansipixels.DetectColorMode().TrueColor
+func DetectColorMode() (cm ColorMode) {
+	cm.MonoColor = tcolor.Blue // default mono (16) color
+	if os.Getenv("NO_COLOR") != "" {
+		cm.Color256 = false
+		cm.TrueColor = false
+		cm.MonoColor = tcolor.White
+		return cm
+	}
+	if os.Getenv("COLORTERM") != "" {
+		cm.TrueColor = true
+	}
+	cm.TermEnv = os.Getenv("TERM")
+	switch cm.TermEnv {
+	case "xterm-256color":
+		cm.Color256 = true
+	case "xterm-truecolor", "xterm-kitty", "alacritty", "wezterm", "xterm-ghostty", "ghostty":
+		cm.TrueColor = true
+	case "":
+		cm.TermEnv = TermNoSet
+	}
+	// TODO: how to find out we're inside windows terminal which also supports true color
+	// but doesn't advertise it.
+	if cm.TrueColor {
+		cm.Color256 = true // if we have true color, we also have 256 color.
+	}
+	return cm
 }
 
 func (ap *AnsiPixels) Open() error {
