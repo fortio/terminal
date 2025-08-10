@@ -92,7 +92,7 @@ func (c RGBColor) Background() string {
 }
 
 // Color: high 2 bits is type, rest is RGB or HSL or BasicColor.
-// HSL is 10 bits for each component (H, S, L)
+// HSL is 12 bits for Hue, 8 bits for Saturation, 10 bits for Luminance (lowest error rate when going to/from RGB).
 // RGB is 8 bits for each component (R, G, B).
 type Color uint32
 
