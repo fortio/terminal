@@ -97,7 +97,8 @@ func (c RGBColor) Background() string {
 type Color uint32
 
 // ColorType is the type of the color, used in the high 2 bits of the Color.
-type ColorType uint8 // 0 for RGB, 1 for HSL, 2 for BasicColor
+type ColorType uint8 // 1 for RGB, 2 for HSL, 3 for BasicColor
+
 const (
 	ColorTypeRGB   ColorType = 1 // RGBColor
 	ColorTypeHSL   ColorType = 2 // HSLColor
@@ -111,10 +112,16 @@ type Uint30 uint32
 type Uint12 uint16
 
 // 8 bits for Saturation component in HSL.
-type Uint8 = uint8
+type Uint8 uint8
 
 // 10 bits for Luminance component in HSL.
 type Uint10 uint16
+
+const (
+	MaxHSLHue        = 4095 // 12 bits
+	MaxHLSSaturation = 255  // 8 bits
+	MaxHSLLightness  = 1023 // 10 bits
+)
 
 //nolint:gosec // no overflow possible
 func (c Color) Decode() (ColorType, Uint30) {
@@ -142,9 +149,9 @@ func RGB(c RGBColor) Color {
 // HSLf creates a Color from HSL float values in [0,1] range.
 func HSLf(h, s, l float64) Color {
 	return Color(uint32(ColorTypeHSL)<<30 |
-		uint32(math.Round(h*4095))<<18 | // h in [0,1]
-		uint32(math.Round(s*255))<<10 | // s in [0,1]
-		uint32(math.Round(l*1023))) // l in [0,1]
+		uint32(math.Round(h*MaxHSLHue))<<18 | // h in [0,1]
+		uint32(math.Round(s*MaxHLSSaturation))<<10 | // s in [0,1]
+		uint32(math.Round(l*MaxHSLLightness))) // l in [0,1]
 }
 
 // HSL creates a Color from HSLColor.
@@ -462,7 +469,8 @@ func FromHexHSLString(color string) (Color, error) {
 		if err != nil {
 			return 0, err
 		}
-		hsl := HSLColor{H: Uint12(rgbColor.R) << 4, S: rgbColor.G, L: Uint10(rgbColor.B) << 2}
+		// Convert from 8,8,8 extracted above to 12,8,10 bits.
+		hsl := HSLColor{H: Uint12(rgbColor.R) << 4, S: Uint8(rgbColor.G), L: Uint10(rgbColor.B) << 2}
 		return HSL(hsl), nil
 	}
 	if len(color) != 8 {
@@ -488,7 +496,7 @@ func (hsl HSLColor) String() string {
 }
 
 func (hsl HSLColor) RGB() RGBColor {
-	return HSLToRGB(float64(hsl.H)/4096., float64(hsl.S)/255., float64(hsl.L)/1023.)
+	return HSLToRGB(float64(hsl.H)/MaxHSLHue, float64(hsl.S)/MaxHLSSaturation, float64(hsl.L)/MaxHSLLightness)
 }
 
 func (hsl HSLColor) Color() Color {
@@ -543,9 +551,9 @@ func hueToRGB(p, q, t float64) float64 {
 func (c RGBColor) HSL() HSLColor {
 	h, s, l := RGBToHSL(c)
 	return HSLColor{
-		H: Uint12(math.Round(h * 4096)),
-		S: Uint8(math.Round(s * 255)),
-		L: Uint10(math.Round(l * 1023)),
+		H: Uint12(math.Round(h * MaxHSLHue)),
+		S: Uint8(math.Round(s * MaxHLSSaturation)),
+		L: Uint10(math.Round(l * MaxHSLLightness)),
 	}
 }
 

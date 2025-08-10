@@ -55,14 +55,14 @@ func TestParsingAdvancedColor(t *testing.T) {
 		{"#33FF57", tcolor.RGBColor{R: 51, G: 255, B: 87}},
 		{"#3357FF", tcolor.RGBColor{R: 51, G: 87, B: 255}},
 		// HSL are not really verified but seem to make sense (matched what was returned)
-		{"0.5,0.5,0.5", tcolor.RGBColor{R: 64, G: 192, B: 192}},
+		{"0.5,0.5,0.5", tcolor.RGBColor{R: 64, G: 191, B: 192}},
 		{"0.1,1,0.5", tcolor.RGBColor{R: 255, G: 153, B: 0}},
 		{"0.1,1,0.75", tcolor.RGBColor{R: 255, G: 204, B: 127}},
 		{"0.1,1,0.25", tcolor.RGBColor{R: 128, G: 77, B: 0}},
 		{"0.70,0.5,0.5", tcolor.RGBColor{R: 89, G: 64, B: 192}},
-		{"0.75,1,0.5", tcolor.RGBColor{R: 127, G: 0, B: 255}},
-		{"0.75,0.5,0.5", tcolor.RGBColor{R: 127, G: 64, B: 192}},
-		{"1.0,1,0.75", tcolor.RGBColor{R: 255, G: 127, B: 128}},
+		{"0.75,1,0.5", tcolor.RGBColor{R: 128, G: 0, B: 255}},
+		{"0.75,0.5,0.5", tcolor.RGBColor{R: 128, G: 64, B: 192}},
+		{"1.0,1,0.75", tcolor.RGBColor{R: 255, G: 127, B: 127}},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
@@ -170,9 +170,9 @@ func TestHSLRGBExactRoundTrip3Bytes(t *testing.T) {
 		}
 	}
 	errorPercent := float64(mismatches) / float64(total) * 100
-	t.Logf("Total RGB to HSL roundtrip mismatches: %d out of %d (%.3f%%)",
+	t.Logf("Total RGB to HSL roundtrip mismatches: %d out of %d (%.4f%%)",
 		mismatches, total, errorPercent)
 	if errorPercent > 0.2 { // 0.2% is about what we get
-		t.Fatalf("Total mismatches: %d (%.3f%%)", mismatches, errorPercent)
+		t.Fatalf("Total mismatches: %d (%.4f%%)", mismatches, errorPercent)
 	}
 }
