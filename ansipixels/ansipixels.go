@@ -64,6 +64,9 @@ type AnsiPixels struct {
 	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
 	// used for fortio.org/tev raw event dump.
 	NoDecode bool
+	// When in FPSTick mode we read directly from the shared input, non blocking. Affects how
+	// other read like MouseDecode should read.
+	readSharedMode bool
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -254,8 +257,12 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 	}
 	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
 	nctx, cancel := ap.SharedInput.Start(ctx)
-	defer timer.Stop()
-	defer cancel()
+	ap.readSharedMode = true
+	defer func() {
+		timer.Stop()
+		cancel()
+		ap.readSharedMode = false
+	}()
 	for {
 		select {
 		case s := <-ap.C:

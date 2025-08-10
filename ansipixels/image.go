@@ -251,12 +251,17 @@ func (ap *AnsiPixels) ShowImages(imagesRGBA *Image, zoom float64, offsetX, offse
 	// GetSize done in Open and Resize handler.
 	for i, imgRGBA := range imagesRGBA.Images {
 		img := resizeAndCenter(imgRGBA, ap.W-2*ap.Margin, 2*ap.H-4*ap.Margin, zoom, offsetX, offsetY)
+		if i > 0 {
+			ap.StartSyncMode()
+		}
 		err := ap.ShowScaledImage(img)
 		if err != nil {
 			return err
 		}
-		ap.Out.Flush()
 		if i < len(imagesRGBA.Delays)-1 { // maybe read keyboard/signal for stop request in case this is longish.
+			if i > 0 {
+				ap.EndSyncMode()
+			}
 			delay := imagesRGBA.Delays[i]
 			log.Debugf("Delay %d", delay)
 			if delay > 0 {
