@@ -85,6 +85,8 @@ const (
 // - NoMouse if no mouse data was found
 // - MouseComplete if the mouse data was successfully decoded
 // - MousePrefix if the mouse data prefix was found but not enough data to decode it.
+// That last one and the complexity don't seem to be occurring anymore but are used/expected by
+// https://github.com/fortio/tev as it used to be required on windows.
 func (ap *AnsiPixels) MouseDecode() MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, sgrMouseDataPrefix)
@@ -101,6 +103,10 @@ func (ap *AnsiPixels) MouseDecode() MouseStatus {
 	state := 0
 	// Fast no alloc parsing (vs `\d+;\d+;\d+[mM]` regexp)
 	for !done {
+		if i >= len(ap.Data) {
+			log.LogVf("MouseDecode: partial mouse event %q", ap.Data[start:])
+			return MousePrefix
+		}
 		c := ap.Data[i]
 		switch c {
 		case 'm':
@@ -146,18 +152,9 @@ func (ap *AnsiPixels) MouseDecode() MouseStatus {
 	return MouseComplete
 }
 
-// MouseDecode decodes a single mouse data event from the AnsiPixels.Data buffer.
-// It is automatically called through [MouseDecodeAll] by [ReadOrResizeOrSignal] and [ReadOrResizeOrSignalOnce]
-// unless NoDecode is set to true
-// (so you typically don't need to call it directly and can just check the Mouse, Mx, My, Mbuttons fields).
-// If there is more than one event you can consume them by calling [MouseDecodeAll].
-//
-// It returns one of the MouseStatus values:
-// - NoMouse if no mouse data was found
-// - MouseComplete if the mouse data was successfully decoded
-// - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfNeeded)
-// - MouseError if there was an error reading the additional mouse data
-// This complication is pretty much only needed for fortio.org/tev.
+// MouseDecodeX10 is the older fixed 3 bytes non 1006h mouse decoding
+// It's the one that really returns MousePrefix (when ran on windows terminal)
+// That complication was pretty much only needed for fortio.org/tev.
 func (ap *AnsiPixels) MouseDecodeX10(readMoreIfNeeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
