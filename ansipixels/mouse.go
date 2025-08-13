@@ -237,6 +237,8 @@ const (
 	MouseWheelMask = ^(AllModifiers | MouseRight)
 )
 
+// MouseDebugString returns a string representation of the current mouse buttons and modifier state.
+// See https://github.com/fortio/tev for an event debugging tool that uses this.
 func (ap *AnsiPixels) MouseDebugString() string {
 	if !ap.Mouse {
 		return "No mouse event "
