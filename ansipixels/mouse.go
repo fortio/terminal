@@ -102,8 +102,9 @@ func (ap *AnsiPixels) MouseDecode() MouseStatus {
 	var b, x, y, endIdx int
 	state := 0
 	// Fast no alloc parsing (vs `\d+;\d+;\d+[mM]` regexp)
+	dataLen := len(ap.Data)
 	for !done {
-		if i >= len(ap.Data) {
+		if i >= dataLen {
 			log.LogVf("MouseDecode: partial mouse event %q", ap.Data[start:])
 			return MousePrefix
 		}
