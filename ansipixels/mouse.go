@@ -1,15 +1,24 @@
 package ansipixels
 
+// See https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Mouse-Tracking
+
 import (
 	"bytes"
+	"strings"
 
 	"fortio.org/log"
 )
 
+// MouseClickOn turns on mouse click and wheel tracking.
+// It will set decoded Mx, My, MButtons, Mouse flag etc... and call OnMouse.
+// If you call *On do call *Off in your defer restore.
 func (ap *AnsiPixels) MouseClickOn() {
-	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
+	// https://github.com/ghostty-org/website/blob/main/docs/vt/csi/xtshiftescape.mdx
 	// Let us see shift key modifiers:
 	ap.WriteString("\033[>1s")
+	// Set the SGR mouse mode (SGR = Select Graphic Rendition) to be able to get coordinates
+	// past 95 in windows terminal and past 223 for everyone else:
+	ap.WriteString("\033[?1006h")
 	ap.WriteString("\033[?1000h")
 }
 
@@ -17,10 +26,16 @@ func (ap *AnsiPixels) MouseClickOff() {
 	ap.WriteString("\033[?1000l")
 }
 
+// MouseTrackingOnMouse Tracking On turns on mouse movements and click tracking.
+// It will set decoded Mx, My, MButtons, Mouse flag etc... and call OnMouse.
+// If you call *On do call *Off in your defer restore.
 func (ap *AnsiPixels) MouseTrackingOn() {
-	// https://github.com/ghostty-org/ghostty/blame/main/website/app/vt/xtshiftescape/page.mdx
+	// https://ghostty.org/docs/vt/csi/xtshiftescape
 	// Let us see shift key modifiers:
 	ap.WriteString("\033[>1s")
+	// Set the SGR mouse mode (SGR = Select Graphic Rendition) to be able to get coordinates
+	// past 95 in windows terminal and past 223 for everyone else:
+	ap.WriteString("\033[?1006h")
 	ap.WriteString("\033[?1003h")
 }
 
@@ -32,10 +47,12 @@ func (ap *AnsiPixels) MouseX10Off() {
 	ap.WriteString("\033[?9l")
 }
 
+// This mode is here for reference but is not automatically decoded for you.
 func (ap *AnsiPixels) MouseX10On() {
 	ap.WriteString("\033[?9h")
 }
 
+// MousePixels on will report coordinates (Mx, My) in pixels instead of cells.
 func (ap *AnsiPixels) MousePixelsOn() {
 	ap.WriteString("\x1b[?1016h")
 }
@@ -44,7 +61,10 @@ func (ap *AnsiPixels) MousePixelsOff() {
 	ap.WriteString("\x1b[?1016l")
 }
 
-var mouseDataPrefix = []byte{0x1b, '[', 'M'}
+var (
+	mouseDataPrefix    = []byte{0x1b, '[', 'M'}
+	sgrMouseDataPrefix = []byte{0x1b, '[', '<'}
+)
 
 type MouseStatus int
 
@@ -64,10 +84,81 @@ const (
 // It returns one of the MouseStatus values:
 // - NoMouse if no mouse data was found
 // - MouseComplete if the mouse data was successfully decoded
+// - MousePrefix if the mouse data prefix was found but not enough data to decode it.
+func (ap *AnsiPixels) MouseDecode() MouseStatus {
+	ap.Mouse = false
+	idx := bytes.Index(ap.Data, sgrMouseDataPrefix)
+	if idx == -1 {
+		return NoMouse
+	}
+	start := idx + len(sgrMouseDataPrefix)
+	// Scan and parse
+	log.LogVf("MouseDecode: found prefix at %d, start at %d, data len %d: %q", idx, start, len(ap.Data), ap.Data[start:])
+	i := start
+	done := false
+	buttonRelease := false
+	var b, x, y, endIdx int
+	state := 0
+	// Fast no alloc parsing (vs `\d+;\d+;\d+[mM]` regexp)
+	for !done {
+		c := ap.Data[i]
+		switch c {
+		case 'm':
+			buttonRelease = true
+			fallthrough
+		case 'M':
+			endIdx = i + 1
+			done = true
+		case ';':
+			state++
+			if state > 2 {
+				log.Errf("MouseDecode: too many ; found %d %q", i, ap.Data[start:])
+				return MouseError
+			}
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9': // or case c>='0' && c<='9':
+
+			// Parse the button, x, and y coordinates
+			switch state {
+			case 0:
+				b = 10*b + int(c-'0')
+			case 1:
+				x = 10*x + int(c-'0')
+			case 2:
+				y = 10*y + int(c-'0')
+			}
+		default:
+			log.Errf("MouseDecode: unexpected mouse data byte at %d %q", i, ap.Data[start:])
+			return MouseError
+		}
+		i++
+	}
+	if state != 2 {
+		log.Errf("MouseDecode: not enough ; found %d %q", i, ap.Data[start:])
+		return MouseError
+	}
+	log.LogVf("MouseDecode: found mouse data %q - release: %t", ap.Data[start:endIdx], buttonRelease)
+	ap.Data = append(ap.Data[:idx], ap.Data[endIdx:]...)
+	ap.Mx = x
+	ap.My = y
+	ap.Mbuttons = b
+	ap.Mrelease = buttonRelease
+	ap.Mouse = true
+	return MouseComplete
+}
+
+// MouseDecode decodes a single mouse data event from the AnsiPixels.Data buffer.
+// It is automatically called through [MouseDecodeAll] by [ReadOrResizeOrSignal] and [ReadOrResizeOrSignalOnce]
+// unless NoDecode is set to true
+// (so you typically don't need to call it directly and can just check the Mouse, Mx, My, Mbuttons fields).
+// If there is more than one event you can consume them by calling [MouseDecodeAll].
+//
+// It returns one of the MouseStatus values:
+// - NoMouse if no mouse data was found
+// - MouseComplete if the mouse data was successfully decoded
 // - MousePrefix if the mouse data prefix was found but not enough data to decode it (and false was passed for readMoreIfNeeded)
 // - MouseError if there was an error reading the additional mouse data
 // This complication is pretty much only needed for fortio.org/tev.
-func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
+func (ap *AnsiPixels) MouseDecodeX10(readMoreIfNeeded bool) MouseStatus {
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, mouseDataPrefix)
 	if idx == -1 {
@@ -117,7 +208,7 @@ func (ap *AnsiPixels) MouseDecode(readMoreIfNeeded bool) MouseStatus {
 // Or set NoDecode to true and call MouseDecode yourself.
 func (ap *AnsiPixels) MouseDecodeAll() {
 	gotMouse := false
-	for ap.MouseDecode(true) == MouseComplete {
+	for ap.MouseDecode() == MouseComplete {
 		// keep decoding mouse events until we have no more.
 		// TODO: consider keeping a list of all the events or saving the left/right clicks in priority
 		// over mouse movements.
@@ -146,6 +237,50 @@ const (
 	MouseWheelMask = ^(AllModifiers | MouseRight)
 )
 
+func (ap *AnsiPixels) MouseDebugString() string {
+	if !ap.Mouse {
+		return "No mouse event "
+	}
+	buf := strings.Builder{}
+	if ap.AltMod() {
+		buf.WriteString("Alt ")
+	}
+	if ap.ShiftMod() {
+		buf.WriteString("Shift ")
+	}
+	if ap.CtrlMod() {
+		buf.WriteString("Ctrl ")
+	}
+	if ap.LeftClick() {
+		buf.WriteString("LeftClick ")
+	}
+	if ap.RightClick() {
+		buf.WriteString("RightClick ")
+	}
+	if ap.Middle() {
+		buf.WriteString("MiddleClick ")
+	}
+	if ap.LeftDrag() {
+		buf.WriteString("LeftDrag ")
+	}
+	if ap.RightDrag() {
+		buf.WriteString("RightDrag ")
+	}
+	if ap.MiddleDrag() {
+		buf.WriteString("MiddleDrag ")
+	}
+	if ap.MouseWheelUp() {
+		buf.WriteString("MouseWheelUp ")
+	}
+	if ap.MouseWheelDown() {
+		buf.WriteString("MouseWheelDown ")
+	}
+	if ap.MouseRelease() {
+		buf.WriteString("Released ")
+	}
+	return buf.String()
+}
+
 func (ap *AnsiPixels) MouseWheelUp() bool {
 	return ap.Mouse && ((ap.Mbuttons & MouseWheelMask) == MouseWheelUp)
 }
@@ -159,11 +294,11 @@ func (ap *AnsiPixels) AltMod() bool {
 }
 
 func (ap *AnsiPixels) ShiftMod() bool {
-	return ap.Mbuttons&Alt != 0
+	return ap.Mbuttons&Shift != 0
 }
 
 func (ap *AnsiPixels) CtrlMod() bool {
-	return ap.Mbuttons&Alt != 0
+	return ap.Mbuttons&Ctrl != 0
 }
 
 func (ap *AnsiPixels) AnyModifier() bool {
@@ -192,4 +327,8 @@ func (ap *AnsiPixels) MiddleDrag() bool {
 
 func (ap *AnsiPixels) RightDrag() bool {
 	return ap.Mouse && ((ap.Mbuttons & AnyModifierMask) == MouseMove|MouseRight)
+}
+
+func (ap *AnsiPixels) MouseRelease() bool {
+	return ap.Mouse && ap.Mrelease
 }
