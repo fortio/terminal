@@ -1,10 +1,10 @@
 // Package tcolor provides ANSI color codes and utilities for terminal colors.
 // You can see a good demo/use of it the tcolor CLI at
-// [github.com/fortio/tcolor](https://github.com/fortio/tcolor) or by running
-// ```shell
-// go install fortio.org/tcolor@latest
-// tcolor
-// ```
+// https://github.com/fortio/tcolor or by running
+//
+//	go install fortio.org/tcolor@latest
+//	tcolor
+//
 // Initially partially from images.go and tclock and generalized.
 package tcolor // import "fortio.org/terminal/ansipixels/tcolor"
 

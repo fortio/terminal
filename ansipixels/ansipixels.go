@@ -53,7 +53,8 @@ type AnsiPixels struct {
 	x, y        int  // Cursor last set position
 	Mouse       bool // Mouse event received
 	Mx, My      int  // Mouse last known position, in 1,1 coordinate system
-	Mbuttons    int  // Mouse buttons and modifier state
+	Mbuttons    int  // Mouse buttons and modifier state, use the accessor methods, e.g [LeftClick] instead of this directly.
+	Mrelease    bool // Mouse button release state
 	C           chan os.Signal
 	Margin      int          // Margin around the image (image is smaller by 2*margin)
 	FPS         float64      // (Target) Frames per second used for Reading with timeout
