@@ -1,4 +1,4 @@
-all: generate lint test demo
+all: generate lint test demo wasm-check
 
 GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
@@ -27,4 +27,7 @@ ansipixels/tcolor/basiccolor_string.go: ansipixels/tcolor/colors.go
 
 generate: ansipixels/tcolor/basiccolor_string.go
 
-.PHONY: all lint test demo tinygo-demo generate
+wasm-check:
+	GOOS=js GOARCH=wasm go build -tags $(GO_BUILD_TAGS) ./...
+
+.PHONY: all lint test demo tinygo-demo generate wasm-check
