@@ -17,7 +17,7 @@ import (
 	"fortio.org/safecast"
 )
 
-type BasicColor uint8
+type BasicColor uint16
 
 const (
 	None         BasicColor = 0 // no color, default
@@ -38,6 +38,7 @@ const (
 	BrightPurple BasicColor = 95
 	BrightCyan   BasicColor = 96
 	White        BasicColor = 97
+	color256     BasicColor = 255 // marker for 256 colors mode.
 
 	// Misc useful sequences.
 	Bold       = "\x1b[1m"
@@ -55,11 +56,13 @@ var _ = White.String() // force compile error if go generate is missing.
 
 // Terminal foreground color string for the BasicColor.
 func (c BasicColor) Foreground() string {
-	switch c {
+	switch c & color256 {
 	case None:
 		return ""
 	case Orange:
 		return "\033[38;5;214m" // Orange is not in the basic colors, but in 256 colors
+	case color256:
+		return fmt.Sprintf("\033[38;5;%dm", c>>8)
 	default:
 		return fmt.Sprintf("\033[%dm", c)
 	}
@@ -67,14 +70,29 @@ func (c BasicColor) Foreground() string {
 
 // Terminal background color string for the BasicColor.
 func (c BasicColor) Background() string {
-	switch c {
+	switch c & color256 {
 	case None:
 		return ""
 	case Orange:
 		return "\033[48;5;214m" // Orange is not in the basic colors, but in 256 colors
+	case color256:
+		return fmt.Sprintf("\033[48;5;%dm", c>>8)
 	default:
 		return fmt.Sprintf("\033[%dm", c+10)
 	}
+}
+
+func (c BasicColor) Color() Color {
+	return Color(uint32(ColorTypeBasic)<<30 | uint32(c))
+}
+
+// Creates indexed (terminal 256) color: 16 basic colors, 216 color cube, grayscale.
+// Stored as 2 bytes, low byte is 0xff to not conflict with basic 16 colors and high byte is the index.
+func Color256(idx int) Color {
+	if idx < 0 || idx > 255 {
+		panic(fmt.Sprintf("Invalid 256 color index %d", idx))
+	}
+	return Color(uint32(ColorTypeBasic)<<30 | uint32(idx)<<8 | uint32(color256))
 }
 
 type RGBColor struct {
@@ -100,9 +118,10 @@ type Color uint32
 type ColorType uint8 // 1 for RGB, 2 for HSL, 3 for BasicColor
 
 const (
-	ColorTypeRGB   ColorType = 1 // RGBColor
-	ColorTypeHSL   ColorType = 2 // HSLColor
-	ColorTypeBasic ColorType = 3 // BasicColor
+	ColorTypeRGB ColorType = 1 // RGBColor
+	ColorTypeHSL ColorType = 2 // HSLColor
+	// Terminal Basic 16 Colors or 256 Colors (216 colorspace cube + grey scale + basic 16).
+	ColorTypeBasic ColorType = 3
 )
 
 // 30 bits, used for 12,8,10 bits HSL color components in HSLColor.
@@ -132,14 +151,14 @@ func (c Color) Decode() (ColorType, Uint30) {
 	case uint32(ColorTypeHSL) << 30:
 		return ColorTypeHSL, Uint30(0x3FFFFFFF & u) // HSL
 	case uint32(ColorTypeBasic) << 30:
-		return ColorTypeBasic, Uint30(uint8(u & 0xFF))
+		return ColorTypeBasic, Uint30(BasicColor(u & 0xFFFF))
 	default:
 		panic(fmt.Sprintf("Invalid color type %x (%x)", u&0xC0000000, u))
 	}
 }
 
 func Basic(c BasicColor) Color {
-	return Color(uint32(ColorTypeBasic)<<30 | uint32(c))
+	return c.Color()
 }
 
 func RGB(c RGBColor) Color {
@@ -182,6 +201,9 @@ func (c Color) String() string {
 		v1, v2, v3 := Int30ToHSL(val)
 		return fmt.Sprintf("HSL_%03X_%02X_%03X", v1, v2, v3)
 	case ColorTypeBasic:
+		if val&Uint30(color256) == Uint30(color256) {
+			return fmt.Sprintf("Idx_%02X", val>>8)
+		}
 		return BasicColor(val).String() //nolint:gosec // no overflow possible
 	default:
 		panic(fmt.Sprintf("Invalid color type %d", t))
