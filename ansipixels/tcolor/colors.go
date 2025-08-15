@@ -327,7 +327,7 @@ func From256(color string) (Color, error) {
 		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255: %w", color, err)
 	}
 	if i < 0 || i > 255 {
-		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255: %w", color, err)
+		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255 (got %d)", color, i)
 	}
 	return Color256(i), nil
 }

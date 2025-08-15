@@ -57,7 +57,7 @@ func TestParsingBasicColors(t *testing.T) {
 				return
 			}
 			if parsedColor != test.expected {
-				t.Errorf("Parsed %q as %d, expected %d", test.input, bc, test.expected)
+				t.Errorf("Parsed %q as %x %x, expected %x", test.input, parsedColor, bc, test.expected)
 			}
 		})
 	}
