@@ -195,11 +195,11 @@ func (c Color) String() string {
 	t, val := c.Decode()
 	switch t {
 	case ColorTypeRGB:
-		v1, v2, v3 := Int30To8bits(val)
-		return fmt.Sprintf("#%02X%02X%02X", v1, v2, v3)
+		r, g, b := Int30To8bits(val)
+		return RGBColor{R: r, G: g, B: b}.String()
 	case ColorTypeHSL:
-		v1, v2, v3 := Int30ToHSL(val)
-		return fmt.Sprintf("HSL_%03X_%02X_%03X", v1, v2, v3)
+		h, s, l := Int30ToHSL(val)
+		return HSLColor{H: h, S: s, L: l}.String()
 	case ColorTypeBasic:
 		if val&Uint30(color256) == Uint30(color256) {
 			return fmt.Sprintf("c%03d", val>>8)
@@ -599,6 +599,10 @@ func (c RGBColor) HSL() HSLColor {
 
 func (c RGBColor) Color() Color {
 	return RGB(c)
+}
+
+func (c RGBColor) String() string {
+	return fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B)
 }
 
 func RGBToHSL(c RGBColor) (h, s, l float64) {
