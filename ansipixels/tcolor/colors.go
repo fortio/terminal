@@ -202,7 +202,7 @@ func (c Color) String() string {
 		return fmt.Sprintf("HSL_%03X_%02X_%03X", v1, v2, v3)
 	case ColorTypeBasic:
 		if val&Uint30(color256) == Uint30(color256) {
-			return fmt.Sprintf("Idx_%02X", val>>8)
+			return fmt.Sprintf("c%03d", val>>8)
 		}
 		return BasicColor(val).String() //nolint:gosec // no overflow possible
 	default:
@@ -317,6 +317,21 @@ func Hex24bitFromString(label, color string) (RGBColor, error) {
 	return RGBColor{R: uint8(r), G: uint8(g), B: uint8(b)}, nil //nolint:gosec // no overflow here
 }
 
+func From256(color string) (Color, error) {
+	if len(color) != 4 || color[0] != 'c' {
+		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255", color)
+	}
+	var i int
+	_, err := fmt.Sscanf(color[1:], "%d", &i)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255: %w", color, err)
+	}
+	if i < 0 || i > 255 {
+		return 0, fmt.Errorf("invalid 256 color '%s', must be c000-255: %w", color, err)
+	}
+	return Color256(i), nil
+}
+
 // FromString converts user input color string to a terminal color.
 // Supports basic color names, RGB hex format (RRGGBB),
 // HSL float format (h,s,l in [0,1]), and HSL 30 bits hex format (HSL#HHHSSSLLL).
@@ -336,6 +351,9 @@ func FromString(color string) (Color, error) {
 	}
 	if hex, ok := strings.CutPrefix(color, "hsl"); ok {
 		return FromHexHSLString(hex)
+	}
+	if len(color) == 4 && color[0] == 'c' {
+		return From256(color)
 	}
 	if len(color) == 6 {
 		rgbColor, err := Hex24bitFromString("RRGGBB", color)
