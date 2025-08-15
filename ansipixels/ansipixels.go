@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	TermNoSet = "TERM not set"
-	bufSize   = 1024
+	TermNotSet = "TERM not set"
+	bufSize    = 1024
 )
 
 // ColorMode determines if images be monochrome, 256 or true color.
@@ -122,7 +122,7 @@ func DetectColorMode() (cm ColorMode) {
 	case "xterm-truecolor", "xterm-kitty", "alacritty", "wezterm", "xterm-ghostty", "ghostty":
 		cm.TrueColor = true
 	case "":
-		cm.TermEnv = TermNoSet
+		cm.TermEnv = TermNotSet
 	}
 	// TODO: how to find out we're inside windows terminal which also supports true color
 	// but doesn't advertise it.

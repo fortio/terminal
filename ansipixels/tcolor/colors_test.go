@@ -15,15 +15,34 @@ func TestHelpString(t *testing.T) {
 	}
 }
 
+func TestParsingErrors(t *testing.T) {
+	tests := []string{
+		"invalidcolor",
+		"#GGGGGG", // invalid hex
+		"hsl#1234567",
+		"c256", // invalid 256 color
+		"cabc",
+	}
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			_, err := tcolor.FromString(test)
+			if err == nil {
+				t.Errorf("Expected error for %q, got none", test)
+			}
+		})
+	}
+}
+
 func TestParsingBasicColors(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected tcolor.BasicColor
+		expected tcolor.Color
 	}{
-		{"none", tcolor.None},
-		{"white", tcolor.White},
-		{"orange", tcolor.Orange},
-		{" bRig_ht - BLue ", tcolor.BrightBlue},
+		{"none", tcolor.None.Color()},
+		{"white", tcolor.White.Color()},
+		{"orange", tcolor.Orange.Color()},
+		{" bRig_ht - BLue ", tcolor.BrightBlue.Color()},
+		{" c123 ", tcolor.Color256(123)},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
@@ -37,8 +56,8 @@ func TestParsingBasicColors(t *testing.T) {
 				t.Errorf("Expected basic color for %q, got %#v", test.input, parsedColor)
 				return
 			}
-			if bc != test.expected {
-				t.Errorf("Parsed %q as %d, expected %d", test.input, bc, test.expected)
+			if parsedColor != test.expected {
+				t.Errorf("Parsed %q as %x %x, expected %x", test.input, parsedColor, bc, test.expected)
 			}
 		})
 	}
