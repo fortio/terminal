@@ -365,8 +365,21 @@ func From256(color string) (Color, error) {
 // Supports basic color names, RGB hex format (RRGGBB),
 // HSL float format (h,s,l in [0,1]), and HSL 30 bits hex format (HSL#HHHSSSLLL).
 func FromString(color string) (Color, error) {
-	toRemove := " \t\r\n_-#" // can't remove . because of hsl
+	toRemove := "\t\r\n_-#" // can't remove . because of hsl
+	hasParen := false
 	color = strings.ToLower(strings.Map(func(r rune) rune {
+		// keep spaces only inside (); for `hsl(deg psat plight)` format.
+		if r == '(' {
+			hasParen = true
+			return r
+		}
+		if r == ')' {
+			hasParen = false
+			return r
+		}
+		if r == ' ' && !hasParen {
+			return -1
+		}
 		if strings.ContainsRune(toRemove, r) {
 			return -1
 		}
@@ -379,7 +392,7 @@ func FromString(color string) (Color, error) {
 		return From3floatHSLString(color)
 	}
 	if hex, ok := strings.CutPrefix(color, "hsl"); ok {
-		return FromHexHSLString(hex)
+		return FromHSLString(hex)
 	}
 	if len(color) == 4 && color[0] == 'c' {
 		return From256(color)
@@ -392,6 +405,28 @@ func FromString(color string) (Color, error) {
 		return RGB(rgbColor), nil
 	}
 	return 0, fmt.Errorf("invalid color '%s', must be RRGGBB or h,s,l or one of: %s", color, ColorHelp)
+}
+
+// WebHSL returns a CSS HSL string for the given color (empty string
+// for basic and 256 colors).
+// Uses specified number of digits rounding (default is full precision
+// (2 for hue and lightness, 1 for saturation) when passing rounding < 0).
+func WebHSL(c Color, rounding int) string {
+	t, v := c.Decode()
+	if t != ColorTypeHSL && t != ColorTypeRGB {
+		return ""
+	}
+	hsl := ToHSL(t, v)
+	deg := float64(hsl.H) * 360.0 / 4095.0 // Convert to degrees
+	sat := float64(hsl.S) * 100.0 / 255.0  // Convert to percentage
+	lum := float64(hsl.L) * 100.0 / 1023.0 // Convert to percentage
+	satRound := 1
+	otherRound := 2
+	if rounding >= 0 {
+		satRound = rounding
+		otherRound = rounding
+	}
+	return fmt.Sprintf("hsl(%.*f %.*f %.*f)", otherRound, deg, satRound, sat, otherRound, lum)
 }
 
 func RGBATo216(pixel RGBColor) uint8 {
@@ -427,8 +462,8 @@ func (co ColorOutput) Foreground(c Color) string {
 	}
 	t, v := c.Decode()
 	switch t {
-	case ColorTypeBasic:
-		return BasicColor(v).Foreground() //nolint:gosec // no overflow possible
+	case ColorTypeBasic, ColorType256:
+		return c.Foreground()
 	case ColorTypeRGB, ColorTypeHSL:
 		rgb := ToRGB(t, v)
 		return fmt.Sprintf("\033[38;5;%dm", RGBATo216(rgb))
@@ -462,7 +497,7 @@ type HSLColor struct {
 	L Uint10
 }
 
-// FromHSLString converts a string in the format "h,s,l" [0,1] each, to a 3 bytes Color.
+// From3floatHSLString converts a string in the format "h,s,l" [0,1] each, to a 3 bytes Color.
 func From3floatHSLString(color string) (Color, error) {
 	parts := strings.SplitN(color, ",", 3)
 	if len(parts) != 3 {
@@ -485,10 +520,10 @@ func From3floatHSLString(color string) (Color, error) {
 	}
 	v, err := strconv.ParseFloat(parts[2], 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid brightness '%s': %w", parts[2], err)
+		return 0, fmt.Errorf("invalid lightness '%s': %w", parts[2], err)
 	}
 	if v < 0 || v > 1 {
-		return 0, fmt.Errorf("brightness must be in [0,1], got %f", v)
+		return 0, fmt.Errorf("lightness must be in [0,1], got %f", v)
 	}
 	return HSLf(h, s, v), nil
 }
@@ -558,6 +593,43 @@ func FromHexHSLString(color string) (Color, error) {
 		return 0, err
 	}
 	return HSL(HSLColor{H: h, S: s, L: l}), nil
+}
+
+func FromHSLString(color string) (Color, error) {
+	if len(color) <= 2 {
+		return 0, fmt.Errorf("invalid too short HSL color 'hsl%s'", color)
+	}
+	if color[0] != '(' {
+		return FromHexHSLString(color)
+	}
+	// Web HSL: `hsl(degree percentsat percentlight)`
+	if color[len(color)-1] != ')' {
+		return 0, fmt.Errorf("invalid HSL color 'hsl%s' should end with ')'", color)
+	}
+	color = color[1 : len(color)-1]
+	parts := strings.SplitN(color, " ", 3)
+	h, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid hue '%s': %w", parts[0], err)
+	}
+	if h < 0 || h > 360 {
+		return 0, fmt.Errorf("hue degrees must be in [0,360], got %f", h)
+	}
+	s, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid saturation '%s': %w", parts[1], err)
+	}
+	if s < 0 || s > 100 {
+		return 0, fmt.Errorf("saturation %% must be in [0,100], got %f", s)
+	}
+	v, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid lightness '%s': %w", parts[2], err)
+	}
+	if v < 0 || v > 100 {
+		return 0, fmt.Errorf("lightness %% must be in [0,100], got %f", v)
+	}
+	return HSLf(h/360.0, s/100.0, v/100.0), nil
 }
 
 func (hsl HSLColor) String() string {
