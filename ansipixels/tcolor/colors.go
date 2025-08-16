@@ -82,7 +82,7 @@ func (c BasicColor) Color() Color {
 	return Color(uint32(ColorTypeBasic)<<30 | uint32(c))
 }
 
-type Color256 Uint8
+type Color256 uint8
 
 // Creates indexed (terminal 256) color: 16 basic colors, 216 color cube, grayscale.
 // Stored as 2 bytes, low byte is 0xff to not conflict with basic 16 colors and high byte is the index.
@@ -224,7 +224,7 @@ func (c Color) Extra() (string, string, ColorType) {
 		hsl := HSLColor{H: h, S: s, L: l}
 		return hsl.String(), hsl.RGB().String(), ColorTypeHSL
 	case ColorType256:
-		return fmt.Sprintf("c%03d", val), "", ColorType256
+		return Color256(val).String(), "", ColorType256 //nolint:gosec // not possible with just high byte shifted.
 	case ColorTypeBasic:
 		if val == Uint30(Orange) {
 			return "Orange", "c214", ColorTypeBasic
