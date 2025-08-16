@@ -26,10 +26,11 @@ func TestParsingErrors(t *testing.T) {
 		"hsl(360 100 100",
 		"hsl(360,100,100)",
 		"hsl(361 100 100)",
+		"hsl(360 100 100 10)",
 		"hsl(360 100.1 100)",
 		"hsl(360 100 100.1)",
 		"hsl(abc 10 10)",
-		"hsl(10 abc 10 10)",
+		"hsl(10 abc 10)",
 		"hsl(10 10 def)",
 	}
 	for _, test := range tests {

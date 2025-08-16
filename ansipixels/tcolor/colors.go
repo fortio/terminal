@@ -411,6 +411,7 @@ func FromString(color string) (Color, error) {
 // for basic and 256 colors).
 // Uses specified number of digits rounding (default is full precision
 // (2 for hue and lightness, 1 for saturation) when passing rounding < 0).
+// Used/Demonstrated in the fortio.org/tcolor TUI.
 func WebHSL(c Color, rounding int) string {
 	t, v := c.Decode()
 	if t != ColorTypeHSL && t != ColorTypeRGB {
@@ -499,7 +500,7 @@ type HSLColor struct {
 
 // From3floatHSLString converts a string in the format "h,s,l" [0,1] each, to a 3 bytes Color.
 func From3floatHSLString(color string) (Color, error) {
-	parts := strings.SplitN(color, ",", 3)
+	parts := strings.SplitN(color, ",", 4)
 	if len(parts) != 3 {
 		return 0, fmt.Errorf("invalid HSL color '%s', must be h,s,l", color)
 	}
@@ -607,7 +608,10 @@ func FromHSLString(color string) (Color, error) {
 		return 0, fmt.Errorf("invalid HSL color 'hsl%s' should end with ')'", color)
 	}
 	color = color[1 : len(color)-1]
-	parts := strings.SplitN(color, " ", 3)
+	parts := strings.SplitN(color, " ", 4)
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid HSL color 'hsl(%s)', must be hsl(h s l)", color)
+	}
 	h, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid hue '%s': %w", parts[0], err)
