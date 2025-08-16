@@ -42,7 +42,6 @@ func TestParsingBasicColors(t *testing.T) {
 		{"white", tcolor.White.Color()},
 		{"orange", tcolor.Orange.Color()},
 		{" bRig_ht - BLue ", tcolor.BrightBlue.Color()},
-		{" c123 ", tcolor.Color256(123)},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
@@ -58,6 +57,27 @@ func TestParsingBasicColors(t *testing.T) {
 			}
 			if parsedColor != test.expected {
 				t.Errorf("Parsed %q as %x %x, expected %x", test.input, parsedColor, bc, test.expected)
+			}
+		})
+	}
+}
+
+func TestParsing256Colors(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected tcolor.Color
+	}{
+		{" c123 ", tcolor.Color256(123).Color()},
+	}
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			parsedColor, err := tcolor.FromString(test.input)
+			if err != nil {
+				t.Errorf("Failed to parse %q: %v", test.input, err)
+				return
+			}
+			if parsedColor != test.expected {
+				t.Errorf("Parsed %q as %x, expected %x", test.input, parsedColor, test.expected)
 			}
 		})
 	}

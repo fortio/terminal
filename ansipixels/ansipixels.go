@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -387,6 +388,16 @@ func (ap *AnsiPixels) WriteAtStr(x, y int, msg string) {
 func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
 	ap.MoveCursor(x, y)
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
+}
+
+func (ap *AnsiPixels) Printf(msg string, args ...interface{}) {
+	_, _ = fmt.Fprintf(ap.Out, msg, args...)
+}
+
+// Copy the given text to the system clipboard.
+// Uses OSC 52 (supported by most terminal emulators).
+func (ap *AnsiPixels) CopyToClipboard(text string) {
+	ap.Printf("\033]52;c;%s\007", base64.StdEncoding.EncodeToString([]byte(text)))
 }
 
 func (ap *AnsiPixels) ScreenWidth(str string) int {
