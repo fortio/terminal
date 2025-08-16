@@ -479,8 +479,8 @@ func (co ColorOutput) Background(c Color) string {
 	}
 	t, v := c.Decode()
 	switch t {
-	case ColorTypeBasic:
-		return BasicColor(v).Background() //nolint:gosec // no overflow possible
+	case ColorTypeBasic, ColorType256:
+		return c.Background()
 	case ColorTypeRGB, ColorTypeHSL:
 		rgb := ToRGB(t, v)
 		return fmt.Sprintf("\033[48;5;%dm", RGBATo216(rgb))

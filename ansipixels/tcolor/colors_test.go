@@ -43,6 +43,33 @@ func TestParsingErrors(t *testing.T) {
 	}
 }
 
+func TestWebHSLOut(t *testing.T) {
+	tests := []struct {
+		input      string
+		expected   string
+		background string
+	}{
+		{"c150", "", "\x1b[48;5;150m"},
+	}
+	cOut := tcolor.ColorOutput{TrueColor: false}
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			color, err := tcolor.FromString(test.input)
+			if err != nil {
+				t.Fatalf("Failed to parse %q: %v", test.input, err)
+			}
+			out := tcolor.WebHSL(color, 0)
+			if out != test.expected {
+				t.Errorf("Expected %q, got %q", test.expected, out)
+			}
+			bg := cOut.Background(color)
+			if bg != test.background {
+				t.Errorf("Expected background %q, got %q", test.background, bg)
+			}
+		})
+	}
+}
+
 func TestParsingBasicColors(t *testing.T) {
 	tests := []struct {
 		input    string
