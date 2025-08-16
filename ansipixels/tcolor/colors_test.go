@@ -22,6 +22,16 @@ func TestParsingErrors(t *testing.T) {
 		"hsl#1234567",
 		"c256", // invalid 256 color
 		"cabc",
+		"hsl()",
+		"hsl(360 100 100",
+		"hsl(360,100,100)",
+		"hsl(361 100 100)",
+		"hsl(360 100 100 10)",
+		"hsl(360 100.1 100)",
+		"hsl(360 100 100.1)",
+		"hsl(abc 10 10)",
+		"hsl(10 abc 10)",
+		"hsl(10 10 def)",
 	}
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
@@ -102,6 +112,7 @@ func TestParsingAdvancedColor(t *testing.T) {
 		{"0.75,1,0.5", tcolor.RGBColor{R: 128, G: 0, B: 255}},
 		{"0.75,0.5,0.5", tcolor.RGBColor{R: 128, G: 64, B: 192}},
 		{"1.0,1,0.75", tcolor.RGBColor{R: 255, G: 127, B: 127}},
+		{"hsl(192.88 57.3 50.05)", tcolor.RGBColor{R: 0x37, G: 0xA9, B: 0xC9}}, // #37A9C9
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
