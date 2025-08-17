@@ -50,6 +50,7 @@ func TestWebHSLOut(t *testing.T) {
 		background string
 	}{
 		{"c150", "", "\x1b[48;5;150m"},
+		{"#F34512", "hsl(14 90 51)", "\x1b[48;5;166m"},
 	}
 	cOut := tcolor.ColorOutput{TrueColor: false}
 	for _, test := range tests {
