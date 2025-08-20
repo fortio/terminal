@@ -119,7 +119,7 @@ func linearToSrgb(f float64) uint8 {
 }
 
 // Gamma aware blending (keeps foreground sharper/closer).
-func Blend(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
+func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	if alpha < 0 {
 		alpha = 0
 	} else if alpha > 1 {
@@ -144,7 +144,7 @@ func Blend(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 }
 
 // Simple linear blend.
-func BlendL(background, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColor {
+func BlendLinear(background, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	r := (1-alpha)*float64(background.R) + alpha*float64(foreground.R)
 	g := (1-alpha)*float64(background.G) + alpha*float64(foreground.G)
 	b := (1-alpha)*float64(background.B) + alpha*float64(foreground.B)
@@ -154,11 +154,11 @@ func BlendL(background, foreground tcolor.RGBColor, alpha float64) tcolor.RGBCol
 // DiscSRGB is like [Disc] but blends to the provided background color instead of black
 // using SRGB aware (non linear, perceptual) blending.
 func (ap *AnsiPixels) DiscSRGB(x, y, radius int, background, foreground tcolor.RGBColor, aliasing float64) {
-	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, Blend)
+	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, BlendSRGB)
 }
 
 // DiscLinear is like [Disc] but blends to the provided background color instead of black
 // using simple linear blending.
 func (ap *AnsiPixels) DiscLinear(x, y, radius int, background, foreground tcolor.RGBColor, aliasing float64) {
-	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, BlendL)
+	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, BlendLinear)
 }
