@@ -50,7 +50,13 @@ func (ap *AnsiPixels) OSCDecode() bool {
 		c := ap.Data[i]
 		switch {
 		case c == '\033':
-			i++ // assume (wrongly!) that next is \
+			// Check if next character is actually a backslash
+			if i+1 < dataLen && ap.Data[i+1] == '\\' {
+				i++ // we got the expected backslash
+			} else {
+				log.Errf("OSCDecode: expected '\\' after ESC at %d in %q", i, ap.Data[start:])
+				return false
+			}
 			fallthrough
 		case c == '\007':
 			endIdx = i + 1
