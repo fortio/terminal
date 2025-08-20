@@ -22,7 +22,7 @@ const osc11ReplyPrefix = "\033]11;rgb:"
 // It is automatically called through [MouseDecodeAll] by [ReadOrResizeOrSignal] and [ReadOrResizeOrSignalOnce]
 // unless NoDecode is set to true
 // (so you typically don't need to call it directly and can just check the BackgroundColor property).
-// It doesn't do anything unless [QueryBackground] was called first.
+// It doesn't do anything unless [RequestBackgroundColor] was called first.
 func (ap *AnsiPixels) OSCDecode() bool {
 	if !ap.backgroundRequested {
 		return false

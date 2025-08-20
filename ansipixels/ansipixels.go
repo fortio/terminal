@@ -70,10 +70,10 @@ type AnsiPixels struct {
 	// When in FPSTick mode we read directly from the shared input, non blocking. Affects how
 	// other read like MouseDecode should read.
 	readSharedMode bool
-	// Background color of the terminal if detected by [OSCDecode] after issuing [QueryBackground]
+	// Background color of the terminal if detected by [OSCDecode] after issuing [RequestBackgroundColor]
 	Background          tcolor.RGBColor
 	backgroundRequested bool
-	GotBackground       bool // Whether we got a background color from the terminal (after QueryBackground and OSCDecode)
+	GotBackground       bool // Whether we got a background color from the terminal (after RequestBackgroundColor and OSCDecode)
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
