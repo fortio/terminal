@@ -93,7 +93,7 @@ func (ap *AnsiPixels) OSCDecode() bool {
 		i++
 	}
 	if state != 2 {
-		log.Errf("OSC decode: not enough ; found %d %q", i, ap.Data[start:])
+		log.Errf("OSC decode: not enough / found %d %q", i, ap.Data[start:])
 		return false
 	}
 	ap.Data = append(ap.Data[:idx], ap.Data[endIdx:]...)
