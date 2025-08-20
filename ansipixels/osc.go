@@ -9,6 +9,15 @@ import (
 	"fortio.org/terminal/ansipixels/tcolor"
 )
 
+func (ap *AnsiPixels) SyncBackgroundColor() bool {
+	if ap.GotBackground {
+		return true
+	}
+	ap.RequestBackgroundColor()
+	_ = ap.ReadOrResizeOrSignal()
+	return ap.OSCDecode()
+}
+
 // RequestBackgroundColor sends a request to the terminal to return the current
 // background color. Which we can use to blend images and pixels with said background.
 func (ap *AnsiPixels) RequestBackgroundColor() {
