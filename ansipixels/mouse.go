@@ -215,6 +215,7 @@ func (ap *AnsiPixels) MouseDecodeAll() {
 			ap.OnMouse()
 		}
 	}
+	ap.OSCDecode()
 	ap.Mouse = gotMouse
 }
 
