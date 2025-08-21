@@ -23,6 +23,80 @@ import (
 	_ "golang.org/x/image/webp" // Import WebP decoder
 )
 
+func (ap *AnsiPixels) IsBackgroundColor(c color.RGBA) bool {
+	return c.A == 0 || (c.R == ap.Background.R && c.G == ap.Background.G && c.B == ap.Background.B)
+}
+
+func (ap *AnsiPixels) DrawTrueColorImageTransparent(sx, sy int, img *image.RGBA, blendFunc ColorBlendingFunction) error {
+	ap.MoveCursor(sx, sy)
+	var err error
+	prev1 := color.RGBA{}
+	prev2 := color.RGBA{}
+	ap.WriteString(ap.Background.Foreground()) // so initial half pixels only on bg don't show up as white.
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
+		firstPixelInLine := true
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel1 := img.RGBAAt(x, y)
+			blended1 := tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B}
+			p1Bg := ap.IsBackgroundColor(pixel1)
+			if !p1Bg && pixel1.A < 255 {
+				blended1 = blendFunc(ap.Background, tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B}, float64(pixel1.A)/255.0)
+			}
+			pixel2 := img.RGBAAt(x, y+1)
+			blended2 := tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B}
+			p2Bg := ap.IsBackgroundColor(pixel2)
+			if !p2Bg && pixel2.A < 255 {
+				blended2 = blendFunc(ap.Background, tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B}, float64(pixel2.A)/255.0)
+			}
+			switch {
+			case p1Bg && p2Bg:
+				firstPixelInLine = true
+				continue // fully transparent, skip
+			case pixel1 == pixel2:
+				if pixel1 == prev1 && !firstPixelInLine {
+					ap.WriteRune('█')
+					continue // we haven't changed color
+				}
+				if pixel2 == prev2 && !firstPixelInLine {
+					ap.WriteRune(' ')
+					continue // we haven't changed color
+				}
+				if firstPixelInLine {
+					ap.MoveCursor(sx+x, sy)
+					firstPixelInLine = false
+				}
+				ap.Printf("%s█", blended1.Foreground())
+				prev1 = pixel1
+				continue
+			case pixel1 == prev1 && pixel2 == prev2:
+				if firstPixelInLine {
+					ap.MoveCursor(sx+x, sy)
+					firstPixelInLine = false
+				}
+				ap.WriteRune('▀')
+			default:
+				if firstPixelInLine {
+					ap.MoveCursor(sx+x, sy)
+					firstPixelInLine = false
+				}
+				if !p1Bg {
+					ap.WriteString(blended1.Foreground())
+				}
+				if !p2Bg {
+					ap.WriteString(blended2.Background())
+				}
+				ap.WriteRune('▀')
+			}
+			prev1 = pixel1
+			prev2 = pixel2
+		}
+		sy++
+		ap.MoveCursor(sx, sy)
+	}
+	ap.WriteString(Reset) // reset color
+	return err
+}
+
 func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	ap.MoveCursor(sx, sy)
 	var err error
@@ -281,7 +355,11 @@ func (ap *AnsiPixels) ShowScaledImage(img *image.RGBA) error {
 	var err error
 	switch {
 	case ap.TrueColor:
-		err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
+		if ap.Transparency {
+			err = ap.DrawTrueColorImageTransparent(ap.Margin, ap.Margin, img, BlendSRGB)
+		} else {
+			err = ap.DrawTrueColorImage(ap.Margin, ap.Margin, img)
+		}
 	case ap.Color256:
 		err = ap.Draw216ColorImage(ap.Margin, ap.Margin, img)
 	default:

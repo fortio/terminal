@@ -9,13 +9,18 @@ import (
 	"fortio.org/terminal/ansipixels/tcolor"
 )
 
+// This will synchronously request and read the terminal background color.
+// It also sets Transparency to true such as image display that have alpha channel
+// or the background color set to same color will use transparency (by not outputting
+// any color or pixels for 0 alpha and pixels matching the background color).
 func (ap *AnsiPixels) SyncBackgroundColor() bool {
 	if ap.GotBackground {
 		return true
 	}
 	ap.RequestBackgroundColor()
 	_ = ap.ReadOrResizeOrSignal()
-	return ap.OSCDecode()
+	ap.Transparency = ap.OSCDecode()
+	return ap.GotBackground // Same as ap.Transparency now.
 }
 
 // RequestBackgroundColor sends a request to the terminal to return the current
@@ -31,7 +36,7 @@ const osc11ReplyPrefix = "\033]11;rgb:"
 // It is automatically called through [MouseDecodeAll] by [ReadOrResizeOrSignal] and [ReadOrResizeOrSignalOnce]
 // unless NoDecode is set to true
 // (so you typically don't need to call it directly and can just check the BackgroundColor property).
-// It doesn't do anything unless [RequestBackgroundColor] was called first.
+// It doesn't do anything unless [RequestBackgroundColor] was called first. Use [SyncBackgroundColor] to do both.
 func (ap *AnsiPixels) OSCDecode() bool {
 	if !ap.backgroundRequested {
 		return false

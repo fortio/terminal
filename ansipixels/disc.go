@@ -28,6 +28,8 @@ func intensity(x, y, radius int, aliasing float64) float64 {
 	return edgeDistance / float64(radius) / aliasing
 }
 
+type ColorBlendingFunction func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolor.RGBColor
+
 // Draws disc/sphere. aliasing is 0.0 to 1.0 fraction of the disc which is anti-aliased.
 // Smaller aliasing the sharper the edge. Larger aliasing the more sphere like effect.
 // This version is older and meant to output over a black background (aliases toward 0 lightness).
@@ -41,7 +43,7 @@ func (ap *AnsiPixels) Disc(x, y, radius int, hsl tcolor.HSLColor, aliasing float
 func (ap *AnsiPixels) DiscBlendFN(
 	x, y, radius int,
 	background, foreground tcolor.RGBColor, aliasing float64,
-	blendFunc func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolor.RGBColor,
+	blendFunc ColorBlendingFunction,
 ) {
 	tcolOut := tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	for j := -radius; j <= radius; j += 2 {

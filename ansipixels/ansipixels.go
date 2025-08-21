@@ -74,6 +74,8 @@ type AnsiPixels struct {
 	Background          tcolor.RGBColor
 	backgroundRequested bool
 	GotBackground       bool // Whether we got a background color from the terminal (after RequestBackgroundColor and OSCDecode)
+	// Whether to use transparency when drawing truecolor images ([SyncBackgroundColor] needed)
+	Transparency bool
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
