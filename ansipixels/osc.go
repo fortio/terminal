@@ -39,7 +39,7 @@ const osc11ReplyPrefix = "\033]11;rgb:"
 // It doesn't do anything unless [RequestBackgroundColor] was called first. Use [SyncBackgroundColor] to do both.
 func (ap *AnsiPixels) OSCDecode() bool {
 	if !ap.backgroundRequested {
-		return false
+		return ap.GotBackground
 	}
 	ap.Mouse = false
 	idx := bytes.Index(ap.Data, []byte(osc11ReplyPrefix))
