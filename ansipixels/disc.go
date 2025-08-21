@@ -100,11 +100,11 @@ func srgbToLinear(c uint8, alpha float64) float64 {
 	if alpha <= 0 {
 		return 0
 	}
-	f := float64(c) / 255.0
+	f := (float64(c) / alpha) / 255.0
 	if f <= 0.04045 {
-		return f / 12.92 / alpha
+		return f / 12.92
 	}
-	return math.Pow((f+0.055)/1.055, 2.4) / alpha
+	return math.Pow((f+0.055)/1.055, 2.4)
 }
 
 func linearToSrgb(f float64) uint8 {
@@ -124,8 +124,9 @@ func linearToSrgb(f float64) uint8 {
 }
 
 // Gamma aware blending (keeps foreground sharper/closer).
-// Note: we really have RGBA colors ie, pre multiplied so we need to divide
-// foreground by alpha.
+// Note: we really have RGBA colors ie, pre multiplied so we
+// divide foreground by the passed in alpha to get it to uncompressed
+// (NRGBA) linear space.
 func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	if alpha < 0 {
 		alpha = 0
@@ -134,7 +135,10 @@ func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	}
 
 	// Convert to linear
+	// Background is assumed to be just RGB color (no alpha).
 	bgR, bgG, bgB := srgbToLinear(bg.R, 1), srgbToLinear(bg.G, 1), srgbToLinear(bg.B, 1)
+	// Alpha given is assumed to be the alpha of the foreground so we divide by it in srgbToLinear
+	// (once in float so not to get quantization problems, though pre multiplied is an issue)
 	fgR, fgG, fgB := srgbToLinear(fg.R, alpha), srgbToLinear(fg.G, alpha), srgbToLinear(fg.B, alpha)
 
 	// Blend in linear space - but foreground is already alpha multiplied.

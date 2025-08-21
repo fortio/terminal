@@ -27,7 +27,14 @@ func (ap *AnsiPixels) IsBackgroundColor(c color.RGBA) bool {
 	return c.A == 0 || (c.R == ap.Background.R && c.G == ap.Background.G && c.B == ap.Background.B)
 }
 
-func (ap *AnsiPixels) DrawTrueColorImageTransparent(sx, sy int, img *image.RGBA, blendFunc ColorBlendingFunction) error {
+// DrawTrueColorImageTransparent draws a true color image with transparency support, removing pixels of 0 alpha or
+// of same color as the Background terminal color. The blending function between background color and
+// foreground color is provided as a parameter. [ShowImageScaled] uses [BlendSRGB].
+func (ap *AnsiPixels) DrawTrueColorImageTransparent( //nolint:gocognit // yeah...
+	sx, sy int,
+	img *image.RGBA,
+	blendFunc ColorBlendingFunction,
+) error {
 	ap.MoveCursor(sx, sy)
 	var err error
 	prev1 := color.RGBA{}
