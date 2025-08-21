@@ -28,6 +28,8 @@ func intensity(x, y, radius int, aliasing float64) float64 {
 	return edgeDistance / float64(radius) / aliasing
 }
 
+type ColorBlendingFunction func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolor.RGBColor
+
 // Draws disc/sphere. aliasing is 0.0 to 1.0 fraction of the disc which is anti-aliased.
 // Smaller aliasing the sharper the edge. Larger aliasing the more sphere like effect.
 // This version is older and meant to output over a black background (aliases toward 0 lightness).
@@ -41,7 +43,7 @@ func (ap *AnsiPixels) Disc(x, y, radius int, hsl tcolor.HSLColor, aliasing float
 func (ap *AnsiPixels) DiscBlendFN(
 	x, y, radius int,
 	background, foreground tcolor.RGBColor, aliasing float64,
-	blendFunc func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolor.RGBColor,
+	blendFunc ColorBlendingFunction,
 ) {
 	tcolOut := tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	for j := -radius; j <= radius; j += 2 {
@@ -94,8 +96,11 @@ func BlendLuminance(_, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColo
 // sRGB <-> linear helpers.
 // TODO: Consider just precalculating the srgbToLinear at least as a table.
 // Or memoize the Blend*().
-func srgbToLinear(c uint8) float64 {
-	f := float64(c) / 255.0
+func srgbToLinear(c uint8, alpha float64) float64 {
+	if alpha <= 0 {
+		return 0
+	}
+	f := (float64(c) / alpha) / 255.0
 	if f <= 0.04045 {
 		return f / 12.92
 	}
@@ -119,6 +124,9 @@ func linearToSrgb(f float64) uint8 {
 }
 
 // Gamma aware blending (keeps foreground sharper/closer).
+// Note: we really have RGBA colors ie, pre multiplied so we
+// divide foreground by the passed in alpha to get it to uncompressed
+// (NRGBA) linear space.
 func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	if alpha < 0 {
 		alpha = 0
@@ -127,10 +135,13 @@ func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	}
 
 	// Convert to linear
-	bgR, bgG, bgB := srgbToLinear(bg.R), srgbToLinear(bg.G), srgbToLinear(bg.B)
-	fgR, fgG, fgB := srgbToLinear(fg.R), srgbToLinear(fg.G), srgbToLinear(fg.B)
+	// Background is assumed to be just RGB color (no alpha).
+	bgR, bgG, bgB := srgbToLinear(bg.R, 1), srgbToLinear(bg.G, 1), srgbToLinear(bg.B, 1)
+	// Alpha given is assumed to be the alpha of the foreground so we divide by it in srgbToLinear
+	// (once in float so not to get quantization problems, though pre multiplied is an issue)
+	fgR, fgG, fgB := srgbToLinear(fg.R, alpha), srgbToLinear(fg.G, alpha), srgbToLinear(fg.B, alpha)
 
-	// Blend in linear space
+	// Blend in linear space - but foreground is already alpha multiplied.
 	r := (1-alpha)*bgR + alpha*fgR
 	g := (1-alpha)*bgG + alpha*fgG
 	b := (1-alpha)*bgB + alpha*fgB
