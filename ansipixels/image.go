@@ -79,10 +79,14 @@ func (ap *AnsiPixels) DrawTrueColorImageTransparent(sx, sy int, img *image.RGBA,
 					ap.MoveCursor(sx+x, sy)
 					firstPixelInLine = false
 				}
-				if !p1Bg {
+				if p1Bg {
+					ap.WriteString(ap.Background.Foreground())
+				} else {
 					ap.WriteString(blended1.Foreground())
 				}
-				if !p2Bg {
+				if p2Bg {
+					ap.WriteString(ap.Background.Background())
+				} else {
 					ap.WriteString(blended2.Background())
 				}
 				ap.WriteRune('▀')

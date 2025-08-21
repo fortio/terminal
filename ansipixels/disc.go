@@ -96,12 +96,15 @@ func BlendLuminance(_, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColo
 // sRGB <-> linear helpers.
 // TODO: Consider just precalculating the srgbToLinear at least as a table.
 // Or memoize the Blend*().
-func srgbToLinear(c uint8) float64 {
+func srgbToLinear(c uint8, alpha float64) float64 {
+	if alpha <= 0 {
+		return 0
+	}
 	f := float64(c) / 255.0
 	if f <= 0.04045 {
-		return f / 12.92
+		return f / 12.92 / alpha
 	}
-	return math.Pow((f+0.055)/1.055, 2.4)
+	return math.Pow((f+0.055)/1.055, 2.4) / alpha
 }
 
 func linearToSrgb(f float64) uint8 {
@@ -121,6 +124,8 @@ func linearToSrgb(f float64) uint8 {
 }
 
 // Gamma aware blending (keeps foreground sharper/closer).
+// Note: we really have RGBA colors ie, pre multiplied so we need to divide
+// foreground by alpha.
 func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	if alpha < 0 {
 		alpha = 0
@@ -129,10 +134,10 @@ func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	}
 
 	// Convert to linear
-	bgR, bgG, bgB := srgbToLinear(bg.R), srgbToLinear(bg.G), srgbToLinear(bg.B)
-	fgR, fgG, fgB := srgbToLinear(fg.R), srgbToLinear(fg.G), srgbToLinear(fg.B)
+	bgR, bgG, bgB := srgbToLinear(bg.R, 1), srgbToLinear(bg.G, 1), srgbToLinear(bg.B, 1)
+	fgR, fgG, fgB := srgbToLinear(fg.R, alpha), srgbToLinear(fg.G, alpha), srgbToLinear(fg.B, alpha)
 
-	// Blend in linear space
+	// Blend in linear space - but foreground is already alpha multiplied.
 	r := (1-alpha)*bgR + alpha*fgR
 	g := (1-alpha)*bgG + alpha*fgG
 	b := (1-alpha)*bgB + alpha*fgB
