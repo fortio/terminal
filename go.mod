@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	fortio.org/cli v1.10.0
 	fortio.org/log v1.17.2
-	fortio.org/safecast v1.0.0
+	fortio.org/safecast v1.1.0
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/image v0.30.0
 	golang.org/x/sys v0.35.0
