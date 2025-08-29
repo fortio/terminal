@@ -165,7 +165,7 @@ func (c Color) Decode() (ColorType, Uint30) {
 			return ColorType256, Uint30((u & 0xFFFF) >> 8)
 		}
 		// safecast here shouldn't be necessary once gosec gets smarter
-		return ColorTypeBasic, Uint30(BasicColor(safecast.MustConv[uint8](u & 0xFF)))
+		return ColorTypeBasic, Uint30(u & 0xFF)
 	default:
 		panic(fmt.Sprintf("Invalid color type %x (%x)", u&0xC0000000, u))
 	}
@@ -226,12 +226,12 @@ func (c Color) Extra() (string, string, ColorType) {
 		hsl := HSLColor{H: h, S: s, L: l}
 		return hsl.String(), hsl.RGB().String(), ColorTypeHSL
 	case ColorType256:
-		return Color256(safecast.MustConv[uint8](val)).String(), "", ColorType256
+		return safecast.MustConv[Color256](val).String(), "", ColorType256
 	case ColorTypeBasic:
 		if val == Uint30(Orange) {
 			return "Orange", "c214", ColorTypeBasic
 		}
-		return BasicColor(safecast.MustConv[uint8](val)).String(), fmt.Sprintf("%d", val), ColorTypeBasic
+		return safecast.MustConv[BasicColor](val).String(), fmt.Sprintf("%d", val), ColorTypeBasic
 	default:
 		panic(fmt.Sprintf("Invalid color type %d", t))
 	}
@@ -240,7 +240,7 @@ func (c Color) Extra() (string, string, ColorType) {
 func (c Color) BasicColor() (BasicColor, bool) {
 	t, v := c.Decode()
 	if t == ColorTypeBasic {
-		return BasicColor(safecast.MustConv[uint8](v)), true
+		return safecast.MustConv[BasicColor](v), true
 	}
 	return None, false
 }
