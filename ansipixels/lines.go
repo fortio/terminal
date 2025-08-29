@@ -56,8 +56,6 @@ func hueToRGB(p, q, t float64) float64 {
 }
 
 // Merge (additively) the pixel with alpha on top of the existing image.
-//
-//nolint:gosec // gosec unable to see the range checks with min/max.
 func MergePlot(img *image.NRGBA, x, y int, c color.NRGBA, newalpha float64) {
 	a := safecast.MustTruncate[uint8](float64(c.A) * newalpha)
 	if newalpha == 0 {
@@ -75,12 +73,13 @@ func MergePlot(img *image.NRGBA, x, y int, c color.NRGBA, newalpha float64) {
 		p1.B = max(p1.B, c.B)
 		p1.A = max(p1.A, a)
 	*/
-	p1.R = uint8(min(255, uint16(p1.R)+uint16(c.R)))
-	p1.G = uint8(min(255, uint16(p1.G)+uint16(c.G)))
-	p1.B = uint8(min(255, uint16(p1.B)+uint16(c.B)))
+	// gosec unable to see the range checks with min/max. when it does we can drop mustconv.
+	p1.R = safecast.MustConv[uint8](min(255, uint16(p1.R)+uint16(c.R)))
+	p1.G = safecast.MustConv[uint8](min(255, uint16(p1.G)+uint16(c.G)))
+	p1.B = safecast.MustConv[uint8](min(255, uint16(p1.B)+uint16(c.B)))
 	// p1.A = uint8(min(255, uint16(p1.A)+uint16(p2.A))) // summing transparency yield non transparent quickly
 	// p1.A = uint8(min(255, uint32(p1.A)*uint32(a))) // multiply transparency
-	p1.A = uint8(min(255, uint16(p1.A)+uint16(a))) // summing transparency - best for overlapping lines
+	p1.A = safecast.MustConv[uint8](min(255, uint16(p1.A)+uint16(a))) // summing transparency - best for overlapping lines
 	// p1.A = max(p1.A, a) //max of the two
 	img.SetNRGBA(x, y, p1)
 }

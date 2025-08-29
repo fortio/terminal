@@ -435,7 +435,7 @@ func RGBATo216(pixel RGBColor) uint8 {
 	shift := 4
 	if (pixel.R>>shift) == (pixel.G>>shift) && (pixel.G>>shift) == (pixel.B>>shift) {
 		// Bugged:
-		// lum := safecast.MustConvert[uint8](max(255, math.Round(0.299*float64(pixel.R)+
+		// lum := safecast.MustConv[uint8](max(255, math.Round(0.299*float64(pixel.R)+
 		// 0.587*float64(pixel.G)+0.114*float64(pixel.B))))
 		lum := (uint16(pixel.R) + uint16(pixel.G) + uint16(pixel.B)) / 3
 		if lum < 9 { // 0-9.8 but ... 0-8 9 levels
@@ -444,7 +444,7 @@ func RGBATo216(pixel RGBColor) uint8 {
 		if lum > 247 { // 248-255 (incl) 8 levels
 			return 231 // -> white
 		}
-		return safecast.MustConvert[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
+		return safecast.MustConv[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
 	}
 	// 6x6x6 color cube
 	col := 16 + 36*(pixel.R/51) + 6*(pixel.G/51) + pixel.B/51

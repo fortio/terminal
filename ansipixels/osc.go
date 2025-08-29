@@ -110,7 +110,7 @@ func (ap *AnsiPixels) OSCDecode() bool {
 		log.Errf("OSC decode: not enough / found %d %q", i, ap.Data[start:])
 		return false
 	}
-	ap.Background = tcolor.RGBColor{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8)} //nolint:gosec // it fits after shift.
+	ap.Background = tcolor.RGBColor{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8)}
 	log.LogVf("OSC decode: found data %q - <r:%x g:%x b:%x> -> %s", ap.Data[start:endIdx], r, g, b, ap.Background)
 	ap.Data = append(ap.Data[:idx], ap.Data[endIdx:]...)
 	ap.GotBackground = true

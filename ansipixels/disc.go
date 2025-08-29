@@ -3,6 +3,7 @@ package ansipixels
 import (
 	"math"
 
+	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels/tcolor"
 )
 
@@ -159,7 +160,7 @@ func BlendLinear(background, foreground tcolor.RGBColor, alpha float64) tcolor.R
 	r := (1-alpha)*float64(background.R) + alpha*float64(foreground.R)
 	g := (1-alpha)*float64(background.G) + alpha*float64(foreground.G)
 	b := (1-alpha)*float64(background.B) + alpha*float64(foreground.B)
-	return tcolor.RGBColor{R: uint8(r + 0.5), G: uint8(g + 0.5), B: uint8(b + 0.5)}
+	return tcolor.RGBColor{R: safecast.MustRound[uint8](r), G: safecast.MustRound[uint8](g), B: safecast.MustRound[uint8](b)}
 }
 
 // DiscSRGB is like [Disc] but blends to the provided background color instead of black
