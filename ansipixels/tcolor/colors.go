@@ -164,7 +164,6 @@ func (c Color) Decode() (ColorType, Uint30) {
 		if u&0xFF == uint32(color256) {
 			return ColorType256, Uint30((u & 0xFFFF) >> 8)
 		}
-		// safecast here shouldn't be necessary once gosec gets smarter
 		return ColorTypeBasic, Uint30(u & 0xFF)
 	default:
 		panic(fmt.Sprintf("Invalid color type %x (%x)", u&0xC0000000, u))
