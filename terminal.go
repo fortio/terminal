@@ -65,8 +65,8 @@ func Open(ctx context.Context) (*Terminal, error) {
 
 func (t *Terminal) Setup(ctx context.Context) error {
 	t.Context = ctx
-	t.fd = safecast.MustConvert[int](os.Stdin.Fd())
-	t.fdOut = safecast.MustConvert[int](os.Stdout.Fd())
+	t.fd = safecast.MustConv[int](os.Stdin.Fd())
+	t.fdOut = safecast.MustConv[int](os.Stdout.Fd())
 	rw := struct {
 		io.Reader
 		io.Writer

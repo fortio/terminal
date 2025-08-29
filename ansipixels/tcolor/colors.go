@@ -153,7 +153,6 @@ const (
 	MaxHSLLightness  = 1023 // 10 bits
 )
 
-//nolint:gosec // no overflow possible
 func (c Color) Decode() (ColorType, Uint30) {
 	u := uint32(c)
 	switch u & 0xC0000000 {
@@ -165,7 +164,7 @@ func (c Color) Decode() (ColorType, Uint30) {
 		if u&0xFF == uint32(color256) {
 			return ColorType256, Uint30((u & 0xFFFF) >> 8)
 		}
-		return ColorTypeBasic, Uint30(BasicColor(u & 0xFFFF))
+		return ColorTypeBasic, Uint30(u & 0xFF)
 	default:
 		panic(fmt.Sprintf("Invalid color type %x (%x)", u&0xC0000000, u))
 	}
@@ -195,14 +194,16 @@ func HSL(hsl HSLColor) Color {
 		uint32(hsl.L)) // l in [0,1023]
 }
 
-//nolint:gosec // no overflow possible
 func Int30ToHSL(val Uint30) (Uint12, Uint8, Uint10) {
-	return Uint12((val >> 18) & 0xFFF), Uint8((val >> 10) & 0xFF), Uint10(val & 0x3FF)
+	return safecast.MustConv[Uint12]((val >> 18) & 0xFFF),
+		safecast.MustConv[Uint8]((val >> 10) & 0xFF),
+		safecast.MustConv[Uint10](val & 0x3FF)
 }
 
-//nolint:gosec // no overflow possible
 func Int30To8bits(val Uint30) (uint8, uint8, uint8) {
-	return uint8((val >> 16) & 0xFF), uint8((val >> 8) & 0xFF), uint8(val & 0xFF)
+	return safecast.MustConv[uint8]((val >> 16) & 0xFF),
+		safecast.MustConv[uint8]((val >> 8) & 0xFF),
+		safecast.MustConv[uint8](val & 0xFF)
 }
 
 func (c Color) String() string {
@@ -224,12 +225,12 @@ func (c Color) Extra() (string, string, ColorType) {
 		hsl := HSLColor{H: h, S: s, L: l}
 		return hsl.String(), hsl.RGB().String(), ColorTypeHSL
 	case ColorType256:
-		return Color256(val).String(), "", ColorType256 //nolint:gosec // not possible with just high byte shifted.
+		return safecast.MustConv[Color256](val).String(), "", ColorType256
 	case ColorTypeBasic:
 		if val == Uint30(Orange) {
 			return "Orange", "c214", ColorTypeBasic
 		}
-		return BasicColor(val).String(), fmt.Sprintf("%d", val), ColorTypeBasic //nolint:gosec // no overflow possible
+		return safecast.MustConv[BasicColor](val).String(), fmt.Sprintf("%d", val), ColorTypeBasic
 	default:
 		panic(fmt.Sprintf("Invalid color type %d", t))
 	}
@@ -238,7 +239,7 @@ func (c Color) Extra() (string, string, ColorType) {
 func (c Color) BasicColor() (BasicColor, bool) {
 	t, v := c.Decode()
 	if t == ColorTypeBasic {
-		return BasicColor(v), true //nolint:gosec // no overflow possible
+		return safecast.MustConv[BasicColor](v), true
 	}
 	return None, false
 }
@@ -276,9 +277,9 @@ func (c Color) Foreground() string {
 	t, v := c.Decode()
 	switch t {
 	case ColorTypeBasic:
-		return BasicColor(v).Foreground() //nolint:gosec // no overflow possible
+		return safecast.MustConv[BasicColor](v).Foreground()
 	case ColorType256:
-		return Color256(v).Foreground() //nolint:gosec // no overflow possible
+		return safecast.MustConv[Color256](v).Foreground()
 	case ColorTypeRGB, ColorTypeHSL:
 		return ToRGB(t, v).Foreground()
 	default:
@@ -290,9 +291,9 @@ func (c Color) Background() string {
 	t, v := c.Decode()
 	switch t {
 	case ColorTypeBasic:
-		return BasicColor(v).Background() //nolint:gosec // no overflow possible
+		return safecast.MustConv[BasicColor](v).Background()
 	case ColorType256:
-		return Color256(v).Background() //nolint:gosec // no overflow possible
+		return safecast.MustConv[Color256](v).Background()
 	case ColorTypeRGB, ColorTypeHSL:
 		return ToRGB(t, v).Background()
 	default:
@@ -340,10 +341,11 @@ func Hex24bitFromString(label, color string) (RGBColor, error) {
 	if err != nil {
 		return RGBColor{}, fmt.Errorf("invalid hex color '%s', must be hex %s: %w", color, label, err)
 	}
-	r := (i >> 16) & 0xFF
-	g := (i >> 8) & 0xFF
-	b := i & 0xFF
-	return RGBColor{R: uint8(r), G: uint8(g), B: uint8(b)}, nil //nolint:gosec // no overflow here
+	// safecast won't be necessary once gosec gets smarter.
+	r := safecast.MustConv[uint8]((i >> 16) & 0xFF)
+	g := safecast.MustConv[uint8]((i >> 8) & 0xFF)
+	b := safecast.MustConv[uint8](i & 0xFF)
+	return RGBColor{R: r, G: g, B: b}, nil
 }
 
 func From256(color string) (Color, error) {
@@ -435,7 +437,7 @@ func RGBATo216(pixel RGBColor) uint8 {
 	shift := 4
 	if (pixel.R>>shift) == (pixel.G>>shift) && (pixel.G>>shift) == (pixel.B>>shift) {
 		// Bugged:
-		// lum := safecast.MustConvert[uint8](max(255, math.Round(0.299*float64(pixel.R)+
+		// lum := safecast.MustConv[uint8](max(255, math.Round(0.299*float64(pixel.R)+
 		// 0.587*float64(pixel.G)+0.114*float64(pixel.B))))
 		lum := (uint16(pixel.R) + uint16(pixel.G) + uint16(pixel.B)) / 3
 		if lum < 9 { // 0-9.8 but ... 0-8 9 levels
@@ -444,7 +446,7 @@ func RGBATo216(pixel RGBColor) uint8 {
 		if lum > 247 { // 248-255 (incl) 8 levels
 			return 231 // -> white
 		}
-		return safecast.MustConvert[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
+		return safecast.MustConv[uint8](min(255, 232+((lum-9)*(256-232))/(247-9)))
 	}
 	// 6x6x6 color cube
 	col := 16 + 36*(pixel.R/51) + 6*(pixel.G/51) + pixel.B/51

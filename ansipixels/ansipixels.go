@@ -87,7 +87,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		fdOut:       safecast.MustConvert[int](os.Stdout.Fd()),
+		fdOut:       safecast.MustConv[int](os.Stdout.Fd()),
 		Out:         bufio.NewWriter(os.Stdout),
 		FPS:         fps,
 		SharedInput: terminal.GetSharedInput(d),

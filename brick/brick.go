@@ -396,7 +396,7 @@ func Main() int {
 	}
 	seedV := *seed
 	if seedV == 0 {
-		seedV = safecast.MustConvert[uint64](time.Now().UnixNano() % (1<<16 - 1))
+		seedV = safecast.MustConv[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
 	var b *Brick
 	waitForInput := false

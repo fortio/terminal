@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"fortio.org/log"
+	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels/tcolor"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/tiff" // Import tiff decoder
@@ -382,8 +383,6 @@ func (ap *AnsiPixels) ShowScaledImage(img *image.RGBA) error {
 // NRGBA to RGBA (from grol images extension initially)
 
 // NRGBAtoRGBA converts a non-premultiplied alpha color to a premultiplied alpha color.
-//
-//nolint:gosec // gosec not smart enough to see this stays in range.
 func NRGBAtoRGBA(c color.NRGBA) color.RGBA {
 	if c.A == 0xFF {
 		return color.RGBA(c)
@@ -394,14 +393,13 @@ func NRGBAtoRGBA(c color.NRGBA) color.RGBA {
 	// Convert non-premultiplied alpha to premultiplied alpha
 	// RGBA = (R * A/255, G * A/255, B * A/255, A)
 	return color.RGBA{
-		R: uint8(uint16(c.R) * uint16(c.A) / 255),
-		G: uint8(uint16(c.G) * uint16(c.A) / 255),
-		B: uint8(uint16(c.B) * uint16(c.A) / 255),
+		R: safecast.MustConv[uint8](uint16(c.R) * uint16(c.A) / 255),
+		G: safecast.MustConv[uint8](uint16(c.G) * uint16(c.A) / 255),
+		B: safecast.MustConv[uint8](uint16(c.B) * uint16(c.A) / 255),
 		A: c.A,
 	}
 }
 
-//nolint:gosec // gosec not smart enough to see the range checks with min - https://github.com/securego/gosec/issues/1212
 func AddPixel(img *image.RGBA, x, y int, c color.RGBA) {
 	p1 := img.RGBAAt(x, y)
 	if p1.R == 0 && p1.G == 0 && p1.B == 0 { // black is no change
@@ -411,9 +409,11 @@ func AddPixel(img *image.RGBA, x, y int, c color.RGBA) {
 	if c.R == 0 && c.G == 0 && c.B == 0 { // black is no change
 		return
 	}
-	p1.R = uint8(min(255, uint16(p1.R)+uint16(c.R)))
-	p1.G = uint8(min(255, uint16(p1.G)+uint16(c.G)))
-	p1.B = uint8(min(255, uint16(p1.B)+uint16(c.B)))
+	// gosec not smart enough to see the range checks with min - https://github.com/securego/gosec/issues/1212
+	// when it does we can remove the MustConv(s).
+	p1.R = safecast.MustConv[uint8](min(255, uint16(p1.R)+uint16(c.R)))
+	p1.G = safecast.MustConv[uint8](min(255, uint16(p1.G)+uint16(c.G)))
+	p1.B = safecast.MustConv[uint8](min(255, uint16(p1.B)+uint16(c.B)))
 	// p1.A = uint8(min(255, uint16(p1.A)+uint16(p2.A))) // summing transparency yield non transparent quickly
 	p1.A = max(p1.A, c.A)
 	img.SetRGBA(x, y, p1)

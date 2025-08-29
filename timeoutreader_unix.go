@@ -56,7 +56,7 @@ func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 		panic("Timeout must be greater or equal to 0")
 	}
 	return &TimeoutReader{
-		fd:       safecast.MustConvert[int](stream.Fd()),
+		fd:       safecast.MustConv[int](stream.Fd()),
 		tv:       TimeoutToTimeval(timeout),
 		blocking: timeout == 0,
 		ostream:  stream,
