@@ -129,6 +129,15 @@ func linearToSrgb(f float64) uint8 {
 // divide foreground by the passed in alpha to get it to uncompressed
 // (NRGBA) linear space.
 func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
+	return blendSRGB(bg, fg, alpha, alpha)
+}
+
+// BlendNSRGB is [BlendSRGB] but assumes the foreground is not pre-multiplied.
+func BlendNSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
+	return blendSRGB(bg, fg, alpha, 1.0)
+}
+
+func blendSRGB(bg, fg tcolor.RGBColor, alpha, alphaFG float64) tcolor.RGBColor {
 	if alpha < 0 {
 		alpha = 0
 	} else if alpha > 1 {
@@ -138,9 +147,9 @@ func BlendSRGB(bg, fg tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	// Convert to linear
 	// Background is assumed to be just RGB color (no alpha).
 	bgR, bgG, bgB := srgbToLinear(bg.R, 1), srgbToLinear(bg.G, 1), srgbToLinear(bg.B, 1)
-	// Alpha given is assumed to be the alpha of the foreground so we divide by it in srgbToLinear
+	// AlphaFG given is the alpha of the foreground so we divide by it in srgbToLinear
 	// (once in float so not to get quantization problems, though pre multiplied is an issue)
-	fgR, fgG, fgB := srgbToLinear(fg.R, alpha), srgbToLinear(fg.G, alpha), srgbToLinear(fg.B, alpha)
+	fgR, fgG, fgB := srgbToLinear(fg.R, alphaFG), srgbToLinear(fg.G, alphaFG), srgbToLinear(fg.B, alphaFG)
 
 	// Blend in linear space - but foreground is already alpha multiplied.
 	r := (1-alpha)*bgR + alpha*fgR
@@ -164,9 +173,16 @@ func BlendLinear(background, foreground tcolor.RGBColor, alpha float64) tcolor.R
 }
 
 // DiscSRGB is like [Disc] but blends to the provided background color instead of black
-// using SRGB aware (non linear, perceptual) blending.
+// using SRGB aware (non linear, perceptual) blending - input is considered to be RGBA
+// and thus need to be premultiplied if not, use [DiscNSRGB].
 func (ap *AnsiPixels) DiscSRGB(x, y, radius int, background, foreground tcolor.RGBColor, aliasing float64) {
 	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, BlendSRGB)
+}
+
+// DiscNSRGB is like [Disc] but blends to the provided background color instead of black
+// using non-linear blending - input FG is considered to be NRGBA (non premultiplied by alpha).
+func (ap *AnsiPixels) DiscNSRGB(x, y, radius int, background, foreground tcolor.RGBColor, aliasing float64) {
+	ap.DiscBlendFN(x, y, radius, background, foreground, aliasing, BlendNSRGB)
 }
 
 // DiscLinear is like [Disc] but blends to the provided background color instead of black
