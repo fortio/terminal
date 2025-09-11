@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"fortio.org/cli"
+	"fortio.org/duration"
 	"fortio.org/log"
 	"fortio.org/terminal"
 )
@@ -255,7 +256,7 @@ func splitN(t *terminal.Terminal, inp string, expected int, usage string) ([]str
 }
 
 func getDuration(t *terminal.Terminal, s string) (time.Duration, bool) {
-	dur, err := time.ParseDuration(s)
+	dur, err := duration.Parse(s)
 	if err != nil {
 		fmt.Fprintf(t.Out, "Invalid duration %q: %v\n", s, err)
 		return 0, false
