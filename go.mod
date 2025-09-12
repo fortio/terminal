@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	fortio.org/cli v1.11.0
-	fortio.org/duration v1.0.1
+	fortio.org/duration v1.0.4
 	fortio.org/log v1.17.2
 	fortio.org/safecast v1.2.0
 	github.com/rivo/uniseg v0.4.7
