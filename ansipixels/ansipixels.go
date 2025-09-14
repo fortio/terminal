@@ -494,6 +494,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	if err != nil {
 		return
 	}
+	log.Debugf("Sent and flushed cursor position request %q", reqPosStr)
 	i := 0
 	ap.Data = nil
 	for {
@@ -501,7 +502,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 			err = errors.New("buffer full, no cursor position found")
 			return
 		}
-		n, err = ap.SharedInput.In.Read(ap.buf[i:bufSize])
+		n, err = ap.SharedInput.TR.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -512,6 +513,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 			err = errors.New("no data read from cursor position")
 			return
 		}
+		log.Debugf("Read %d (response maybe) %q", n, ap.buf[0:i+n])
 		res := cursPosRegexp.FindSubmatch(ap.buf[0 : i+n])
 		if log.LogVerbose() {
 			// use go run . -loglevel verbose 2> /tmp/ansipixels.log to capture this
