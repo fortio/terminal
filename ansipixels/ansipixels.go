@@ -452,6 +452,14 @@ func (ap *AnsiPixels) ClearEndOfLine() {
 	ap.WriteString("\033[K")
 }
 
+func (ap *AnsiPixels) SaveCursorPos() {
+	ap.WriteString("\033[s")
+}
+
+func (ap *AnsiPixels) RestoreCursorPos() {
+	ap.WriteString("\033[u")
+}
+
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
 
 // ReadCursorPosXY returns the current X,Y coordinates of the cursor or insertion point
