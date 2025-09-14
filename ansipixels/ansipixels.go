@@ -453,12 +453,12 @@ func (ap *AnsiPixels) ClearEndOfLine() {
 }
 
 func (ap *AnsiPixels) SaveCursorPos() {
-	ap.WriteString("\033[s")
+	ap.WriteString("\0337")
 	ap.Out.Flush()
 }
 
 func (ap *AnsiPixels) RestoreCursorPos() {
-	ap.WriteString("\033[u")
+	ap.WriteString("\0338")
 }
 
 var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
