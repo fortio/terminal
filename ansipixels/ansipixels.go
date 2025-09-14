@@ -454,6 +454,7 @@ func (ap *AnsiPixels) ClearEndOfLine() {
 
 func (ap *AnsiPixels) SaveCursorPos() {
 	ap.WriteString("\033[s")
+	ap.Out.Flush()
 }
 
 func (ap *AnsiPixels) RestoreCursorPos() {
