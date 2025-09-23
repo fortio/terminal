@@ -45,6 +45,8 @@ type ColorMode struct {
 
 type AnsiPixels struct {
 	ColorMode
+	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
+	ColorOutput tcolor.ColorOutput
 	fdOut       int
 	Out         *bufio.Writer
 	SharedInput *terminal.InterruptReader
@@ -94,6 +96,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		C:           make(chan os.Signal, 1),
 	}
 	ap.ColorMode = DetectColorMode()
+	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	signal.Notify(ap.C, signalList...)
 	return ap
 }
@@ -142,11 +145,22 @@ func DetectColorMode() (cm ColorMode) {
 func (ap *AnsiPixels) Open() error {
 	ap.firstClear = true
 	ap.restored = false
+	ap.ColorOutput.TrueColor = ap.TrueColor // sync, in case it was changed by flags from auto detect.
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
 	}
 	return err
+}
+
+// WriteFg writes the tcolor code as foreground color, including down converting from truecolor to closest 256 color.
+func (ap *AnsiPixels) WriteFg(c tcolor.Color) {
+	ap.WriteString(ap.ColorOutput.Foreground(c))
+}
+
+// WriteBg writes the tcolor code as background color, including down converting from truecolor to closest 256 color.
+func (ap *AnsiPixels) WriteBg(c tcolor.Color) {
+	ap.WriteString(ap.ColorOutput.Background(c))
 }
 
 // So this handles both outgoing and incoming escape sequences, but maybe we should split them
