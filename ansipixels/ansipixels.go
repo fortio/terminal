@@ -463,7 +463,7 @@ func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
 }
 
 func (ap *AnsiPixels) ClearEndOfLine() {
-	ap.WriteString("\033[K")
+	ap.WriteString(ClearLine)
 }
 
 func (ap *AnsiPixels) SaveCursorPos() {
