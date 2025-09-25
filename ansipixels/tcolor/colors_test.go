@@ -152,6 +152,7 @@ func TestParsingAdvancedColor(t *testing.T) {
 		{"hsl(192.88 57.3 50.05)", tcolor.RGBColor{R: 0x37, G: 0xA9, B: 0xC9}}, // #37A9C9
 		{"oklch(0.7 0.16 245.1)", tcolor.RGBColor{R: 0x2e, G: 0xa6, B: 0xfa}},  // #2ea6fa
 		{"oklch(0.86 0.29 143)", tcolor.RGBColor{R: 0x00, G: 0xfd, B: 0x19}},   // #00fd19
+		{"oklch(0.0951 0.0061 243.12)", tcolor.RGBColor{R: 2, G: 3, B: 4}},     // exercise low value in linear conversion.
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
@@ -263,5 +264,34 @@ func TestHSLRGBExactRoundTrip3Bytes(t *testing.T) {
 		mismatches, total, errorPercent)
 	if errorPercent > 0.2 { // 0.2% is about what we get
 		t.Fatalf("Total mismatches: %d (%.4f%%)", mismatches, errorPercent)
+	}
+}
+
+func TestToWebOKHCL(t *testing.T) {
+	tests := []struct {
+		input    tcolor.Color
+		expected string
+	}{
+		{tcolor.RGBColor{255, 0, 0}.Color(), "oklch(0.6280 0.2577 29.23)"},
+		{tcolor.RGBColor{0, 255, 0}.Color(), "oklch(0.8664 0.2948 142.50)"},
+		{tcolor.RGBColor{0, 0, 255}.Color(), "oklch(0.4520 0.3132 264.05)"},
+		// not quite what one gets on oklch.com which is oklch(0.7375 0.1089 195.05)
+		{tcolor.HSLf(0.5, 0.5, 0.5), "oklch(0.7372 0.1086 195.82)"},
+		{tcolor.Red.Color(), ""}, // only rgb/hsl have oklch
+	}
+	for _, test := range tests {
+		t.Run(test.expected, func(t *testing.T) {
+			result := tcolor.WebOklch(test.input, -1)
+			if result != test.expected {
+				t.Errorf("%s -> %s, expected %s", test.input, result, test.expected)
+			}
+		})
+	}
+	// Exercise rounding:
+	color := tcolor.RGBColor{255, 0, 0}.Color()
+	actual := tcolor.WebOklch(color, 1)
+	expected := "oklch(0.6 0.3 29.2)" // not quite the original but close: #f80000
+	if actual != expected {
+		t.Errorf("%s -> %s, expected %s", color, actual, expected)
 	}
 }

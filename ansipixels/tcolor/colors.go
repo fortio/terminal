@@ -893,9 +893,6 @@ func ToWebOklch(color RGBColor) (l, c, h float64) {
 }
 
 func cbrt(x float64) float64 {
-	if x < 0 {
-		return -math.Pow(-x, 1.0/3.0)
-	}
 	return math.Pow(x, 1.0/3.0)
 }
 
@@ -907,11 +904,13 @@ func WebOklch(color Color, rounding int) string {
 	}
 	rgb := ToRGB(t, v)
 	l, c, h := ToWebOklch(rgb)
-	hueRound := 1
-	otherRound := 3
+	hueRound := 2
+	chromaRound := 4
+	lumRound := 4
 	if rounding >= 0 {
 		hueRound = rounding
-		otherRound = rounding
+		chromaRound = rounding
+		lumRound = rounding
 	}
-	return fmt.Sprintf("oklch(%.*f %.*f %.*f)", otherRound, l, otherRound, c, hueRound, h)
+	return fmt.Sprintf("oklch(%.*f %.*f %.*f)", lumRound, l, chromaRound, c, hueRound, h)
 }
