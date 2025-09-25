@@ -393,8 +393,11 @@ func FromString(color string) (Color, error) {
 	if strings.IndexByte(color, ',') != -1 {
 		return From3floatHSLString(color)
 	}
-	if hex, ok := strings.CutPrefix(color, "hsl"); ok {
-		return FromHSLString(hex)
+	if hsl, ok := strings.CutPrefix(color, "hsl"); ok {
+		return FromHSLString(hsl)
+	}
+	if oklch, ok := strings.CutPrefix(color, "oklch"); ok {
+		return FromOKLCHString(oklch)
 	}
 	if len(color) == 4 && color[0] == 'c' {
 		return From256(color)
@@ -638,6 +641,43 @@ func FromHSLString(color string) (Color, error) {
 	return HSLf(h/360.0, s/100.0, v/100.0), nil
 }
 
+func FromOKLCHString(color string) (Color, error) {
+	if len(color) <= 2 {
+		return 0, fmt.Errorf("invalid too short OKLCH color 'oklch%s'", color)
+	}
+	// Web OKLCH: `oklch(l c h)`
+	if color[0] != '(' || color[len(color)-1] != ')' {
+		return 0, fmt.Errorf("invalid OKLCH color 'oklch%s' should be oklch(<l> <c> <h deg>)", color)
+	}
+	color = color[1 : len(color)-1]
+	parts := strings.SplitN(color, " ", 4)
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid OKLCH color 'oklch(%s)', must be oklch(l c h)", color)
+	}
+	l, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid lightness '%s': %w", parts[0], err)
+	}
+	if l < 0 || l > 1. {
+		return 0, fmt.Errorf("lightness %% must be in [0,1], got %f", l)
+	}
+	c, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid chroma '%s': %w", parts[1], err)
+	}
+	if c < 0 || c > 1. {
+		return 0, fmt.Errorf("chroma %% must be in [0,1] (0-0.34 usable), got %f", c)
+	}
+	h, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid hue '%s': %w", parts[2], err)
+	}
+	if h < 0 || h > 360 {
+		return 0, fmt.Errorf("hue degrees must be in [0,360], got %f", h)
+	}
+	return FromWebOklch(l, c, h), nil
+}
+
 func (hsl HSLColor) String() string {
 	return fmt.Sprintf("HSL#%03X_%02X_%03X", hsl.H, hsl.S, hsl.L)
 }
@@ -745,4 +785,133 @@ func RGBToHSL(c RGBColor) (h, s, l float64) {
 	}
 	h /= 6
 	return h, s, l
+}
+
+// sRGB <-> linear helpers.
+// TODO: Consider just precalculating the SrgbToLinear at least as a table.
+// Or memoize the Blend*().
+
+// TODO: consider higher resolution oklch (unfortunately we picked hsl for higher rez).
+
+// Converts a RGB component to linear space (with optional alpha multiplier if input isn't already alpha multiplied (ie NRGBA)).
+// See [ansipixels.BlendSRGB] for example of code using this.
+func SrgbToLinear(c uint8, alpha float64) float64 {
+	if alpha <= 0 {
+		return 0
+	}
+	f := (float64(c) / alpha) / 255.0
+	if f <= 0.04045 {
+		return f / 12.92
+	}
+	return math.Pow((f+0.055)/1.055, 2.4)
+}
+
+// Converts a linear RGB component to sRGB space.
+func LinearToSrgb(f float64) uint8 {
+	if f <= 0.0 {
+		return 0
+	}
+	if f >= 1.0 {
+		return 255
+	}
+	var c float64
+	if f <= 0.0031308 {
+		c = f * 12.92
+	} else {
+		c = 1.055*math.Pow(f, 1./2.4) - 0.055
+	}
+	return uint8(math.Round(c * 255.0))
+}
+
+// Oklch converts Oklch color space to sRGB.
+// Input l in [0,1], c in [0,1+] where 0.34 (or 0.4) is the maximum useful chroma, h in radian [0,2π)
+// https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
+func Oklch(l, c, h float64) Color {
+	// Step 1: OKLCh to OKLab
+	a := c * math.Cos(h)
+	b := c * math.Sin(h)
+
+	// Step 2: OKLab to linear sRGB
+	l1 := l + 0.3963377774*a + 0.2158037573*b
+	m1 := l - 0.1055613458*a - 0.0638541728*b
+	s1 := l - 0.0894841775*a - 1.2914855480*b
+
+	l3 := l1 * l1 * l1
+	m3 := m1 * m1 * m1
+	s3 := s1 * s1 * s1
+
+	R := 4.0767416621*l3 - 3.3077115913*m3 + 0.2309699292*s3
+	G := -1.2684380046*l3 + 2.6097574011*m3 - 0.3413193965*s3
+	B := -0.0041960863*l3 - 0.7034186147*m3 + 1.7076147010*s3
+
+	// Step 3: linear to sRGB
+	return RGBColor{
+		R: LinearToSrgb(R),
+		G: LinearToSrgb(G),
+		B: LinearToSrgb(B),
+	}.Color()
+}
+
+// Use the web oklch, ie with hue in degree instead of radiant.
+func FromWebOklch(l, c, h float64) Color {
+	return Oklch(l, c, h*2*math.Pi/360.)
+}
+
+// Oklchf with normalize 0-1 float for all components (chroma 1.0 will be 0.35), 0-1 h is [0,2π].
+func Oklchf(l, c, h float64) Color {
+	return Oklch(l, 0.35*c, h*2*math.Pi)
+}
+
+// Returns the web component formats of the rgb color to oklch.
+func ToWebOklch(color RGBColor) (l, c, h float64) {
+	// Step 1: sRGB to linear
+	R := SrgbToLinear(color.R, 1)
+	G := SrgbToLinear(color.G, 1)
+	B := SrgbToLinear(color.B, 1)
+
+	// Step 2: linear to OKLab
+	l3 := 0.4122214708*R + 0.5363325363*G + 0.0514459929*B
+	m3 := 0.2119034982*R + 0.6806995451*G + 0.1073969566*B
+	s3 := 0.0883024619*R + 0.2817188376*G + 0.6299787005*B
+
+	l1 := cbrt(l3)
+	m1 := cbrt(m3)
+	s1 := cbrt(s3)
+
+	l = 0.2104542553*l1 + 0.7936177850*m1 - 0.0040720468*s1
+	a := 1.9779984951*l1 - 2.4285922050*m1 + 0.4505937099*s1
+	b := 0.0259040371*l1 + 0.7827717662*m1 - 0.8086757660*s1
+
+	// Step 3: OKLab → OKLCh
+	c = math.Hypot(a, b)
+	h = math.Atan2(b, a)
+	if h < 0 {
+		h += 2 * math.Pi
+	}
+	h = 360 * h / (2 * math.Pi)
+	return l, c, h
+}
+
+func cbrt(x float64) float64 {
+	if x < 0 {
+		return -math.Pow(-x, 1.0/3.0)
+	}
+	return math.Pow(x, 1.0/3.0)
+}
+
+// WebOklch produce a web oklch string from our tcolor (rgb). See https://oklch.com/.
+func WebOklch(color Color, rounding int) string {
+	t, v := color.Decode()
+	if t != ColorTypeHSL && t != ColorTypeRGB {
+		return ""
+	}
+	rgb := ToRGB(t, v)
+	l, c, h := ToWebOklch(rgb)
+	hueRound := 1
+	otherRound := 3
+	if rounding >= 0 {
+		hueRound = rounding
+		otherRound = rounding
+	}
+	return fmt.Sprintf("oklch(%.*f %.*f %.*f)", otherRound, l, otherRound, c, hueRound, h)
 }

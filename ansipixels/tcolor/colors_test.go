@@ -32,6 +32,15 @@ func TestParsingErrors(t *testing.T) {
 		"hsl(abc 10 10)",
 		"hsl(10 abc 10)",
 		"hsl(10 10 def)",
+		"oklch()",
+		"oklch(0.5 0.5)",
+		"oklch(1 1 1",
+		"oklch(a 0 0)",
+		"oklch(0 a 0)",
+		"oklch(0 0 a)",
+		"oklch(1.1 0 0)",
+		"oklch(0 1.1 0)",
+		"oklch(0 0 360.1)",
 	}
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
@@ -141,6 +150,8 @@ func TestParsingAdvancedColor(t *testing.T) {
 		{"0.75,0.5,0.5", tcolor.RGBColor{R: 128, G: 64, B: 192}},
 		{"1.0,1,0.75", tcolor.RGBColor{R: 255, G: 127, B: 127}},
 		{"hsl(192.88 57.3 50.05)", tcolor.RGBColor{R: 0x37, G: 0xA9, B: 0xC9}}, // #37A9C9
+		{"oklch(0.7 0.16 245.1)", tcolor.RGBColor{R: 0x2e, G: 0xa6, B: 0xfa}},  // #2ea6fa
+		{"oklch(0.86 0.29 143)", tcolor.RGBColor{R: 0x00, G: 0xfd, B: 0x19}},   // #00fd19
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
