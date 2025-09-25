@@ -94,36 +94,6 @@ func BlendLuminance(_, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColo
 	return newHSL.RGB()
 }
 
-// sRGB <-> linear helpers.
-// TODO: Consider just precalculating the srgbToLinear at least as a table.
-// Or memoize the Blend*().
-func srgbToLinear(c uint8, alpha float64) float64 {
-	if alpha <= 0 {
-		return 0
-	}
-	f := (float64(c) / alpha) / 255.0
-	if f <= 0.04045 {
-		return f / 12.92
-	}
-	return math.Pow((f+0.055)/1.055, 2.4)
-}
-
-func linearToSrgb(f float64) uint8 {
-	if f <= 0.0 {
-		return 0
-	}
-	if f >= 1.0 {
-		return 255
-	}
-	var c float64
-	if f <= 0.0031308 {
-		c = f * 12.92
-	} else {
-		c = 1.055*math.Pow(f, 1./2.4) - 0.055
-	}
-	return uint8(math.Round(c * 255.0))
-}
-
 // Gamma aware blending (keeps foreground sharper/closer).
 // Note: we really have RGBA colors ie, pre multiplied so we
 // divide foreground by the passed in alpha to get it to uncompressed
@@ -146,10 +116,10 @@ func blendSRGB(bg, fg tcolor.RGBColor, alpha, alphaFG float64) tcolor.RGBColor {
 
 	// Convert to linear
 	// Background is assumed to be just RGB color (no alpha).
-	bgR, bgG, bgB := srgbToLinear(bg.R, 1), srgbToLinear(bg.G, 1), srgbToLinear(bg.B, 1)
+	bgR, bgG, bgB := tcolor.SrgbToLinear(bg.R, 1), tcolor.SrgbToLinear(bg.G, 1), tcolor.SrgbToLinear(bg.B, 1)
 	// AlphaFG given is the alpha of the foreground so we divide by it in srgbToLinear
 	// (once in float so not to get quantization problems, though pre multiplied is an issue)
-	fgR, fgG, fgB := srgbToLinear(fg.R, alphaFG), srgbToLinear(fg.G, alphaFG), srgbToLinear(fg.B, alphaFG)
+	fgR, fgG, fgB := tcolor.SrgbToLinear(fg.R, alphaFG), tcolor.SrgbToLinear(fg.G, alphaFG), tcolor.SrgbToLinear(fg.B, alphaFG)
 
 	// Blend in linear space - but foreground is already alpha multiplied.
 	r := (1-alpha)*bgR + alpha*fgR
@@ -158,9 +128,9 @@ func blendSRGB(bg, fg tcolor.RGBColor, alpha, alphaFG float64) tcolor.RGBColor {
 
 	// Convert back to sRGB
 	return tcolor.RGBColor{
-		R: linearToSrgb(r),
-		G: linearToSrgb(g),
-		B: linearToSrgb(b),
+		R: tcolor.LinearToSrgb(r),
+		G: tcolor.LinearToSrgb(g),
+		B: tcolor.LinearToSrgb(b),
 	}
 }
 
