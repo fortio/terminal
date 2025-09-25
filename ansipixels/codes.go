@@ -4,15 +4,17 @@ import "fortio.org/terminal/ansipixels/tcolor"
 
 // Ansi codes.
 const (
-	// Use newer tcolor for these.
+	// ClearLine clears the rest of the line like [ClearEndOfLine].
+	ClearLine = "\033[K"
+	MoveLeft  = "\033[1D"
+
+	// Deprecated: use newer tcolor for these.
 	Bold       = tcolor.Bold
 	Dim        = tcolor.Dim
 	Underlined = tcolor.Underlined
 	Blink      = tcolor.Blink
-	// Inverse fg/bg colors. (was also called Reverse).
+	// Deprecated: use [tcolor.Inverse].
 	Inverse = tcolor.Inverse
-
-	MoveLeft = "\033[1D"
 
 	Reset = tcolor.Reset
 
