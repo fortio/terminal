@@ -17,6 +17,7 @@ import (
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels/tcolor"
+	_ "github.com/jbuchbinder/gopnm" // ppm/pnm decoder
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/tiff" // Import tiff decoder
 	_ "golang.org/x/image/vp8"  // Import VP8 decoder
