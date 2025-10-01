@@ -376,7 +376,7 @@ func (ap *AnsiPixels) FlushLogger() bool {
 	ap.Logger.Lock()
 	hasOutput := ap.logbuffer.Len() > 0
 	if hasOutput {
-		extra = ap.logbuffer.Bytes()
+		extra = append(extra, ap.logbuffer.Bytes()...) // need to copy as we release the lock
 		ap.logbuffer.Reset()
 	}
 	ap.Logger.Unlock()
