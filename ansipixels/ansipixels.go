@@ -78,8 +78,8 @@ type AnsiPixels struct {
 	GotBackground       bool // Whether we got a background color from the terminal (after RequestBackgroundColor and OSCDecode)
 	// Whether to use transparency when drawing truecolor images ([SyncBackgroundColor] needed)
 	Transparency bool
-	// Whether FPSTicks automatically calls StartSyncMode and EndSyncMode around the callback. Note that this prevents the cursor from blinking
-	// at FPS above 4. Default is true.
+	// Whether FPSTicks automatically calls StartSyncMode and EndSyncMode around the callback.
+	// Note that this prevents the cursor from blinking at FPS above 4. Default is true.
 	AutoSync bool
 }
 
