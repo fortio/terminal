@@ -3,6 +3,7 @@ package terminal
 import (
 	"bytes"
 	"io"
+	"sync"
 )
 
 type CRLFWriter struct {
@@ -11,7 +12,7 @@ type CRLFWriter struct {
 }
 
 func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
-	// Someone copied from x/term's writeWithCRLF
+	// Somewhat copied from x/term's writeWithCRLF
 	for len(buf) > 0 {
 		i := bytes.IndexByte(buf, '\n')
 		todo := len(buf)
@@ -33,5 +34,69 @@ func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
 			buf = buf[1:]
 		}
 	}
-	return n, nil
+	// Auto flush
+	if flusher, ok := w.Out.(FlushWriter); ok {
+		err = flusher.Flush()
+	}
+	return n, err
+}
+
+func (w *CRLFWriter) Flush() error {
+	// flush already done at the end of Write.
+	return nil
+}
+
+type FlushWriter interface {
+	io.Writer
+	Flush() error
+}
+
+type Bufio interface {
+	FlushWriter
+	WriteString(s string) (n int, err error)
+	WriteByte(c byte) error
+	WriteRune(r rune) (n int, err error)
+}
+
+// SyncWriter is a threadsafe wrapper around a most of the APIs of bufio.Writer.
+type SyncWriter struct {
+	// Out is the underlying writer to write to.
+	Out Bufio
+	// mu protects access to the Out writer.
+	mu sync.Mutex
+}
+
+func (w *SyncWriter) Write(buf []byte) (n int, err error) {
+	w.mu.Lock()
+	n, err = w.Out.Write(buf)
+	w.mu.Unlock()
+	return n, err
+}
+
+func (w *SyncWriter) Flush() error {
+	w.mu.Lock()
+	err := w.Out.Flush()
+	w.mu.Unlock()
+	return err
+}
+
+func (w *SyncWriter) WriteString(s string) (n int, err error) {
+	w.mu.Lock()
+	n, err = w.Out.WriteString(s)
+	w.mu.Unlock()
+	return n, err
+}
+
+func (w *SyncWriter) WriteByte(c byte) error {
+	w.mu.Lock()
+	err := w.Out.WriteByte(c)
+	w.mu.Unlock()
+	return err
+}
+
+func (w *SyncWriter) WriteRune(r rune) (n int, err error) {
+	w.mu.Lock()
+	n, err = w.Out.WriteRune(r)
+	w.mu.Unlock()
+	return n, err
 }

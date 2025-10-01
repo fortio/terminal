@@ -48,7 +48,7 @@ type AnsiPixels struct {
 	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
 	ColorOutput tcolor.ColorOutput
 	fdOut       int
-	Out         *bufio.Writer
+	Out         terminal.Bufio
 	SharedInput *terminal.InterruptReader
 	buf         [bufSize]byte
 	Data        []byte
@@ -651,11 +651,14 @@ func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	}
 	var cursorX int
 	var cursorY int
+	x := (ap.W - maxw) / 2
 	for i, l := range lines {
 		cursorY = y + i
-		x := (ap.W - widths[i]) / 2
 		ap.MoveCursor(x, cursorY)
+		delta := (maxw - widths[i])
+		ap.WriteString(strings.Repeat(" ", delta/2))
 		ap.WriteString(l)
+		ap.WriteString(strings.Repeat(" ", delta/2+delta%2)) // if odd, add 1 more space on the right
 		cursorX = x + widths[i]
 	}
 	ap.DrawRoundBox((ap.W-maxw)/2-1, y-1, maxw+2, len(lines)+2)
@@ -687,4 +690,9 @@ func (ap *AnsiPixels) SetBracketedPasteMode(on bool) {
 func FormatDate(d *time.Time) string {
 	return fmt.Sprintf("%d-%02d-%02d-%02d%02d%02d", d.Year(), d.Month(), d.Day(),
 		d.Hour(), d.Minute(), d.Second())
+}
+
+func (ap *AnsiPixels) LoggerSetup() {
+	ap.Out = &terminal.SyncWriter{Out: ap.Out}
+	terminal.LoggerSetup(&terminal.CRLFWriter{Out: ap.Out})
 }
