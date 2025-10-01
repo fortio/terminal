@@ -3,6 +3,7 @@ package terminal
 import (
 	"bytes"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -12,6 +13,10 @@ type CRLFWriter struct {
 }
 
 func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
+	return CRLFWrite(w.Out, buf)
+}
+
+func CRLFWrite(out io.Writer, buf []byte) (n int, err error) {
 	// Somewhat copied from x/term's writeWithCRLF
 	for len(buf) > 0 {
 		i := bytes.IndexByte(buf, '\n')
@@ -20,14 +25,14 @@ func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
 			todo = i
 		}
 		var nn int
-		nn, err = w.Out.Write(buf[:todo])
+		nn, err = out.Write(buf[:todo])
 		n += nn
 		if err != nil {
 			return n, err
 		}
 		buf = buf[todo:]
 		if i >= 0 {
-			if _, err = w.Out.Write([]byte{'\r', '\n'}); err != nil {
+			if _, err = out.Write([]byte{'\r', '\n'}); err != nil {
 				return n, err
 			}
 			n++
@@ -35,7 +40,7 @@ func (w *CRLFWriter) Write(buf []byte) (n int, err error) {
 		}
 	}
 	// Auto flush
-	if flusher, ok := w.Out.(FlushWriter); ok {
+	if flusher, ok := out.(FlushWriter); ok {
 		err = flusher.Flush()
 	}
 	return n, err
@@ -53,8 +58,8 @@ type FlushWriter interface {
 
 type Bufio interface {
 	FlushWriter
-	WriteString(s string) (n int, err error)
-	WriteByte(c byte) error
+	io.StringWriter
+	io.ByteWriter
 	WriteRune(r rune) (n int, err error)
 }
 
@@ -109,4 +114,20 @@ func (w *SyncWriter) Lock() {
 // Unlock: Shares the underlying lock.
 func (w *SyncWriter) Unlock() {
 	w.mu.Unlock()
+}
+
+type FlushableStringBuilder struct {
+	strings.Builder
+}
+
+func (b *FlushableStringBuilder) Flush() error {
+	return nil
+}
+
+type FlushableBytesBuffer struct {
+	bytes.Buffer
+}
+
+func (b *FlushableBytesBuffer) Flush() error {
+	return nil
 }

@@ -48,7 +48,7 @@ type AnsiPixels struct {
 	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
 	ColorOutput tcolor.ColorOutput
 	fdOut       int
-	Out         terminal.Bufio
+	Out         terminal.Bufio // typically a bufio.Writer wrapping os.Stdout but can be swapped for testing or other uses.
 	SharedInput *terminal.InterruptReader
 	buf         [bufSize]byte
 	Data        []byte
@@ -81,6 +81,11 @@ type AnsiPixels struct {
 	// Whether FPSTicks automatically calls StartSyncMode and EndSyncMode around the callback.
 	// Note that this prevents the cursor from blinking at FPS above 4. Default is true.
 	AutoSync bool
+	// Concurrent safe sink for output to the terminal while drawing (eg. logger output).
+	// it's content if any will be dumped to the terminal when [EndSyncMode] is called.
+	// LF are converted to CRLF automatically.
+	Logger    *terminal.SyncWriter
+	logbuffer terminal.FlushableBytesBuffer
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -99,6 +104,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		C:           make(chan os.Signal, 1),
 		AutoSync:    true,
 	}
+	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	signal.Notify(ap.C, signalList...)
@@ -307,7 +313,7 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 				ap.MouseDecodeAll()
 			}
 			if ap.AutoSync {
-				ap.StartSyncMode()
+				ap.StartSyncMode() // will also flush logger output if any.
 			}
 			cont := callback(nctx)
 			if ap.AutoSync {
@@ -342,13 +348,45 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	return 0, nil
 }
 
+// Starts the terminal output transaction. If AutoSync is set (default) logger output will get flushed as well.
 func (ap *AnsiPixels) StartSyncMode() {
+	if ap.AutoSync { // we could rely on && shortcut but for clarity, inner if:
+		if ap.FlushLogger() {
+			return // we're done, flushlogger did the start sync mode
+		}
+	}
+	ap.startSyncMode()
+}
+
+// Internal unconditional/not dealing with logger start sync mode.
+func (ap *AnsiPixels) startSyncMode() {
 	ap.WriteString("\033[?2026h")
+}
+
+// FlushLogger flushes the logger output if any to the terminal (saving/restoring cursor position).
+// Returns true if something was output. if there was output a StartSyncMode is done before that output.
+func (ap *AnsiPixels) FlushLogger() bool {
+	var extra []byte
+	ap.Logger.Lock()
+	hasOutput := ap.logbuffer.Len() > 0
+	if hasOutput {
+		extra = ap.logbuffer.Bytes()
+		ap.logbuffer.Reset()
+	}
+	ap.Logger.Unlock()
+	if !hasOutput {
+		return false
+	}
+	ap.startSyncMode() // internal one so we don't infinite loop back here.
+	ap.RestoreCursorPos()
+	_, _ = terminal.CRLFWrite(ap.Out, extra)
+	ap.SaveCursorPos()
+	return true
 }
 
 // End sync (and flush).
 func (ap *AnsiPixels) EndSyncMode() {
-	ap.WriteString("\033[?2026l")
+	_, _ = ap.Out.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
 }
 
@@ -702,8 +740,6 @@ func FormatDate(d *time.Time) string {
 
 // Sets up the fortio logger to have CRLF and SyncWriter so it can log while we're drawing.
 func (ap *AnsiPixels) LoggerSetup() *terminal.SyncWriter {
-	sw := &terminal.SyncWriter{Out: ap.Out}
-	ap.Out = sw
-	terminal.LoggerSetup(&terminal.CRLFWriter{Out: sw})
-	return sw
+	terminal.LoggerSetup(ap.Logger)
+	return ap.Logger
 }
