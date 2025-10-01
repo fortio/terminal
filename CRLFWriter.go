@@ -100,3 +100,13 @@ func (w *SyncWriter) WriteRune(r rune) (n int, err error) {
 	w.mu.Unlock()
 	return n, err
 }
+
+// Lock: Shares the underlying lock.
+func (w *SyncWriter) Lock() {
+	w.mu.Lock()
+}
+
+// Unlock: Shares the underlying lock.
+func (w *SyncWriter) Unlock() {
+	w.mu.Unlock()
+}
