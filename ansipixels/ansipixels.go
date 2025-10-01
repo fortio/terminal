@@ -86,6 +86,8 @@ type AnsiPixels struct {
 	// LF are converted to CRLF automatically.
 	Logger    *terminal.SyncWriter
 	logbuffer terminal.FlushableBytesBuffer
+	// Setup fortio logger unless this is set to false (defaults to true in NewAnsiPixels, clear before Open if desired).
+	AutoLoggerSetup bool
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -97,12 +99,13 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		fdOut:       safecast.MustConv[int](os.Stdout.Fd()),
-		Out:         bufio.NewWriter(os.Stdout),
-		FPS:         fps,
-		SharedInput: terminal.GetSharedInput(d),
-		C:           make(chan os.Signal, 1),
-		AutoSync:    true,
+		fdOut:           safecast.MustConv[int](os.Stdout.Fd()),
+		Out:             bufio.NewWriter(os.Stdout),
+		FPS:             fps,
+		SharedInput:     terminal.GetSharedInput(d),
+		C:               make(chan os.Signal, 1),
+		AutoSync:        true,
+		AutoLoggerSetup: true,
 	}
 	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
@@ -159,6 +162,9 @@ func (ap *AnsiPixels) Open() error {
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
+	}
+	if ap.AutoLoggerSetup {
+		ap.LoggerSetup()
 	}
 	return err
 }
@@ -400,6 +406,7 @@ func (ap *AnsiPixels) Restore() {
 		return
 	}
 	ap.ShowCursor()
+	ap.FlushLogger() // in case there is something pending
 	ap.EndSyncMode()
 	_ = ap.SharedInput.NormalMode()
 	ap.restored = true

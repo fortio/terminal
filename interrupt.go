@@ -317,7 +317,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 
 func (ir *InterruptReader) setError(err error) {
 	level := log.Info
-	if errors.Is(err, ErrStopped) {
+	if errors.Is(err, ErrStopped) || errors.Is(err, context.Canceled) {
 		level = log.Verbose
 	}
 	log.S(level, "InterruptReader setting error", log.Any("err", err))
