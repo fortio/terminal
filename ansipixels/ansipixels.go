@@ -48,7 +48,7 @@ type AnsiPixels struct {
 	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
 	ColorOutput tcolor.ColorOutput
 	fdOut       int
-	Out         *bufio.Writer
+	Out         terminal.Bufio // typically a bufio.Writer wrapping os.Stdout but can be swapped for testing or other uses.
 	SharedInput *terminal.InterruptReader
 	buf         [bufSize]byte
 	Data        []byte
@@ -78,6 +78,16 @@ type AnsiPixels struct {
 	GotBackground       bool // Whether we got a background color from the terminal (after RequestBackgroundColor and OSCDecode)
 	// Whether to use transparency when drawing truecolor images ([SyncBackgroundColor] needed)
 	Transparency bool
+	// Whether FPSTicks automatically calls StartSyncMode and EndSyncMode around the callback.
+	// Note that this prevents the cursor from blinking at FPS above 4. Default is true.
+	AutoSync bool
+	// Concurrent safe sink for output to the terminal while drawing (eg. logger output).
+	// it's content if any will be dumped to the terminal when [EndSyncMode] is called.
+	// LF are converted to CRLF automatically.
+	Logger    *terminal.SyncWriter
+	logbuffer terminal.FlushableBytesBuffer
+	// Setup fortio logger unless this is set to false (defaults to true in NewAnsiPixels, clear before Open if desired).
+	AutoLoggerSetup bool
 }
 
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
@@ -89,12 +99,15 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		fdOut:       safecast.MustConv[int](os.Stdout.Fd()),
-		Out:         bufio.NewWriter(os.Stdout),
-		FPS:         fps,
-		SharedInput: terminal.GetSharedInput(d),
-		C:           make(chan os.Signal, 1),
+		fdOut:           safecast.MustConv[int](os.Stdout.Fd()),
+		Out:             bufio.NewWriter(os.Stdout),
+		FPS:             fps,
+		SharedInput:     terminal.GetSharedInput(d),
+		C:               make(chan os.Signal, 1),
+		AutoSync:        true,
+		AutoLoggerSetup: true,
 	}
+	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	signal.Notify(ap.C, signalList...)
@@ -149,6 +162,9 @@ func (ap *AnsiPixels) Open() error {
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
+	}
+	if ap.AutoLoggerSetup {
+		ap.LoggerSetup()
 	}
 	return err
 }
@@ -272,8 +288,8 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 // The callback should return false to stop the loop (typically to exit the program), true to continue it.
 // Note this is using and 'starting' ap.SharedInput unlike ReadOrResizeOrSignal which is using the underlying
 // InterruptReader directly. Data can be lost if you mix the 2 modes (so don't).
-// StartSyncMode and EndSyncMode are called around the callback to ensure the display is synchronized so you don't
-// have to do it in the callback.
+// StartSyncMode and EndSyncMode are called around the callback when AutoSync is set (which is the default)
+// to ensure the display is synchronized so you don't have to do it in the callback.
 func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Context) bool) error {
 	if ap.FPS <= 0 {
 		panic("FPSTicks called with non-positive FPS")
@@ -302,9 +318,13 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 			if !ap.NoDecode {
 				ap.MouseDecodeAll()
 			}
-			ap.StartSyncMode()
+			if ap.AutoSync {
+				ap.StartSyncMode() // will also flush logger output if any.
+			}
 			cont := callback(nctx)
-			ap.EndSyncMode()
+			if ap.AutoSync {
+				ap.EndSyncMode()
+			}
 			if !cont {
 				return nil // exit the loop
 			}
@@ -334,13 +354,45 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	return 0, nil
 }
 
+// Starts the terminal output transaction. If AutoSync is set (default) logger output will get flushed as well.
 func (ap *AnsiPixels) StartSyncMode() {
+	if ap.AutoSync { // we could rely on && shortcut but for clarity, inner if:
+		if ap.FlushLogger() {
+			return // we're done, flushlogger did the start sync mode
+		}
+	}
+	ap.startSyncMode()
+}
+
+// Internal unconditional/not dealing with logger start sync mode.
+func (ap *AnsiPixels) startSyncMode() {
 	ap.WriteString("\033[?2026h")
+}
+
+// FlushLogger flushes the logger output if any to the terminal (saving/restoring cursor position).
+// Returns true if something was output. if there was output a StartSyncMode is done before that output.
+func (ap *AnsiPixels) FlushLogger() bool {
+	var extra []byte
+	ap.Logger.Lock()
+	hasOutput := ap.logbuffer.Len() > 0
+	if hasOutput {
+		extra = ap.logbuffer.Bytes()
+		ap.logbuffer.Reset()
+	}
+	ap.Logger.Unlock()
+	if !hasOutput {
+		return false
+	}
+	ap.startSyncMode() // internal one so we don't infinite loop back here.
+	ap.RestoreCursorPos()
+	_, _ = terminal.CRLFWrite(ap.Out, extra)
+	ap.SaveCursorPos()
+	return true
 }
 
 // End sync (and flush).
 func (ap *AnsiPixels) EndSyncMode() {
-	ap.WriteString("\033[?2026l")
+	_, _ = ap.Out.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
 }
 
@@ -354,6 +406,7 @@ func (ap *AnsiPixels) Restore() {
 		return
 	}
 	ap.ShowCursor()
+	ap.FlushLogger() // in case there is something pending
 	ap.EndSyncMode()
 	_ = ap.SharedInput.NormalMode()
 	ap.restored = true
@@ -651,12 +704,15 @@ func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	}
 	var cursorX int
 	var cursorY int
+	leftX := (ap.W - maxw) / 2
 	for i, l := range lines {
 		cursorY = y + i
-		x := (ap.W - widths[i]) / 2
-		ap.MoveCursor(x, cursorY)
+		ap.MoveCursor(leftX, cursorY)
+		delta := (maxw - widths[i])
+		ap.WriteString(strings.Repeat(" ", delta/2))
 		ap.WriteString(l)
-		cursorX = x + widths[i]
+		ap.WriteString(strings.Repeat(" ", delta/2+delta%2)) // if odd, add 1 more space on the right
+		cursorX = leftX + delta/2 + widths[i]
 	}
 	ap.DrawRoundBox((ap.W-maxw)/2-1, y-1, maxw+2, len(lines)+2)
 	// put back the cursor at the end of the last line (inside the box)
@@ -687,4 +743,10 @@ func (ap *AnsiPixels) SetBracketedPasteMode(on bool) {
 func FormatDate(d *time.Time) string {
 	return fmt.Sprintf("%d-%02d-%02d-%02d%02d%02d", d.Year(), d.Month(), d.Day(),
 		d.Hour(), d.Minute(), d.Second())
+}
+
+// Sets up the fortio logger to have CRLF and SyncWriter so it can log while we're drawing.
+func (ap *AnsiPixels) LoggerSetup() *terminal.SyncWriter {
+	terminal.LoggerSetup(ap.Logger)
+	return ap.Logger
 }
