@@ -746,7 +746,7 @@ func FormatDate(d *time.Time) string {
 }
 
 // Sets up the fortio logger to have CRLF and SyncWriter so it can log while we're drawing.
-func (ap *AnsiPixels) LoggerSetup() *terminal.SyncWriter {
+// (will only happen if stderr hasn't been redirected).
+func (ap *AnsiPixels) LoggerSetup() {
 	terminal.LoggerSetup(ap.Logger)
-	return ap.Logger
 }
