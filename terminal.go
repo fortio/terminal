@@ -125,6 +125,10 @@ func (t *Terminal) IsTerminal() bool {
 // Setups fortio logger (and thus stdlib "log" too)
 // to write to the terminal as needed to preserve prompt/work in raw mode (ie add \r before \n).
 func LoggerSetup(out io.Writer) {
+	// If stderr has been redirected, don't change anything.
+	if !log.ConsoleLogging() {
+		return
+	}
 	// Keep same color logic as fortio logger, so flags like -logger-no-color work.
 	colormode := log.ColorMode()
 	// t.Out will add the needed \r for each \n when term is in raw mode
