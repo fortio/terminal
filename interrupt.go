@@ -73,13 +73,13 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 		bufSize: bufSize,
 		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
-		TR:      NewTimeoutReader(reader, timeout),
 	}
 	ir.reset = ir.buf
 	if timeout != 0 {
 		ir.cond = *sync.NewCond(&ir.mu)
-		log.Config.GoroutineID = true
+		log.Config.GoroutineID = true // must be set before (on windows/with non select reader) we start the goroutine.
 	}
+	ir.TR = NewTimeoutReader(reader, timeout) // will start goroutine on windows.
 	return ir
 }
 
