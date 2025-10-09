@@ -15,6 +15,8 @@ import (
 	"golang.org/x/term"
 )
 
+// InterruptReader is a reader that can be interrupted by Ctrl-C or signals.
+// It supports both blocking and non-blocking modes based on the timeout value provided during initialization.
 type InterruptReader struct {
 	In      *os.File // stdin typically
 	buf     []byte
@@ -26,8 +28,8 @@ type InterruptReader struct {
 	cancel  context.CancelFunc
 	timeout time.Duration
 	stopped bool
-	// TimeoutReader is the timeout reader for the interrupt reader. Do not access directly if also using Start/Stop.
-	TR *TimeoutReader
+	// TimeoutReader is the timeout reader for the interrupt reader.
+	tr *TimeoutReader
 	// Terminal state (raw mode vs normal)
 	st *term.State
 }
@@ -63,10 +65,13 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 }
 
 // NewInterruptReader creates a new interrupt reader.
-// it needs to be Start()ed to start reading from the underlying reader
+// It needs to be Start()ed to start reading from the underlying reader
 // and intercept Ctrl-C and listen for interrupt signals.
 // Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
 // Using 0 as the timeout disables most layers and uses the underlying reader directly (blocking IOs).
+// Start() must be called after creating it to create (and start) the timeout reader and goroutines.
+// Note doing it in NewInterruptReader() allows for logger configuration to happen single threaded and
+// thus avoid races.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
 	ir := &InterruptReader{
 		In:      reader,
@@ -75,11 +80,14 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 		buf:     make([]byte, 0, bufSize),
 	}
 	ir.reset = ir.buf
-	if timeout != 0 {
+	if timeout == 0 {
+		// This won't be starting a thread/goroutine, just a passthrough reader in the mode so we can create it early/here.
+		ir.tr = NewTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
+	} else {
 		ir.cond = *sync.NewCond(&ir.mu)
 		log.Config.GoroutineID = true // must be set before (on windows/with non select reader) we start the goroutine.
 	}
-	ir.TR = NewTimeoutReader(reader, timeout) // will start goroutine on windows.
+	// We create the "tr" only in Start() to avoid starting the goroutine too early which causes log races.
 	return ir
 }
 
@@ -93,10 +101,10 @@ func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 		panic("Cannot change timeout from blocking to non-blocking mode")
 	}
 	ir.timeout = timeout
-	if ir.TR.IsClosed() {
-		ir.TR = NewTimeoutReader(ir.In, timeout)
+	if ir.tr == nil || ir.tr.IsClosed() {
+		ir.tr = NewTimeoutReader(ir.In, timeout)
 	} else {
-		ir.TR.ChangeTimeout(timeout)
+		ir.tr.ChangeTimeout(timeout)
 	}
 }
 
@@ -140,6 +148,9 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	}
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
+	if ir.tr == nil {
+		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+	}
 	if ir.timeout != 0 {
 		go func() {
 			ir.start(nctx)
@@ -152,11 +163,11 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	if ir.timeout == 0 {
 		// blocking mode, direct read.
-		return ir.TR.Read(p)
+		return ir.tr.Read(p)
 	}
 	ir.mu.Lock()
 	for len(ir.buf) == 0 && ir.err == nil {
-		ir.cond.Wait()
+		ir.cond.Wait() // wait _until_ data or error
 	}
 	n, err := ir.read(p)
 	ir.mu.Unlock()
@@ -171,6 +182,21 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	ir.mu.Lock()
 	n, err := ir.read(p)
 	ir.mu.Unlock()
+	return n, err
+}
+
+// ReadNonBlocking will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
+func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
+	if ir.timeout == 0 {
+		panic("ReadWithTimeout called in blocking mode")
+	}
+	ir.mu.Lock()
+	if len(ir.buf) == 0 && ir.err == nil {
+		ir.cond.Wait() // single wait cycle.
+	}
+	n, err := ir.read(p)
+	ir.mu.Unlock()
+
 	return n, err
 }
 
@@ -249,10 +275,10 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	// Check for signal and context every ir.timeout, though signals should interrupt the select,
 	// they don't (at least on macOS, for the signals we are watching).
-	tr := ir.TR
-	if tr.IsClosed() {
+	tr := ir.tr
+	if tr == nil || tr.IsClosed() {
 		tr = NewTimeoutReader(ir.In, ir.timeout)
-		ir.TR = tr
+		ir.tr = tr
 	} else {
 		tr.ChangeTimeout(ir.timeout)
 	}
@@ -283,6 +309,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 				return
 			}
 			if n == 0 {
+				ir.cond.Signal() // for ReadWithTimeout, 1 cycle of waiting tops.
 				continue
 			}
 			localBuf = localBuf[:n]

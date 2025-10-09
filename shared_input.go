@@ -84,6 +84,6 @@ func (ir *InterruptReader) Raw() bool {
 // It also returns the terminal to normal mode.
 func (ir *InterruptReader) Close() error {
 	err := ir.NormalMode()
-	ir.TR.Close()
+	ir.tr.Close()
 	return err
 }

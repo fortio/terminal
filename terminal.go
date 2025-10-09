@@ -70,12 +70,12 @@ func (t *Terminal) Setup(ctx context.Context) error {
 	rw := struct {
 		io.Reader
 		io.Writer
-	}{t.IntrReader, os.Stderr}
+	}{t.IntrReader, os.Stdout}
 	t.term = term.NewTerminal(rw, "")
 	t.term.History = t.history
 	t.Out = t.term
 	if !t.IsTerminal() {
-		t.Out = os.Stderr // no need to add \r for non raw mode.
+		t.Out = os.Stdout // no need to add \r for non raw mode.
 		t.ResetInterrupts(ctx)
 		return nil
 	}
@@ -313,7 +313,7 @@ func (t *Terminal) Close() error {
 	err := t.IntrReader.NormalMode()
 	t.IntrReader.Close()
 	t.IntrReader = nil
-	// t.Out = os.Stderr // races during exit.
+	// t.Out = os.Stdout // races during exit.
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.
 	if t.historyFile == "" || t.capacity <= 0 {
@@ -349,7 +349,7 @@ func (t *Terminal) ReadLine() (string, error) {
 	if errors.Is(err, io.EOF) && !t.IntrReader.InEOF() {
 		log.LogVf("ReadLine got artificial EOF, closing interrupt reader %q", c)
 		t.IntrReader.Stop()
-		t.IntrReader.TR.Close()
+		t.IntrReader.tr.Close()
 	}
 	// That error isn't an error that needs to be propagated,
 	// it's just to allow copy/paste without autocomplete.

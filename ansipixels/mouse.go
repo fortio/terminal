@@ -61,10 +61,7 @@ func (ap *AnsiPixels) MousePixelsOff() {
 	ap.WriteString("\x1b[?1016l")
 }
 
-var (
-	mouseDataPrefix    = []byte{0x1b, '[', 'M'}
-	sgrMouseDataPrefix = []byte{0x1b, '[', '<'}
-)
+var sgrMouseDataPrefix = []byte{0x1b, '[', '<'}
 
 type MouseStatus int
 
@@ -149,51 +146,6 @@ func (ap *AnsiPixels) MouseDecode() MouseStatus {
 	ap.My = y
 	ap.Mbuttons = b
 	ap.Mrelease = buttonRelease
-	ap.Mouse = true
-	return MouseComplete
-}
-
-// MouseDecodeX10 is the older fixed 3 bytes non 1006h mouse decoding
-// It's the one that really returns MousePrefix (when ran on windows terminal)
-// That complication was pretty much only needed for fortio.org/tev.
-func (ap *AnsiPixels) MouseDecodeX10(readMoreIfNeeded bool) MouseStatus {
-	ap.Mouse = false
-	idx := bytes.Index(ap.Data, mouseDataPrefix)
-	if idx == -1 {
-		return NoMouse
-	}
-	start := idx + len(mouseDataPrefix)
-	if start+3 > len(ap.Data) { //nolint:nestif // the 2 possible read sources made this go over.
-		if !readMoreIfNeeded {
-			return MousePrefix
-		}
-		// Read the missing bytes (eg windows terminal sends in 2 chunks).
-		need := start + 3 - len(ap.Data)
-		buf := [3]byte{}
-		var n int
-		var err error
-		if ap.readSharedMode {
-			n, err = ap.SharedInput.Read(buf[:need])
-		} else {
-			n, err = ap.SharedInput.TR.Read(buf[:need])
-		}
-		if err != nil {
-			log.Errf("Error reading additional mouse data: %v", err)
-			return MouseError
-		}
-		ap.Data = append(ap.Data, buf[:n]...)
-		if n < need {
-			log.Errf("Not enough bytes read for mouse data: %d, expected %d", n, need)
-			return MouseError
-		}
-	}
-	b := ap.Data[start]
-	x := ap.Data[start+1]
-	y := ap.Data[start+2]
-	ap.Data = append(ap.Data[:idx], ap.Data[start+3:]...)
-	ap.Mx = int(x) - 32
-	ap.My = int(y) - 32
-	ap.Mbuttons = int(b) - 32
 	ap.Mouse = true
 	return MouseComplete
 }
