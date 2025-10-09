@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"math"
@@ -424,7 +423,7 @@ func Main() int {
 	result := 0
 	n := 0
 
-	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
+	err = ap.FPSTicks(func() bool {
 		if waitForInput && len(ap.Data) == 0 {
 			// Pause mode after resize or death.
 			return true

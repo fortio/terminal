@@ -69,9 +69,6 @@ type AnsiPixels struct {
 	// In NoDecode mode the mouse decode and the end of sync are not done automatically.
 	// used for fortio.org/tev raw event dump.
 	NoDecode bool
-	// When in FPSTick mode we read directly from the shared input, non blocking. Affects how
-	// other read like MouseDecode should read.
-	readSharedMode bool
 	// Background color of the terminal if detected by [OSCDecode] after issuing [RequestBackgroundColor]
 	Background          tcolor.RGBColor
 	backgroundRequested bool
@@ -156,6 +153,10 @@ func DetectColorMode() (cm ColorMode) {
 }
 
 func (ap *AnsiPixels) Open() error {
+	return ap.OpenWithContext(context.Background())
+}
+
+func (ap *AnsiPixels) OpenWithContext(ctx context.Context) error {
 	ap.firstClear = true
 	ap.restored = false
 	ap.ColorOutput.TrueColor = ap.TrueColor // sync, in case it was changed by flags from auto detect.
@@ -166,6 +167,7 @@ func (ap *AnsiPixels) Open() error {
 	if ap.AutoLoggerSetup {
 		ap.LoggerSetup()
 	}
+	ap.SharedInput.Start(ctx)
 	return err
 }
 
@@ -290,17 +292,13 @@ func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 // InterruptReader directly. Data can be lost if you mix the 2 modes (so don't).
 // StartSyncMode and EndSyncMode are called around the callback when AutoSync is set (which is the default)
 // to ensure the display is synchronized so you don't have to do it in the callback.
-func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Context) bool) error {
+func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	if ap.FPS <= 0 {
 		panic("FPSTicks called with non-positive FPS")
 	}
 	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
-	nctx, cancel := ap.SharedInput.Start(ctx)
-	ap.readSharedMode = true
 	defer func() {
 		timer.Stop()
-		cancel()
-		ap.readSharedMode = false
 	}()
 	for {
 		select {
@@ -321,7 +319,7 @@ func (ap *AnsiPixels) FPSTicks(ctx context.Context, callback func(ctx context.Co
 			if ap.AutoSync {
 				ap.StartSyncMode() // will also flush logger output if any.
 			}
-			cont := callback(nctx)
+			cont := callback()
 			if ap.AutoSync {
 				ap.EndSyncMode()
 			}
@@ -344,7 +342,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 			return 0, err
 		}
 	default:
-		n, err := ap.SharedInput.TR.Read(ap.buf[0:bufSize])
+		n, err := ap.SharedInput.ReadWithTimeout(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		if !ap.NoDecode {
 			ap.MouseDecodeAll()
@@ -578,7 +576,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 			err = errors.New("buffer full, no cursor position found")
 			return
 		}
-		n, err = ap.SharedInput.TR.Read(ap.buf[i:bufSize])
+		n, err = ap.SharedInput.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
