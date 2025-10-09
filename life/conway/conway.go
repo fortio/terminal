@@ -85,7 +85,7 @@ func (c *Conway) Randomize(fillFactor float32) {
 	}
 }
 
-// Handles negative and out of bounds coordinates.
+// SafeSet sets a cell and handles negative and out of bounds coordinates.
 func (c *Conway) SafeSet(x, y int) {
 	c.Set((x+c.Width)%c.Width, (y+c.Height)%c.Height)
 }
@@ -148,7 +148,7 @@ type Game struct {
 	Extra                  func()
 }
 
-// Call once after randomize or reset/restart.
+// Start is called once after randomize or reset/restart.
 func (g *Game) Start() {
 	g.C.Current = 1 - g.C.Current
 	g.Generation = 1

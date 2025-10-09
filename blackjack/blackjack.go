@@ -50,6 +50,7 @@ type Game struct {
 	first       bool
 }
 
+// Heart symbol used in the blackjack game.
 // Because of https://github.com/ghostty-org/ghostty/discussions/7204
 // we change ♥ to ❤ (the wrong one) for ghostty on macos.
 var Heart = "♥"

@@ -78,8 +78,8 @@ func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 	tr.tv = TimeoutToTimeval(timeout)
 }
 
-// Unless we are in blocking mode, we don't really close the underlying
-// but this is a chance to cleanup for the other implementation.
+// Close closes the underlying stream if we are in blocking mode.
+// nop otherwise.
 func (tr *TimeoutReader) Close() (err error) {
 	if tr.blocking && tr.ostream != nil {
 		err = tr.ostream.Close()

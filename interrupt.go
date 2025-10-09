@@ -159,7 +159,7 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	return nctx, cancel
 }
 
-// Implement io.Reader interface.
+// Read implements io.Reader interface.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	if ir.timeout == 0 {
 		// blocking mode, direct read.
@@ -185,7 +185,7 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	return n, err
 }
 
-// ReadNonBlocking will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
+// ReadWithTimeout will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
 func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
 	if ir.timeout == 0 {
 		panic("ReadWithTimeout called in blocking mode")

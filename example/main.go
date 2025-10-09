@@ -44,14 +44,14 @@ var commands = []string{promptCmd, afterCmd, sleepCmd, cancelCmd, exitCmd, helpC
 func autoCompleteCallback(t *terminal.Terminal, line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 	log.LogVf("AutoCompleteCallback: %q %d %q", line, pos, key)
 	if key != '\t' {
-		return // only tab for now
+		return newLine, newPos, ok // only tab for now
 	}
 	if len(line) == 0 {
 		fmt.Fprintf(t.Out, "Available commands: %v\n", commands)
-		return
+		return newLine, newPos, ok
 	}
 	if pos != len(line) {
-		return // end only (for now)
+		return newLine, newPos, ok // end only (for now)
 	}
 	for _, c := range commands { // for now all have unique prefixes
 		if strings.HasPrefix(c, line) {
@@ -62,7 +62,7 @@ func autoCompleteCallback(t *terminal.Terminal, line string, pos int, key rune) 
 			return c, len(c), true
 		}
 	}
-	return
+	return newLine, newPos, ok
 }
 
 func AddOrReplaceHistory(t *terminal.Terminal, replace bool, l string) {
