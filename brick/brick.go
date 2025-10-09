@@ -71,11 +71,13 @@ const (
 	PaddleYDelta = 3
 	Paddle       = "▀▀▀▀▀▀▀" // 7 \u2580 (1/2 height top locks).
 	PaddleWidth  = 7
+
 	// Ball     = "⚾" // or "◯" or "⚫" doesn't work well/jerky movement, ⚪ is even worse as double width. so we use 1/2 blocks instead.
+
 	PaddleSpinFactor = 0.7
 )
 
-// height and width in full height blocks (unlike images/life) for most but the ball.
+// NewBrick creates a new game with height and width in full height blocks (unlike images/life) for most but the ball.
 func NewBrick(width, height, numLives int, checkLives bool, seed uint64) *Brick {
 	if numLives == 0 || !checkLives {
 		numLives = -1
@@ -148,7 +150,7 @@ func (b *Brick) Death() {
 	}
 }
 
-// Returns true if there has been a death.
+// Next updates the game state and returns true if there has been a death.
 func (b *Brick) Next() bool {
 	if b.Replay && (len(b.MoveRecords) > 0) && (b.MoveRecords[0].Frame == b.Frames) {
 		b.PaddleDirection = b.MoveRecords[0].Direction

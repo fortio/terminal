@@ -26,7 +26,7 @@ func (ap *AnsiPixels) MouseClickOff() {
 	ap.WriteString("\033[?1000l")
 }
 
-// MouseTrackingOnMouse Tracking On turns on mouse movements and click tracking.
+// MouseTrackingOn turns on tracking for mouse movements and click tracking.
 // It will set decoded Mx, My, MButtons, Mouse flag etc... and call OnMouse.
 // If you call *On do call *Off in your defer restore.
 func (ap *AnsiPixels) MouseTrackingOn() {
@@ -47,12 +47,12 @@ func (ap *AnsiPixels) MouseX10Off() {
 	ap.WriteString("\033[?9l")
 }
 
-// This mode is here for reference but is not automatically decoded for you.
+// MouseX10On is the X10 mouse mode and is here for reference but is not automatically decoded for you.
 func (ap *AnsiPixels) MouseX10On() {
 	ap.WriteString("\033[?9h")
 }
 
-// MousePixels on will report coordinates (Mx, My) in pixels instead of cells.
+// MousePixelsOn will report coordinates (Mx, My) in pixels instead of cells.
 func (ap *AnsiPixels) MousePixelsOn() {
 	ap.WriteString("\x1b[?1016h")
 }
@@ -183,6 +183,7 @@ const (
 	Ctrl            = 0b010000
 	AllModifiers    = Shift | Alt | Ctrl
 	AnyModifierMask = ^AllModifiers
+	// MouseWheelMask is what is used to identify a mouse wheel event.
 	// On a mac with a physical mouse, shift mousewheel is translated to button 6,7 which
 	// here looks like we set the MouseRight bit (when shift-mousewheeling).
 	MouseWheelMask = ^(AllModifiers | MouseRight)

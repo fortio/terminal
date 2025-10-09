@@ -1,4 +1,11 @@
-// Library to interact with ansi/v100 style terminals.
+// Package terminal provides a library to interact with ansi/v100 style terminals, readline style.
+// It wraps golang.org/x/term and adds history, prompt, auto-completion and
+// interrupt handling (control-C and signals).
+// It also provides a way to suspend the terminal (restore normal mode) to run sub commands
+// and resume it back to raw mode.
+// It also provides a way to share a single InterruptReader between multiple users of the terminal
+// (for instance both Terminal.ReadLine and AnsiPixels.ReadOrResizeOrSignal can share it).
+// See example/main.go for an example of usage.
 package terminal // import "fortio.org/terminal"
 
 import (
@@ -111,7 +118,7 @@ func (t *Terminal) UpdateSize() error {
 	return nil
 }
 
-// If you want to reset and restart after an interrupt, call this.
+// ResetInterrupts resets and restarts if you want to continue after an interrupt.
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
 	t.Context, t.Cancel = t.IntrReader.Start(ctx)
@@ -122,8 +129,9 @@ func (t *Terminal) IsTerminal() bool {
 	return term.IsTerminal(t.fd)
 }
 
-// Setups fortio logger (and thus stdlib "log" too)
+// LoggerSetup sets up fortio logger (and thus stdlib "log" too)
 // to write to the terminal as needed to preserve prompt/work in raw mode (ie add \r before \n).
+// If stderr has been redirected, it doesn't do anything (logs to json in said case).
 func LoggerSetup(out io.Writer) {
 	// If stderr has been redirected, don't change anything.
 	if !log.ConsoleLogging() {
@@ -137,7 +145,7 @@ func LoggerSetup(out io.Writer) {
 	log.SetColorMode()
 }
 
-// Sets up a file to load and save history from/to. File is being read when this is called.
+// SetHistoryFile sets up a file to load and save history from/to. File is being read when this is called.
 // If no error is returned, the file will also be automatically updated on Close().
 func (t *Terminal) SetHistoryFile(f string) error {
 	if f == "" {
@@ -280,7 +288,7 @@ func saveHistory(f string, h []string) {
 	}
 }
 
-// Temporarily suspend/resume of the terminal back to normal (for example to run a sub process).
+// Suspend temporarily suspends/resumes the terminal back to normal (for example to run a sub process).
 // use defer t.Resume() after calling Suspend() to put the terminal back in raw mode.
 func (t *Terminal) Suspend() {
 	t.IntrReader.Stop() // stop the interrupt reader
@@ -366,7 +374,7 @@ func (t *Terminal) LastWasPaste() bool {
 	return t.lastWasPaste
 }
 
-// Sets or change the prompt.
+// SetPrompt sets or change the prompt.
 func (t *Terminal) SetPrompt(s string) {
 	t.lastPrompt = []byte(s)
 	t.term.SetPrompt(s)
@@ -403,7 +411,7 @@ type TermHistory struct {
 	AutoHistory bool
 }
 
-// Creates a new ring buffer of strings with the given capacity.
+// NewHistory creates a new ring buffer of strings with the given capacity.
 func NewHistory(capacity int) *TermHistory {
 	return &TermHistory{
 		entries:     make([]string, capacity),

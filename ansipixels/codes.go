@@ -21,6 +21,7 @@ const (
 	// Foreground Colors.
 	// Deprecated: use [tcolor.BasicColor] constants instead
 	// and corresponding Foreground() and Background() methods.
+
 	Black        = "\033[30m"
 	Red          = "\033[31m"
 	Green        = "\033[32m"
@@ -37,7 +38,9 @@ const (
 	BrightPurple = "\033[95m"
 	BrightCyan   = "\033[96m"
 	White        = "\033[97m"
+
 	// Background Colors.
+
 	BlackBG        = "\033[40m"
 	RedBG          = "\033[41m"
 	GreenBG        = "\033[42m"
@@ -55,11 +58,12 @@ const (
 	BrightCyanBG   = "\033[106m"
 	WhiteBG        = "\033[107m"
 
-	// Select colors from the 256 colors set that are missing from above.
+	// Orange is a color from the 256 colors set that is missing from above.
 	// Deprecated: use [tcolor.Orange.Foreground()] instead.
 	Orange = "\033[38;5;214m"
 
 	// Combo for RGB full pixel (used by fps).
+
 	RedPixel   = Red + "█"
 	GreenPixel = Green + "█"
 	BluePixel  = Blue + "█"

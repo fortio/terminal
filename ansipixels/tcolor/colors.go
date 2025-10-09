@@ -41,6 +41,7 @@ const (
 	color256     BasicColor = 255 // marker for 256 colors mode.
 
 	// Misc useful sequences.
+
 	Bold       = "\x1b[1m"
 	Dim        = "\x1b[2m"
 	Underlined = "\x1b[4m"
@@ -54,7 +55,7 @@ const (
 //go:generate stringer -type=BasicColor
 var _ = White.String() // force compile error if go generate is missing.
 
-// Terminal foreground color string for the BasicColor.
+// Foreground is the terminal foreground color string for the BasicColor.
 func (c BasicColor) Foreground() string {
 	switch c {
 	case None:
@@ -66,7 +67,7 @@ func (c BasicColor) Foreground() string {
 	}
 }
 
-// Terminal background color string for the BasicColor.
+// Background is the terminal background color string for the BasicColor.
 func (c BasicColor) Background() string {
 	switch c {
 	case None:
@@ -84,7 +85,7 @@ func (c BasicColor) Color() Color {
 
 type Color256 uint8
 
-// Creates indexed (terminal 256) color: 16 basic colors, 216 color cube, grayscale.
+// Color creates indexed (terminal 256) color: 16 basic colors, 216 color cube, grayscale.
 // Stored as 2 bytes, low byte is 0xff to not conflict with basic 16 colors and high byte is the index.
 func (idx Color256) Color() Color {
 	// Piggy back on the ColorBasic bit/type with low byte == 0xFF
@@ -107,12 +108,12 @@ type RGBColor struct {
 	R, G, B uint8
 }
 
-// Terminal foreground color string for RGBColor.
+// Foreground is the foreground color string for RGBColor.
 func (c RGBColor) Foreground() string {
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm", c.R, c.G, c.B)
 }
 
-// Terminal background color string for RGBColor.
+// Background is the background color string for RGBColor.
 func (c RGBColor) Background() string {
 	return fmt.Sprintf("\033[48;2;%d;%d;%dm", c.R, c.G, c.B)
 }
@@ -128,23 +129,23 @@ type ColorType uint8 // 1 for RGB, 2 for HSL, 3 for BasicColor
 const (
 	ColorTypeRGB ColorType = 1 // RGBColor
 	ColorTypeHSL ColorType = 2 // HSLColor
-	// Terminal Basic 16 Colors.
+	// ColorTypeBasic are the terminal basic 16 Colors.
 	ColorTypeBasic ColorType = 3
-	// 256 Colors (216 colorspace cube + grey scale + basic 16).
+	// ColorType256 are the terminal 256 Colors (216 colorspace cube + grey scale + basic 16).
 	// Virtual type, split from ColorTypeBasic when the low byte is 0xFF.
 	ColorType256 ColorType = 99
 )
 
-// 30 bits, used for 12,8,10 bits HSL color components in HSLColor.
+// Uint30 is 30 bits, used for 12,8,10 bits HSL color components in HSLColor.
 type Uint30 uint32
 
-// 12 bits for Hue component in HSL.
+// Uint12 is 12 bits for Hue component in HSL.
 type Uint12 uint16
 
-// 8 bits for Saturation component in HSL.
+// Uint8 is 8 bits for Saturation component in HSL.
 type Uint8 uint8
 
-// 10 bits for Lightness component in HSL.
+// Uint10 is 10 bits for Lightness component in HSL.
 type Uint10 uint16
 
 const (
@@ -301,13 +302,13 @@ func (c Color) Background() string {
 	}
 }
 
-// Ordered list of the basic colors.
+// BasicColorList is an ordered list of the basic colors.
 var BasicColorList []BasicColor
 
-// Map from color name to BasicColor.
+// ColorMap is a map from color name to BasicColor.
 var ColorMap map[string]BasicColor
 
-// Help string for the basic color choices.
+// ColorHelp is a help string for the basic color choices.
 var ColorHelp string
 
 func init() {
@@ -334,7 +335,7 @@ func init() {
 	ColorHelp = buf.String()
 }
 
-// Extract 24 bit values from a hex color string (RRGGBB / HHSSLL) or error.
+// Hex24bitFromString extracts 24 bit values from a hex color string (RRGGBB / HHSSLL) or error.
 func Hex24bitFromString(label, color string) (RGBColor, error) {
 	var i int
 	_, err := fmt.Sscanf(color, "%x", &i)
@@ -456,7 +457,7 @@ func RGBATo216(pixel RGBColor) uint8 {
 	return col
 }
 
-// User specified color (obtained from FromString) to terminal color output including
+// ColorOutput takes a user specified color (obtained from FromString) and maps terminal color output including
 // conversion to 216 colors if TrueColor is false.
 type ColorOutput struct {
 	TrueColor bool // true if the output supports true color, false for 256 colors
@@ -570,7 +571,7 @@ func HexStrToUint10(hex string) (Uint10, error) {
 	return Uint10(i), nil
 }
 
-// Extract RGB values from a hex color string (HHH_SS_LLL or HHSSLL) or error.
+// FromHexHSLString extracts RGB values from a hex color string (HHH_SS_LLL or HHSSLL) or error.
 // (Same as RGBFromString but bytes being HSL instead of RGB).
 func FromHexHSLString(color string) (Color, error) {
 	if len(color) == 6 {
@@ -793,7 +794,8 @@ func RGBToHSL(c RGBColor) (h, s, l float64) {
 
 // TODO: consider higher resolution oklch (unfortunately we picked hsl for higher rez).
 
-// Converts a RGB component to linear space (with optional alpha multiplier if input isn't already alpha multiplied (ie NRGBA)).
+// SrgbToLinear converts a RGB component to linear space (with optional alpha multiplier
+// if input isn't already alpha multiplied (ie NRGBA)).
 // See [ansipixels.BlendSRGB] for example of code using this.
 func SrgbToLinear(c uint8, alpha float64) float64 {
 	if alpha <= 0 {
@@ -806,7 +808,7 @@ func SrgbToLinear(c uint8, alpha float64) float64 {
 	return math.Pow((f+0.055)/1.055, 2.4)
 }
 
-// Converts a linear RGB component to sRGB space.
+// LinearToSrgb converts a linear RGB component to sRGB space.
 func LinearToSrgb(f float64) uint8 {
 	if f <= 0.0 {
 		return 0
@@ -852,7 +854,7 @@ func Oklch(l, c, h float64) Color {
 	}.Color()
 }
 
-// Use the web oklch, ie with hue in degree instead of radiant.
+// FromWebOklch uses the web oklch units, ie with hue in degree instead of radiant.
 func FromWebOklch(l, c, h float64) Color {
 	return Oklch(l, c, h*2*math.Pi/360.)
 }
@@ -862,7 +864,7 @@ func Oklchf(l, c, h float64) Color {
 	return Oklch(l, 0.35*c, h*2*math.Pi)
 }
 
-// Returns the web component formats of the rgb color to oklch.
+// ToWebOklch returns the web component formats of the rgb color to oklch.
 func ToWebOklch(color RGBColor) (l, c, h float64) {
 	// Step 1: sRGB to linear
 	R := SrgbToLinear(color.R, 1)

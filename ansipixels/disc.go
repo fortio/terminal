@@ -31,7 +31,7 @@ func intensity(x, y, radius int, aliasing float64) float64 {
 
 type ColorBlendingFunction func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolor.RGBColor
 
-// Draws disc/sphere. aliasing is 0.0 to 1.0 fraction of the disc which is anti-aliased.
+// Disc draws a disc/sphere. aliasing is 0.0 to 1.0 fraction of the disc which is anti-aliased.
 // Smaller aliasing the sharper the edge. Larger aliasing the more sphere like effect.
 // This version is older and meant to output over a black background (aliases toward 0 lightness).
 // Deprecated: use [DiscSRGB] instead.
@@ -40,7 +40,7 @@ func (ap *AnsiPixels) Disc(x, y, radius int, hsl tcolor.HSLColor, aliasing float
 	ap.DiscBlendFN(x, y, radius, tcolor.RGBColor{}, hsl.RGB(), aliasing, BlendLuminance)
 }
 
-// DiscBlend is like [Disc] but blends to the provided background color instead of black and provided blending function.
+// DiscBlendFN is like [Disc] but blends to the provided background color instead of black and provided blending function.
 func (ap *AnsiPixels) DiscBlendFN(
 	x, y, radius int,
 	background, foreground tcolor.RGBColor, aliasing float64,
@@ -94,7 +94,7 @@ func BlendLuminance(_, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColo
 	return newHSL.RGB()
 }
 
-// Gamma aware blending (keeps foreground sharper/closer).
+// BlendSRGB is a gamma aware blending (keeps foreground sharper/closer).
 // Note: we really have RGBA colors ie, pre multiplied so we
 // divide foreground by the passed in alpha to get it to uncompressed
 // (NRGBA) linear space.
@@ -134,7 +134,7 @@ func blendSRGB(bg, fg tcolor.RGBColor, alpha, alphaFG float64) tcolor.RGBColor {
 	}
 }
 
-// Simple linear blend.
+// BlendLinear is a simple linear blend.
 func BlendLinear(background, foreground tcolor.RGBColor, alpha float64) tcolor.RGBColor {
 	r := (1-alpha)*float64(background.R) + alpha*float64(foreground.R)
 	g := (1-alpha)*float64(background.G) + alpha*float64(foreground.G)

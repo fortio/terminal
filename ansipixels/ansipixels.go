@@ -1,4 +1,4 @@
-// ansipixels provides terminal drawing and key reading abilities.
+// Package ansipixels provides terminal drawing and key reading abilities.
 // [fortio.org/terminal/fps] and life/life.go are examples/demos of how to use it.
 package ansipixels
 
@@ -87,6 +87,7 @@ type AnsiPixels struct {
 	AutoLoggerSetup bool
 }
 
+// NewAnsiPixels creates a new ansipixels object (to be [Open] post customization if any).
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
 // Otherwise a non blocking reader is setup with 1/fps timeout. Reader is / can be shared
 // with Terminal.
@@ -152,10 +153,15 @@ func DetectColorMode() (cm ColorMode) {
 	return cm
 }
 
+// Open sets the terminal in raw mode, gets the size and starts the shared input reader using
+// default background context. Use [OpenWithContext] to pass a specific context for that underlying
+// reader.
 func (ap *AnsiPixels) Open() error {
 	return ap.OpenWithContext(context.Background())
 }
 
+// OpenWithContext sets the terminal in raw mode, gets the size and starts the shared input reader
+// with the given context.
 func (ap *AnsiPixels) OpenWithContext(ctx context.Context) error {
 	ap.firstClear = true
 	ap.restored = false
@@ -266,9 +272,8 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 	return nil
 }
 
-// Read something or return terminal.ErrSignal if signal is received (normal exit requested case),
-// will automatically call OnResize if set and if a resize signal is received and continue trying
-// to read.
+// ReadOrResizeOrSignal reads something or return terminal.ErrSignal if signal is received (normal exit requested case),
+// will automatically call OnResize if set and if a resize signal is received and continue trying to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 	if !ap.NoDecode {
 		ap.EndSyncMode()
@@ -330,7 +335,7 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	}
 }
 
-// This will return either because of signal, or something read or the timeout (fps) passed.
+// ReadOrResizeOrSignalOnce will return either because of signal, or something read or the timeout (fps) passed.
 // ap.Data is (re)set to the read data. Note that if there is a lot of data produced (eg. mouse movements)
 // this will return more often than the fps. Use [FPSTicks] with a callback for a fixed fps (outside of resize events)
 // where data available will be set in ap.Data and the callback will be called every tick.
@@ -352,7 +357,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 	return 0, nil
 }
 
-// Starts the terminal output transaction. If AutoSync is set (default) logger output will get flushed as well.
+// StartSyncMode starts the terminal output transaction. If AutoSync is set (default) logger output will get flushed as well.
 func (ap *AnsiPixels) StartSyncMode() {
 	if ap.AutoSync { // we could rely on && shortcut but for clarity, inner if:
 		if ap.FlushLogger() {
@@ -388,7 +393,7 @@ func (ap *AnsiPixels) FlushLogger() bool {
 	return true
 }
 
-// End sync (and flush).
+// EndSyncMode ends sync (and flushes).
 func (ap *AnsiPixels) EndSyncMode() {
 	_, _ = ap.Out.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
@@ -396,7 +401,7 @@ func (ap *AnsiPixels) EndSyncMode() {
 
 func (ap *AnsiPixels) GetSize() (err error) {
 	ap.W, ap.H, err = term.GetSize(ap.fdOut)
-	return
+	return err
 }
 
 func (ap *AnsiPixels) Restore() {
@@ -426,7 +431,7 @@ func (ap *AnsiPixels) ClearScreen() {
 	}
 }
 
-// Moves the cursor to the given x,y position (0,0 is top left).
+// MoveCursor moves the cursor to the given x,y position (0,0 is top left).
 func (ap *AnsiPixels) MoveCursor(x, y int) {
 	ap.x, ap.y = x, y
 	_, err := ap.Out.WriteString("\033[" + strconv.Itoa(y+1) + ";" + strconv.Itoa(x+1) + "H")
@@ -465,7 +470,7 @@ func (ap *AnsiPixels) Printf(msg string, args ...interface{}) {
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
-// Copy the given text to the system clipboard.
+// CopyToClipboard copies the given text to the system clipboard.
 // Uses OSC 52 (supported by most terminal emulators).
 func (ap *AnsiPixels) CopyToClipboard(text string) {
 	ap.Printf("\033]52;c;%s\007", base64.StdEncoding.EncodeToString([]byte(text)))
@@ -549,8 +554,6 @@ func (ap *AnsiPixels) ReadCursorPosXY() (int, int, error) {
 // the AnsiPixels coordinates which start at 0,0.
 // Use [ReadCursorPosXY] to get 0,0 based coordinates usable with MoveCursor,
 // WriteAt, etc.
-//
-//nolint:nakedret // it's really the same return everywhere with error but the last one.
 func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	col = -1
 	row = -1
@@ -558,15 +561,15 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	var n int
 	n, err = ap.Out.WriteString(reqPosStr)
 	if err != nil {
-		return
+		return row, col, err
 	}
 	if n != len(reqPosStr) {
 		err = errors.New("short write")
-		return
+		return row, col, err
 	}
 	err = ap.Out.Flush()
 	if err != nil {
-		return
+		return row, col, err
 	}
 	log.Debugf("Sent and flushed cursor position request %q", reqPosStr)
 	i := 0
@@ -574,18 +577,18 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	for {
 		if i == bufSize {
 			err = errors.New("buffer full, no cursor position found")
-			return
+			return row, col, err
 		}
 		n, err = ap.SharedInput.Read(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return
+			return row, col, err
 		}
 		if n == 0 {
 			err = errors.New("no data read from cursor position")
-			return
+			return row, col, err
 		}
 		log.Debugf("Read %d (response maybe) %q", n, ap.buf[0:i+n])
 		res := cursPosRegexp.FindSubmatch(ap.buf[0 : i+n])
@@ -600,11 +603,11 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 		}
 		row, err = strconv.Atoi(string(res[2]))
 		if err != nil {
-			return
+			return row, col, err
 		}
 		col, err = strconv.Atoi(string(res[3]))
 		if err != nil {
-			return
+			return row, col, err
 		}
 		ap.Data = append(ap.Data, res[1]...)
 		ap.Data = append(ap.Data, res[4]...)
@@ -613,7 +616,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 	if !ap.NoDecode {
 		ap.MouseDecodeAll()
 	}
-	return
+	return row, col, err
 }
 
 func (ap *AnsiPixels) HideCursor() {
@@ -632,7 +635,8 @@ func (ap *AnsiPixels) DrawRoundBox(x, y, w, h int) {
 	ap.DrawBox(x, y, w, h, RoundTopLeft, Horizontal, RoundTopRight, Vertical, RoundBottomLeft, Horizontal, RoundBottomRight, false)
 }
 
-// Draw a colored box with the given background color and double width option which means extra bars on the left and right.
+// DrawColoredBox draws a colored box with the given background color and double width option
+// which means extra bars on the left and right.
 func (ap *AnsiPixels) DrawColoredBox(x, y, w, h int, color string, doubleWidth bool) {
 	topHorizontal := Inverse + string(TopHalfPixel)
 	bottomHorizontal := string(BottomHalfPixel)
@@ -743,7 +747,7 @@ func FormatDate(d *time.Time) string {
 		d.Hour(), d.Minute(), d.Second())
 }
 
-// Sets up the fortio logger to have CRLF and SyncWriter so it can log while we're drawing.
+// LoggerSetup sets up the fortio logger to have CRLF and SyncWriter so it can log while we're drawing.
 // (will only happen if stderr hasn't been redirected).
 func (ap *AnsiPixels) LoggerSetup() {
 	terminal.LoggerSetup(ap.Logger)
