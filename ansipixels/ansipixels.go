@@ -5,7 +5,6 @@ package ansipixels
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -296,10 +295,8 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 		panic("FPSTicks called with non-positive FPS")
 	}
 	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
-	ap.SharedInput.Start(context.Background())
 	defer func() {
 		timer.Stop()
-		ap.SharedInput.Stop()
 	}()
 	for {
 		select {
@@ -309,7 +306,7 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 				return err
 			}
 		case <-timer.C:
-			n, err := ap.SharedInput.ReadNonBlocking(ap.buf[0:bufSize])
+			n, err := ap.SharedInput.ReadImmediate(ap.buf[0:bufSize])
 			if err != nil {
 				return err
 			}

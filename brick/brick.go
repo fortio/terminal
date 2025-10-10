@@ -51,6 +51,7 @@ type Brick struct {
 	MoveRecords     []MoveRecord
 	Paused          bool // true if paused, false if running
 	rnd             *rand.Rand
+	waitForInput    bool // true if waiting for user input (after resize or death)
 }
 
 /*
@@ -400,7 +401,6 @@ func Main() int {
 		seedV = safecast.MustConv[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
 	var b *Brick
-	waitForInput := false
 	ap.OnResize = func() error {
 		ap.ClearScreen()
 		ap.StartSyncMode()
@@ -417,7 +417,7 @@ func Main() int {
 		ap.WriteCentered(ap.H/2+3, "Quit: ^C or Shift-Q; Pause: Space")
 		showInfo(ap, b)
 		ap.EndSyncMode()
-		waitForInput = true
+		b.waitForInput = true
 		return nil
 	}
 	_ = ap.OnResize()
@@ -426,17 +426,17 @@ func Main() int {
 	n := 0
 
 	err = ap.FPSTicks(func() bool {
-		if waitForInput && len(ap.Data) == 0 {
+		if b.waitForInput && len(ap.Data) == 0 {
 			// Pause mode after resize or death.
 			return true
 		}
-		waitForInput = false
 		if handleKeys(ap, b) {
 			if !*noSave {
 				result = b.SaveGame()
 			}
 			return false // exit the loop
 		}
+		b.waitForInput = false
 		if b.Paused {
 			// User issued Pause (space bar): make the message blink (without flickering/clearing the screen: in place)
 			msg := "⏱️ Paused, any key to resume... ⏱️"
@@ -466,7 +466,7 @@ func Main() int {
 				return false // exit the loop
 			}
 			death = false
-			waitForInput = true
+			b.waitForInput = true
 			return true // continue the loop
 		}
 		if b.NumBricks == 0 {
@@ -526,7 +526,7 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 		return true
 	case ' ':
 		// first space, starts the game, doesn't toggle pause.
-		if b.Frames > 1 {
+		if !b.waitForInput {
 			b.Paused = !b.Paused
 		}
 		return false // continue the loop

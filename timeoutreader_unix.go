@@ -74,6 +74,14 @@ func (tr *TimeoutReader) ReadBlocking(buf []byte) (int, error) {
 	return tr.ostream.Read(buf)
 }
 
+func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
+	if tr.blocking {
+		return tr.ostream.Read(buf)
+	}
+	var zeroTv unix.Timeval
+	return ReadWithTimeout(tr.fd, &zeroTv, buf)
+}
+
 // ChangeTimeout on unix should be called from same goroutine as any Read* or not concurrently.
 func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 	if tr.blocking && timeout > 0 {
