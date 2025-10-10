@@ -525,7 +525,10 @@ func handleKeys(ap *ansipixels.AnsiPixels, b *Brick) bool {
 		atEnd(ap, b)
 		return true
 	case ' ':
-		b.Paused = !b.Paused
+		// first space, starts the game, doesn't toggle pause.
+		if b.Frames > 1 {
+			b.Paused = !b.Paused
+		}
 		return false // continue the loop
 	}
 	b.Paused = false // unpause if we were paused.

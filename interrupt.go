@@ -17,6 +17,7 @@ import (
 
 // InterruptReader is a reader that can be interrupted by Ctrl-C or signals.
 // It supports both blocking and non-blocking modes based on the timeout value provided during initialization.
+// When stopped the reads are directly to the underlying timeoutreader.
 type InterruptReader struct {
 	In      *os.File // stdin typically
 	buf     []byte
@@ -65,11 +66,13 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 }
 
 // NewInterruptReader creates a new interrupt reader.
-// It needs to be Start()ed to start reading from the underlying reader
-// and intercept Ctrl-C and listen for interrupt signals.
+// It needs to be Start()ed to start reading from the underlying reader to
+// intercept Ctrl-C and listen for interrupt signals. When not started, it
+// just reads directly from the underlying timeout reader (which can be blocking if
+// timeout is 0).
 // Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
 // Using 0 as the timeout disables most layers and uses the underlying reader directly (blocking IOs).
-// Start() must be called after creating it to create (and start) the timeout reader and goroutines.
+// Start() needs to be called after creating it to add the intermediate layer.
 // Note doing it in NewInterruptReader() allows for logger configuration to happen single threaded and
 // thus avoid races.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
@@ -78,6 +81,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 		bufSize: bufSize,
 		timeout: timeout,
 		buf:     make([]byte, 0, bufSize),
+		stopped: true,
 	}
 	ir.reset = ir.buf
 	if timeout == 0 {
@@ -127,7 +131,7 @@ func (ir *InterruptReader) Stop() {
 	log.Debugf("InterruptReader done stopping")
 	ir.mu.Lock()
 	ir.buf = ir.reset
-	ir.err = nil
+	ir.err = nil // clear stop error so further read go directly to underlying reader.
 	ir.mu.Unlock()
 }
 
@@ -159,6 +163,26 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	return nctx, cancel
 }
 
+// StartDirect ensures the underlying reader is started (in case of non blocking mode),
+// this is used by [ansipixels.Open].
+func (ir *InterruptReader) StartDirect() {
+	ir.mu.Lock()
+	if ir.tr == nil {
+		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+	}
+	ir.mu.Unlock()
+}
+
+// DirectRead reads directly from the underlying reader, bypassing the interrupt handling.
+// this is what happens in stopped mode.
+func (ir *InterruptReader) DirectRead(p []byte) (int, error) {
+	return ir.tr.Read(p)
+}
+
+func (ir *InterruptReader) ReadBlocking(p []byte) (int, error) {
+	return ir.tr.ReadBlocking(p)
+}
+
 // Read implements io.Reader interface.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	if ir.timeout == 0 {
@@ -167,6 +191,10 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 	}
 	ir.mu.Lock()
 	for len(ir.buf) == 0 && ir.err == nil {
+		if ir.stopped {
+			ir.mu.Unlock()
+			return ir.DirectRead(p)
+		}
 		ir.cond.Wait() // wait _until_ data or error
 	}
 	n, err := ir.read(p)
@@ -180,18 +208,28 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 		panic("ReadNonBlocking called in blocking mode")
 	}
 	ir.mu.Lock()
+	if len(ir.buf) == 0 && ir.stopped {
+		ir.mu.Unlock()
+		return ir.DirectRead(p)
+	}
 	n, err := ir.read(p)
 	ir.mu.Unlock()
 	return n, err
 }
 
 // ReadWithTimeout will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
+// Note that in blocking mode this is like a normal Read() call (it will block). In order to preserve the tev
+// functionality of direct access despite it calling [ansipixels.ReadOrResizeOrSignalOnce].
 func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
 	if ir.timeout == 0 {
-		panic("ReadWithTimeout called in blocking mode")
+		return ir.tr.Read(p)
 	}
 	ir.mu.Lock()
 	if len(ir.buf) == 0 && ir.err == nil {
+		if ir.stopped {
+			ir.mu.Unlock()
+			return ir.DirectRead(p)
+		}
 		ir.cond.Wait() // single wait cycle.
 	}
 	n, err := ir.read(p)
