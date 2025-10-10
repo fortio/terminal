@@ -107,7 +107,6 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
-	signal.Notify(ap.C, signalList...)
 	return ap
 }
 
@@ -162,6 +161,7 @@ func (ap *AnsiPixels) Open() error {
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
+		signal.Notify(ap.C, signalList...) // only catch signals in raw mode.
 	}
 	if ap.AutoLoggerSetup {
 		ap.LoggerSetup()
