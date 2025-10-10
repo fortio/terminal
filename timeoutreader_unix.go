@@ -48,7 +48,7 @@ type TimeoutReader struct {
 	fd       int
 	tv       *unix.Timeval
 	blocking bool     // true if the reader is blocking (timeout == 0), false if it has a timeout set
-	ostream  *os.File // not used on unix, but kept for interface compatibility
+	ostream  *os.File // original file/stream
 }
 
 func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
@@ -68,6 +68,10 @@ func (tr *TimeoutReader) Read(buf []byte) (int, error) {
 		return tr.ostream.Read(buf)
 	}
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
+}
+
+func (tr *TimeoutReader) ReadBlocking(buf []byte) (int, error) {
+	return tr.ostream.Read(buf)
 }
 
 // ChangeTimeout on unix should be called from same goroutine as any Read* or not concurrently.

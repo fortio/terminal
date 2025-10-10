@@ -157,12 +157,6 @@ func DetectColorMode() (cm ColorMode) {
 // default background context. Use [OpenWithContext] to pass a specific context for that underlying
 // reader.
 func (ap *AnsiPixels) Open() error {
-	return ap.OpenWithContext(context.Background())
-}
-
-// OpenWithContext sets the terminal in raw mode, gets the size and starts the shared input reader
-// with the given context.
-func (ap *AnsiPixels) OpenWithContext(ctx context.Context) error {
 	ap.firstClear = true
 	ap.restored = false
 	ap.ColorOutput.TrueColor = ap.TrueColor // sync, in case it was changed by flags from auto detect.
@@ -173,7 +167,7 @@ func (ap *AnsiPixels) OpenWithContext(ctx context.Context) error {
 	if ap.AutoLoggerSetup {
 		ap.LoggerSetup()
 	}
-	ap.SharedInput.Start(ctx)
+	ap.SharedInput.StartDirect()
 	return err
 }
 
@@ -302,8 +296,10 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 		panic("FPSTicks called with non-positive FPS")
 	}
 	timer := time.NewTicker(time.Duration(1e9 / ap.FPS))
+	ap.SharedInput.Start(context.Background())
 	defer func() {
 		timer.Stop()
+		ap.SharedInput.Stop()
 	}()
 	for {
 		select {
@@ -347,7 +343,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 			return 0, err
 		}
 	default:
-		n, err := ap.SharedInput.ReadWithTimeout(ap.buf[0:bufSize])
+		n, err := ap.SharedInput.DirectRead(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		if !ap.NoDecode {
 			ap.MouseDecodeAll()
@@ -579,7 +575,7 @@ func (ap *AnsiPixels) ReadCursorPos() (row int, col int, err error) {
 			err = errors.New("buffer full, no cursor position found")
 			return row, col, err
 		}
-		n, err = ap.SharedInput.Read(ap.buf[i:bufSize])
+		n, err = ap.SharedInput.ReadBlocking(ap.buf[i:bufSize])
 		if errors.Is(err, io.EOF) {
 			break
 		}
