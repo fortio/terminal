@@ -72,7 +72,7 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // timeout is 0).
 // Use GetSharedInput() to get a shared interrupt reader across libraries/caller.
 // Using 0 as the timeout disables most layers and uses the underlying reader directly (blocking IOs).
-// Start() needs to be called after creating it to add the intermediate layer.
+// When not in blocking mode, one of [Start] or [StartDirect] must be called after creating it to add the intermediate layer.
 // Note doing it in NewInterruptReader() allows for logger configuration to happen single threaded and
 // thus avoid races.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
