@@ -27,7 +27,7 @@ func (ap *AnsiPixels) SyncBackgroundColor() bool {
 // RequestBackgroundColor sends a request to the terminal to return the current
 // background color. Which we can use to blend images and pixels with said background.
 // Use [SyncBackgroundColor] to do both the request and read/decode in one call, this
-// low level function just does the request part and only for tev decoding.
+// low level function just does the request part and only for fortio.org/tev decoding.
 func (ap *AnsiPixels) RequestBackgroundColor() {
 	ap.WriteString("\033]11;?\x07")
 	ap.backgroundRequested = true

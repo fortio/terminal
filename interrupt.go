@@ -218,8 +218,8 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 }
 
 // ReadWithTimeout will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
-// Note that in blocking mode this is like a normal Read() call (it will block). In order to preserve the tev
-// functionality of direct access despite it calling [ansipixels.ReadOrResizeOrSignalOnce].
+// Note that in blocking mode this is like a normal Read() call (it will block). In order to preserve the
+// fortio.org/tev functionality of direct access despite it calling [ansipixels.ReadOrResizeOrSignalOnce].
 func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
 	if ir.timeout == 0 {
 		return ir.tr.Read(p)
