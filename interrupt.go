@@ -183,6 +183,14 @@ func (ir *InterruptReader) ReadBlocking(p []byte) (int, error) {
 	return ir.tr.ReadBlocking(p)
 }
 
+// ReadImmediate returns immediately with something readily available to read,
+// if any. On unix it means a select with 0 timeout, on windows it means
+// checking the goroutine channel for something already read (which can be off by one
+// read due to the timeout).
+func (ir *InterruptReader) ReadImmediate(p []byte) (int, error) {
+	return ir.tr.ReadImmediate(p)
+}
+
 // Read implements io.Reader interface.
 func (ir *InterruptReader) Read(p []byte) (int, error) {
 	if ir.timeout == 0 {
