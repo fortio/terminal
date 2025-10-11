@@ -39,69 +39,68 @@ func (ap *AnsiPixels) DrawTrueColorImageTransparent( //nolint:gocognit // yeah..
 ) error {
 	ap.MoveCursor(sx, sy)
 	var err error
-	prev1 := color.RGBA{}
-	prev2 := color.RGBA{}
+	prevBg := color.RGBA{}
+	prevFg := color.RGBA{}
 	ap.WriteString(ap.Background.Foreground()) // so initial half pixels only on bg don't show up as white.
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
-		firstPixelInLine := true
+		needPosition := true
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			pixel1 := img.RGBAAt(x, y)
-			blended1 := tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B}
-			p1Bg := ap.IsBackgroundColor(pixel1)
-			if !p1Bg && pixel1.A < 255 {
-				blended1 = blendFunc(ap.Background, tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B}, float64(pixel1.A)/255.0)
+			topPixel := img.RGBAAt(x, y)
+			blendedTop := tcolor.RGBColor{R: topPixel.R, G: topPixel.G, B: topPixel.B}
+			topIsBg := ap.IsBackgroundColor(topPixel)
+			if !topIsBg && topPixel.A < 255 {
+				blendedTop = blendFunc(ap.Background, tcolor.RGBColor{R: topPixel.R, G: topPixel.G, B: topPixel.B},
+					float64(topPixel.A)/255.0)
 			}
-			pixel2 := img.RGBAAt(x, y+1)
-			blended2 := tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B}
-			p2Bg := ap.IsBackgroundColor(pixel2)
-			if !p2Bg && pixel2.A < 255 {
-				blended2 = blendFunc(ap.Background, tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B}, float64(pixel2.A)/255.0)
+			bottomPixel := img.RGBAAt(x, y+1)
+			blendedBottom := tcolor.RGBColor{R: bottomPixel.R, G: bottomPixel.G, B: bottomPixel.B}
+			bottomIsBg := ap.IsBackgroundColor(bottomPixel)
+			if !bottomIsBg && bottomPixel.A < 255 {
+				blendedBottom = blendFunc(ap.Background, tcolor.RGBColor{R: bottomPixel.R, G: bottomPixel.G, B: bottomPixel.B},
+					float64(bottomPixel.A)/255.0)
 			}
 			switch {
-			case p1Bg && p2Bg:
-				firstPixelInLine = true
-				continue // fully transparent, skip
-			case pixel1 == pixel2:
-				if pixel1 == prev1 && !firstPixelInLine {
-					ap.WriteRune('█')
-					continue // we haven't changed color
-				}
-				if pixel2 == prev2 && !firstPixelInLine {
+			case topIsBg && bottomIsBg:
+				// In a gap/fully transparent area.
+				needPosition = true
+				continue
+			case topPixel == bottomPixel:
+				if topPixel == prevBg && !needPosition {
 					ap.WriteRune(' ')
 					continue // we haven't changed color
 				}
-				if firstPixelInLine {
+				if needPosition {
 					ap.MoveCursor(sx+x, sy)
-					firstPixelInLine = false
+					needPosition = false
 				}
-				ap.Printf("%s█", blended1.Foreground())
-				prev1 = pixel1
+				ap.Printf("%s ", blendedTop.Background())
+				prevBg = topPixel
 				continue
-			case pixel1 == prev1 && pixel2 == prev2:
-				if firstPixelInLine {
+			case topPixel == prevBg && bottomPixel == prevFg:
+				if needPosition {
 					ap.MoveCursor(sx+x, sy)
-					firstPixelInLine = false
+					needPosition = false
 				}
-				ap.WriteRune('▀')
+				ap.WriteRune('▄')
 			default:
-				if firstPixelInLine {
+				if needPosition {
 					ap.MoveCursor(sx+x, sy)
-					firstPixelInLine = false
+					needPosition = false
 				}
-				if p1Bg {
-					ap.WriteString(ap.Background.Foreground())
-				} else {
-					ap.WriteString(blended1.Foreground())
-				}
-				if p2Bg {
+				if topIsBg {
 					ap.WriteString(ap.Background.Background())
 				} else {
-					ap.WriteString(blended2.Background())
+					ap.WriteString(blendedTop.Background())
 				}
-				ap.WriteRune('▀')
+				if bottomIsBg {
+					ap.WriteString(ap.Background.Foreground())
+				} else {
+					ap.WriteString(blendedBottom.Foreground())
+				}
+				ap.WriteRune('▄')
 			}
-			prev1 = pixel1
-			prev2 = pixel2
+			prevBg = topPixel
+			prevFg = bottomPixel
 		}
 		sy++
 		ap.MoveCursor(sx, sy)
@@ -113,35 +112,39 @@ func (ap *AnsiPixels) DrawTrueColorImageTransparent( //nolint:gocognit // yeah..
 func (ap *AnsiPixels) DrawTrueColorImage(sx, sy int, img *image.RGBA) error {
 	ap.MoveCursor(sx, sy)
 	var err error
-	prev1 := color.RGBA{}
-	prev2 := color.RGBA{}
-	ap.WriteAt(sx, sy, "\033[38;5;%dm\033[48;5;%dm", 0, 0)
+	prevFG := color.RGBA{}
+	prevBG := color.RGBA{}
+	ap.WriteAtStr(sx, sy, "\033[38;5;0m\033[48;5;0m") // both fg/bg black matching prev1/prev2.
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			pixel1 := img.RGBAAt(x, y)
-			pixel2 := img.RGBAAt(x, y+1)
+			topPixel := img.RGBAAt(x, y)
+			bottomPixel := img.RGBAAt(x, y+1)
 			switch {
-			case pixel1 == pixel2:
-				if pixel1 == prev1 {
-					ap.WriteRune('█')
-					continue // we haven't changed color
-				}
-				if pixel2 == prev2 {
+			case topPixel == bottomPixel:
+				/*
+					avoid full pixel because with apple terminal the color bleeds through
+					also full pixel is 3 bytes vs 1 for space.
+					if topPixel == prevFG {
+						ap.WriteRune('█')
+						continue // we haven't changed color
+					}
+				*/
+				if bottomPixel == prevBG {
 					ap.WriteRune(' ')
 					continue // we haven't changed color
 				}
-				ap.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm█", pixel1.R, pixel1.G, pixel1.B))
-				prev1 = pixel1
+				ap.WriteString(fmt.Sprintf("\033[48;2;%d;%d;%dm ", topPixel.R, topPixel.G, topPixel.B))
+				prevBG = topPixel // == bottomPixel
 				continue
-			case pixel1 == prev1 && pixel2 == prev2:
-				ap.WriteRune('▀')
+			case bottomPixel == prevFG && topPixel == prevBG:
+				ap.WriteRune('▄')
 			default:
-				ap.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀",
-					pixel1.R, pixel1.G, pixel1.B,
-					pixel2.R, pixel2.G, pixel2.B))
+				ap.WriteString(fmt.Sprintf("\033[48;2;%d;%d;%dm\033[38;2;%d;%d;%dm▄",
+					topPixel.R, topPixel.G, topPixel.B,
+					bottomPixel.R, bottomPixel.G, bottomPixel.B))
 			}
-			prev1 = pixel1
-			prev2 = pixel2
+			prevFG = bottomPixel
+			prevBG = topPixel
 		}
 		sy++
 		ap.MoveCursor(sx, sy)
@@ -157,23 +160,33 @@ func (ap *AnsiPixels) Draw216ColorImage(sx, sy int, img *image.RGBA) error {
 		prevBg := uint8(0)
 		ap.WriteAtStr(sx, sy, Reset)
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			pixel1 := img.RGBAAt(x, y)
-			pixel2 := img.RGBAAt(x, y+1)
-			fgColor := tcolor.RGBATo216(tcolor.RGBColor{R: pixel1.R, G: pixel1.G, B: pixel1.B})
-			bgColor := tcolor.RGBATo216(tcolor.RGBColor{R: pixel2.R, G: pixel2.G, B: pixel2.B})
+			topPixel := img.RGBAAt(x, y)
+			bottomPixel := img.RGBAAt(x, y+1)
+			bgColor := tcolor.RGBATo216(tcolor.RGBColor{R: topPixel.R, G: topPixel.G, B: topPixel.B})
+			fgColor := tcolor.RGBATo216(tcolor.RGBColor{R: bottomPixel.R, G: bottomPixel.G, B: bottomPixel.B})
+			// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows
+			// also, using space instead of full pixel is way better anyway for bytes/pixel.
 			switch {
+			case fgColor == bgColor:
+				if bgColor == prevBg {
+					ap.WriteRune(' ')
+				} else {
+					ap.WriteString(fmt.Sprintf("\033[48;5;%dm ", bgColor))
+					prevBg = bgColor
+				}
 			case fgColor == prevFg && bgColor == prevBg:
 				ap.WriteRune('▄')
 			case fgColor == prevFg:
-				ap.WriteString(fmt.Sprintf("\033[38;5;%dm▄", bgColor))
+				ap.WriteString(fmt.Sprintf("\033[48;5;%dm▄", bgColor))
+				prevBg = bgColor
 			case bgColor == prevBg:
-				ap.WriteString(fmt.Sprintf("\033[48;5;%dm▄", fgColor))
+				ap.WriteString(fmt.Sprintf("\033[38;5;%dm▄", fgColor))
+				prevFg = fgColor
 			default:
-				// Apple's macOS terminal needs lower half pixel or there are gaps where the background shows.
-				ap.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", bgColor, fgColor))
+				ap.WriteString(fmt.Sprintf("\033[38;5;%dm\033[48;5;%dm▄", fgColor, bgColor))
+				prevFg = fgColor
+				prevBg = bgColor
 			}
-			prevFg = fgColor
-			prevBg = bgColor
 		}
 		sy++
 	}

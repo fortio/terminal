@@ -4,6 +4,11 @@ GO_BUILD_TAGS:=no_net,no_json,no_pprof
 
 demo:
 	go run -race -tags $(GO_BUILD_TAGS) ./example/ -loglevel debug -only-valid
+
+# "Windows" timeoutreader variant (no select on file descriptor)
+demo-alt:
+	make demo GO_BUILD_TAGS="${GO_BUILD_TAGS},test_alt_timeoutreader"
+
 tinygo-demo:
 	# No luck on mac https://github.com/tinygo-org/tinygo/issues/4395
 	# on linux, after doesn't work it seems.
