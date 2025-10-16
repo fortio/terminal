@@ -52,6 +52,7 @@ func ReplayGame(ap *ansipixels.AnsiPixels, fname string) int {
 		b.MoveRecords = gs.MoveRecords
 		b.Replay = true
 		ap.WriteCentered(ap.H/2+2, "Press a key once matched and ready, ^C to abort\r")
+		ap.EndSyncMode()
 		return nil
 	}
 	_ = ap.OnResize()
