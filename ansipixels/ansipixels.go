@@ -258,9 +258,10 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 		return err
 	}
 	if ap.OnResize != nil {
-		err := ap.OnResize()
-		ap.EndSyncMode()
-		return err
+		// OnResize typically does call start and end sync mode but might not (might defer to next FPSTick for instance).
+		// In any case doing the "end" without the "start" was odd.
+		// Undoing https://github.com/fortio/terminal/commit/703bc42f8b98331facaa29d0065c3ba15fa2ef7e
+		return ap.OnResize()
 	}
 	return nil
 }
