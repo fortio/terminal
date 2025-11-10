@@ -34,6 +34,7 @@ type ColorBlendingFunction func(tcolor.RGBColor, tcolor.RGBColor, float64) tcolo
 // Disc draws a disc/sphere. aliasing is 0.0 to 1.0 fraction of the disc which is anti-aliased.
 // Smaller aliasing the sharper the edge. Larger aliasing the more sphere like effect.
 // This version is older and meant to output over a black background (aliases toward 0 lightness).
+//
 // Deprecated: use [DiscSRGB] instead.
 func (ap *AnsiPixels) Disc(x, y, radius int, hsl tcolor.HSLColor, aliasing float64) {
 	// Initial version was staying in HSL space but to reuse same code, we keep converting back and forth.

@@ -1,5 +1,4 @@
 //go:build unix && !test_alt_timeoutreader
-// +build unix,!test_alt_timeoutreader
 
 package terminal
 

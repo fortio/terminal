@@ -13,6 +13,7 @@ import (
 	"fortio.org/log"
 	"fortio.org/safecast"
 	"fortio.org/terminal/ansipixels"
+	"fortio.org/terminal/ansipixels/tcolor"
 )
 
 func main() {
@@ -304,13 +305,13 @@ func Draw(ap *ansipixels.AnsiPixels, b *Brick) {
 		ap.MoveCursor(b.Padding+1, 3+y)
 		switch y {
 		case 0:
-			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.BrightRed)
+			ap.WriteAtStr(b.Padding+1, 3+y, tcolor.BrightRed.Foreground())
 		case 2:
-			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Orange)
+			ap.WriteAtStr(b.Padding+1, 3+y, tcolor.Orange.Foreground())
 		case 4:
-			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Green)
+			ap.WriteAtStr(b.Padding+1, 3+y, tcolor.Green.Foreground())
 		case 6:
-			ap.WriteAtStr(b.Padding+1, 3+y, ansipixels.Yellow)
+			ap.WriteAtStr(b.Padding+1, 3+y, tcolor.Yellow.Foreground())
 		}
 		for n := range b.NumW {
 			if n > 0 {

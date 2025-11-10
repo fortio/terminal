@@ -455,12 +455,12 @@ func (ap *AnsiPixels) WriteAtStr(x, y int, msg string) {
 	ap.WriteString(msg)
 }
 
-func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...interface{}) {
+func (ap *AnsiPixels) WriteAt(x, y int, msg string, args ...any) {
 	ap.MoveCursor(x, y)
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
-func (ap *AnsiPixels) Printf(msg string, args ...interface{}) {
+func (ap *AnsiPixels) Printf(msg string, args ...any) {
 	_, _ = fmt.Fprintf(ap.Out, msg, args...)
 }
 
@@ -476,7 +476,7 @@ func (ap *AnsiPixels) ScreenWidth(str string) int {
 	return uniseg.StringWidth(string(b))
 }
 
-func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...interface{}) {
+func (ap *AnsiPixels) WriteCentered(y int, msg string, args ...any) {
 	s := fmt.Sprintf(msg, args...)
 	x := (ap.W - ap.ScreenWidth(s)) / 2
 	ap.MoveCursor(x, y)
@@ -501,7 +501,7 @@ func (ap *AnsiPixels) TruncateLeftToFit(msg string, maxWidth int) (string, int) 
 	return str, 1
 }
 
-func (ap *AnsiPixels) WriteRight(y int, msg string, args ...interface{}) {
+func (ap *AnsiPixels) WriteRight(y int, msg string, args ...any) {
 	s := fmt.Sprintf(msg, args...)
 	s, l := ap.TruncateLeftToFit(s, ap.W-2*ap.Margin)
 	x := ap.W - l - ap.Margin
@@ -688,7 +688,7 @@ func (ap *AnsiPixels) DrawBox(x, y, w, h int,
 	}
 }
 
-func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
+func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...any) {
 	s := fmt.Sprintf(msg, args...)
 	lines := strings.Split(s, "\n")
 	maxw := 0
@@ -715,7 +715,7 @@ func (ap *AnsiPixels) WriteBoxed(y int, msg string, args ...interface{}) {
 	ap.MoveCursor(cursorX, cursorY)
 }
 
-func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...interface{}) {
+func (ap *AnsiPixels) WriteRightBoxed(y int, msg string, args ...any) {
 	s := fmt.Sprintf(msg, args...)
 	w := ap.ScreenWidth(s)
 	x := ap.W - w // not using margin as we assume we want to join lines in the corner

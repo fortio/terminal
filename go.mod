@@ -3,9 +3,9 @@ module fortio.org/terminal
 go 1.23.0
 
 require (
-	fortio.org/cli v1.12.2
+	fortio.org/cli v1.12.3
 	fortio.org/duration v1.0.4
-	fortio.org/log v1.18.1
+	fortio.org/log v1.18.3
 	fortio.org/safecast v1.2.0
 	github.com/jbuchbinder/gopnm v0.0.0-20220507095634-e31f54490ce0
 	github.com/rivo/uniseg v0.4.7
