@@ -59,6 +59,7 @@ const (
 	WhiteBG        = "\033[107m"
 
 	// Orange is a color from the 256 colors set that is missing from above.
+	//
 	// Deprecated: use [tcolor.Orange.Foreground()] instead.
 	Orange = "\033[38;5;214m"
 
