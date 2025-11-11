@@ -41,7 +41,7 @@ func (ap *AnsiPixels) WriteTable(
 		// Only BorderOuter needs an additional round box, as the table lines don't include borders
 		ap.DrawRoundBox((ap.W-width)/2-1, y-1, width+2, len(lines)+2)
 	case BorderNone, BorderColumns, BorderOuterColumns, BorderFull:
-		// These styles either have no borders or already drew them in CreateTableLines
+		// These styles either have no borders or already drew them in createTableLines
 	}
 	return width
 }
