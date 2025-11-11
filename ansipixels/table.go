@@ -22,7 +22,8 @@ const (
 
 // WriteTable renders a table at the specified y position with the given border style.
 // The table is centered horizontally on the screen.
-// Returns the width of the table content (excluding borders).
+// Returns the total width of the rendered table, including borders for BorderOuterColumns and BorderFull styles.
+// For BorderNone, BorderColumns, and BorderOuter, the width excludes borders.
 func (ap *AnsiPixels) WriteTable(
 	y int, alignment []Alignment,
 	columnSpacing int, table [][]string, borderStyle BorderStyle,
