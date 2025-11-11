@@ -1,16 +1,14 @@
-package table
+package ansipixels
 
 import (
 	"bufio"
 	"bytes"
 	"strings"
 	"testing"
-
-	"fortio.org/terminal/ansipixels"
 )
 
 func TestCreateTableLines_LeftAlignment(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Left, Left}
 	columnSpacing := 2
 	table := [][]string{
@@ -19,7 +17,7 @@ func TestCreateTableLines_LeftAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -40,7 +38,7 @@ func TestCreateTableLines_LeftAlignment(t *testing.T) {
 }
 
 func TestCreateTableLines_RightAlignment(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Right, Right, Right}
 	columnSpacing := 2
 	table := [][]string{
@@ -49,7 +47,7 @@ func TestCreateTableLines_RightAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -78,7 +76,7 @@ func TestCreateTableLines_RightAlignment(t *testing.T) {
 }
 
 func TestCreateTableLines_CenterAlignment(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Center, Center, Center}
 	columnSpacing := 2
 	table := [][]string{
@@ -87,7 +85,7 @@ func TestCreateTableLines_CenterAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -113,7 +111,7 @@ func TestCreateTableLines_CenterAlignment(t *testing.T) {
 }
 
 func TestCreateTableLines_MixedAlignment(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Right, Center}
 	columnSpacing := 3
 	table := [][]string{
@@ -122,7 +120,7 @@ func TestCreateTableLines_MixedAlignment(t *testing.T) {
 		{"Banana", "0.75", "50"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -145,7 +143,7 @@ func TestCreateTableLines_MixedAlignment(t *testing.T) {
 }
 
 func TestCreateTableLines_DifferentColumnSpacing(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Left}
 	table := [][]string{
 		{"A", "B"},
@@ -155,7 +153,7 @@ func TestCreateTableLines_DifferentColumnSpacing(t *testing.T) {
 	testCases := []int{0, 1, 2, 5, 10}
 
 	for _, spacing := range testCases {
-		lines, width := CreateTableLines(ap, alignment, spacing, table, BorderNone)
+		lines, width := ap.CreateTableLines(alignment, spacing, table, BorderNone)
 
 		// Check that spacing is correctly applied
 		// Width should be: max_col0_width + spacing + max_col1_width
@@ -175,7 +173,7 @@ func TestCreateTableLines_DifferentColumnSpacing(t *testing.T) {
 }
 
 func TestCreateTableLines_SingleColumn(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Center}
 	columnSpacing := 2
 	table := [][]string{
@@ -184,7 +182,7 @@ func TestCreateTableLines_SingleColumn(t *testing.T) {
 		{"Row2"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -198,7 +196,7 @@ func TestCreateTableLines_SingleColumn(t *testing.T) {
 }
 
 func TestCreateTableLines_UnevenColumnWidths(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Left, Left}
 	columnSpacing := 2
 	table := [][]string{
@@ -207,7 +205,7 @@ func TestCreateTableLines_UnevenColumnWidths(t *testing.T) {
 		{"Test", "Data", "C"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -230,12 +228,12 @@ func TestCreateTableLines_UnevenColumnWidths(t *testing.T) {
 }
 
 func TestCreateTableLines_EmptyTable(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left}
 	columnSpacing := 2
 	table := [][]string{}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 0 {
 		t.Errorf("Expected 0 lines for empty table, got %d", len(lines))
@@ -247,7 +245,7 @@ func TestCreateTableLines_EmptyTable(t *testing.T) {
 }
 
 func TestCreateTableLines_InconsistentColumns(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Left}
 	columnSpacing := 2
 	table := [][]string{
@@ -261,11 +259,11 @@ func TestCreateTableLines_InconsistentColumns(t *testing.T) {
 		}
 	}()
 
-	CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 }
 
 func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Center}
 	columnSpacing := 0
 
@@ -275,7 +273,7 @@ func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
 		{"ABC"},
 	}
 
-	linesEvenDelta, _ := CreateTableLines(ap, alignment, columnSpacing, tableEvenDelta, BorderNone)
+	linesEvenDelta, _ := ap.CreateTableLines(alignment, columnSpacing, tableEvenDelta, BorderNone)
 
 	// "ABC" centered in 5 chars with delta=2 should be " ABC " (1 space left, 1 space right)
 	abcLine := linesEvenDelta[1]
@@ -289,7 +287,7 @@ func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
 		{"ABC"},
 	}
 
-	linesOddDelta, _ := CreateTableLines(ap, alignment, columnSpacing, tableOddDelta, BorderNone)
+	linesOddDelta, _ := ap.CreateTableLines(alignment, columnSpacing, tableOddDelta, BorderNone)
 
 	// "ABC" centered in 6 chars with delta=3 should be " ABC  " (1 space left, 2 spaces right due to odd delta)
 	abcLineOdd := linesOddDelta[1]
@@ -299,7 +297,7 @@ func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
 }
 
 func TestCreateTableLines_ZeroColumnSpacing(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Left, Left}
 	columnSpacing := 0
 	table := [][]string{
@@ -307,7 +305,7 @@ func TestCreateTableLines_ZeroColumnSpacing(t *testing.T) {
 		{"X", "Y", "Z"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	// Width should be sum of column widths with no spacing
 	expectedWidth := 3 // 1 + 1 + 1
@@ -325,7 +323,7 @@ func TestCreateTableLines_ZeroColumnSpacing(t *testing.T) {
 }
 
 func TestCreateTableLines_WithEmojisAndUnicode(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 	alignment := []Alignment{Left, Center, Right}
 	columnSpacing := 2
 	table := [][]string{
@@ -335,7 +333,7 @@ func TestCreateTableLines_WithEmojisAndUnicode(t *testing.T) {
 		{"Charlie", "✨", "98"},
 	}
 
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 4 {
 		t.Errorf("Expected 4 lines, got %d", len(lines))
@@ -351,7 +349,7 @@ func TestCreateTableLines_WithEmojisAndUnicode(t *testing.T) {
 }
 
 func TestCreateTableLines_VisualAlignment(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 
 	tests := []struct {
 		name          string
@@ -444,7 +442,7 @@ A         B|`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lines, _ := CreateTableLines(ap, tt.alignment, tt.columnSpacing, tt.table, BorderNone)
+			lines, _ := ap.CreateTableLines(tt.alignment, tt.columnSpacing, tt.table, BorderNone)
 			result := "\n" + strings.Join(lines, "\n")
 			expected := strings.ReplaceAll(tt.expected, "|", "")
 
@@ -458,7 +456,7 @@ A         B|`,
 func TestWriteTableBoxed(t *testing.T) {
 	var buf bytes.Buffer
 	writer := bufio.NewWriter(&buf)
-	ap := &ansipixels.AnsiPixels{
+	ap := &AnsiPixels{
 		W:   80,
 		H:   24,
 		Out: writer,
@@ -473,7 +471,7 @@ func TestWriteTableBoxed(t *testing.T) {
 	}
 
 	y := 5
-	width := WriteTable(ap, y, alignment, columnSpacing, table, BorderOuter)
+	width := ap.WriteTable(y, alignment, columnSpacing, table, BorderOuter)
 
 	// Flush the writer to get the output
 	writer.Flush()
@@ -523,7 +521,7 @@ func TestWriteTable_BorderStyles(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			writer := bufio.NewWriter(&buf)
-			ap := &ansipixels.AnsiPixels{
+			ap := &AnsiPixels{
 				W:   80,
 				H:   24,
 				Out: writer,
@@ -537,7 +535,7 @@ func TestWriteTable_BorderStyles(t *testing.T) {
 			}
 
 			y := 5
-			width := WriteTable(ap, y, alignment, columnSpacing, table, tt.borderStyle)
+			width := ap.WriteTable(y, alignment, columnSpacing, table, tt.borderStyle)
 			writer.Flush()
 
 			if width == 0 {
@@ -554,7 +552,7 @@ func TestWriteTable_BorderStyles(t *testing.T) {
 
 //nolint:funlen // it's a test.
 func TestCreateTableLines_BorderStyles(t *testing.T) {
-	ap := &ansipixels.AnsiPixels{}
+	ap := &AnsiPixels{}
 
 	tests := []struct {
 		name          string
@@ -686,7 +684,7 @@ A│B|`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lines, _ := CreateTableLines(ap, tt.alignment, tt.columnSpacing, tt.table, tt.borderStyle)
+			lines, _ := ap.CreateTableLines(tt.alignment, tt.columnSpacing, tt.table, tt.borderStyle)
 			result := "\n" + strings.Join(lines, "\n")
 			expected := strings.ReplaceAll(tt.expected, "|", "")
 

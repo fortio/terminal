@@ -1,12 +1,6 @@
-// Package table provides functions to render tables in terminal using ansipixels.
-// TODO: move to fortio.org/terminal/ansipixels/table
-package table
+package ansipixels
 
-import (
-	"strings"
-
-	"fortio.org/terminal/ansipixels"
-)
+import "strings"
 
 type Alignment int
 
@@ -29,11 +23,11 @@ const (
 // WriteTable renders a table at the specified y position with the given border style.
 // The table is centered horizontally on the screen.
 // Returns the width of the table content (excluding borders).
-func WriteTable(
-	ap *ansipixels.AnsiPixels, y int, alignment []Alignment,
+func (ap *AnsiPixels) WriteTable(
+	y int, alignment []Alignment,
 	columnSpacing int, table [][]string, borderStyle BorderStyle,
 ) int {
-	lines, width := CreateTableLines(ap, alignment, columnSpacing, table, borderStyle)
+	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, borderStyle)
 	var cursorY int
 	leftX := (ap.W - width) / 2
 	for i, l := range lines {
@@ -56,7 +50,7 @@ func drawHorizontalBorder(ncols int, colWidths []int, columnSpacing int, left, m
 	var sb strings.Builder
 	sb.WriteString(left)
 	for j := range ncols {
-		sb.WriteString(strings.Repeat(ansipixels.Horizontal, colWidths[j]+2*columnSpacing))
+		sb.WriteString(strings.Repeat(Horizontal, colWidths[j]+2*columnSpacing))
 		if j < ncols-1 {
 			sb.WriteString(middle)
 		}
@@ -67,7 +61,7 @@ func drawHorizontalBorder(ncols int, colWidths []int, columnSpacing int, left, m
 
 // calculateColumnWidths computes the maximum width needed for each column
 // and returns both the column widths and all individual cell widths.
-func calculateColumnWidths(ap *ansipixels.AnsiPixels, table [][]string, ncols int) ([]int, [][]int) {
+func calculateColumnWidths(ap *AnsiPixels, table [][]string, ncols int) ([]int, [][]int) {
 	nrows := len(table)
 	colWidths := make([]int, ncols)
 	allWidths := make([][]int, 0, nrows)
@@ -143,7 +137,7 @@ func formatCell(sb *strings.Builder, cell string, cellWidth, columnWidth, column
 	}
 }
 
-func CreateTableLines(ap *ansipixels.AnsiPixels,
+func (ap *AnsiPixels) CreateTableLines(
 	alignment []Alignment,
 	columnSpacing int,
 	table [][]string,
@@ -178,7 +172,7 @@ func CreateTableLines(ap *ansipixels.AnsiPixels,
 	// Add top border if needed
 	if hasOuterBorder {
 		lines[lineIdx] = drawHorizontalBorder(ncols, colWidths, columnSpacing,
-			ansipixels.SquareTopLeft, ansipixels.TopT, ansipixels.SquareTopRight)
+			SquareTopLeft, TopT, SquareTopRight)
 		lineIdx++
 	}
 
@@ -189,13 +183,13 @@ func CreateTableLines(ap *ansipixels.AnsiPixels,
 		// Add row separator for full borders (except before first row)
 		if borderStyle == BorderFull && i > 0 {
 			lines[lineIdx] = drawHorizontalBorder(ncols, colWidths, columnSpacing,
-				ansipixels.LeftT, ansipixels.MiddleCross, ansipixels.RightT)
+				LeftT, MiddleCross, RightT)
 			lineIdx++
 		}
 
 		// Add left border if needed
 		if hasOuterBorder {
-			sb.WriteString(ansipixels.Vertical)
+			sb.WriteString(Vertical)
 		}
 
 		// Build the data row
@@ -206,7 +200,7 @@ func CreateTableLines(ap *ansipixels.AnsiPixels,
 			if j < ncols-1 {
 				separator := strings.Repeat(" ", columnSpacing)
 				if hasColumnBorders {
-					separator = ansipixels.Vertical
+					separator = Vertical
 				}
 				sb.WriteString(separator)
 			}
@@ -214,7 +208,7 @@ func CreateTableLines(ap *ansipixels.AnsiPixels,
 
 		// Add right border if needed
 		if hasOuterBorder {
-			sb.WriteString(ansipixels.Vertical)
+			sb.WriteString(Vertical)
 		}
 
 		lines[lineIdx] = sb.String()
@@ -225,7 +219,7 @@ func CreateTableLines(ap *ansipixels.AnsiPixels,
 	// Add bottom border if needed
 	if hasOuterBorder {
 		lines[lineIdx] = drawHorizontalBorder(ncols, colWidths, columnSpacing,
-			ansipixels.SquareBottomLeft, ansipixels.BottomT, ansipixels.SquareBottomRight)
+			SquareBottomLeft, BottomT, SquareBottomRight)
 	}
 
 	return lines, maxw
