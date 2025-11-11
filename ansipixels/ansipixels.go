@@ -525,7 +525,7 @@ func (ap *AnsiPixels) RestoreCursorPos() {
 	ap.WriteString("\0338")
 }
 
-var cursPosRegexp = regexp.MustCompile(`^(.*)\033\[(\d+);(\d+)R(.*)$`)
+var cursPosRegexp = regexp.MustCompile(`(?s)^(.*)\033\[(\d+);(\d+)R(.*)$`)
 
 // ReadCursorPosXY returns the current X,Y coordinates of the cursor or insertion point
 // using the same coordinate system as MoveCursor, WriteAt, etc. ie 0,0 is the top left corner.
@@ -746,4 +746,21 @@ func FormatDate(d *time.Time) string {
 // Called automatically by [Open] unless AutoLoggerSetup is false.
 func (ap *AnsiPixels) LoggerSetup() {
 	terminal.LoggerSetup(ap.Logger)
+}
+
+// NonRawTerminalSize tries to get the terminal size from any of the
+// 3 standard file descriptors (stdout, stderr, stdin).
+// Returns 80x24 and an error if none of them worked.
+// This is meant to be used when redirecting a TUI program output to a file or pipe
+// (eg to save the ansi codes output to a file for later replay).
+// Used in tray and tbonsai for instance.
+func NonRawTerminalSize() (width, height int, err error) {
+	for _, attempt := range []*os.File{os.Stdout, os.Stderr, os.Stdin} {
+		width, height, err = term.GetSize(int(attempt.Fd()))
+		if err == nil {
+			return width, height, nil
+		}
+	}
+	log.Warnf("Unable to get terminal size from any of stdout, stderr, stdin: %v", err)
+	return 80, 24, err
 }
