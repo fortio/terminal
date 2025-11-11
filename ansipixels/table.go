@@ -28,7 +28,7 @@ func (ap *AnsiPixels) WriteTable(
 	y int, alignment []Alignment,
 	columnSpacing int, table [][]string, borderStyle BorderStyle,
 ) int {
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, borderStyle)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, borderStyle)
 	var cursorY int
 	leftX := (ap.W - width) / 2
 	for i, l := range lines {
@@ -138,7 +138,10 @@ func formatCell(sb *strings.Builder, cell string, cellWidth, columnWidth, column
 	}
 }
 
-func (ap *AnsiPixels) CreateTableLines(
+// createTableLines generates the formatted text lines for a table with the specified alignment,
+// spacing, and border style. It calculates column widths, applies formatting and borders,
+// and returns both the rendered lines and the total width of the table.
+func (ap *AnsiPixels) createTableLines(
 	alignment []Alignment,
 	columnSpacing int,
 	table [][]string,

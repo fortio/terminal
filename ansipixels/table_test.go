@@ -17,7 +17,7 @@ func TestCreateTableLines_LeftAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -47,7 +47,7 @@ func TestCreateTableLines_RightAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -85,7 +85,7 @@ func TestCreateTableLines_CenterAlignment(t *testing.T) {
 		{"Bob", "25", "LA"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -120,7 +120,7 @@ func TestCreateTableLines_MixedAlignment(t *testing.T) {
 		{"Banana", "0.75", "50"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -153,7 +153,7 @@ func TestCreateTableLines_DifferentColumnSpacing(t *testing.T) {
 	testCases := []int{0, 1, 2, 5, 10}
 
 	for _, spacing := range testCases {
-		lines, width := ap.CreateTableLines(alignment, spacing, table, BorderNone)
+		lines, width := ap.createTableLines(alignment, spacing, table, BorderNone)
 
 		// Check that spacing is correctly applied
 		// Width should be: max_col0_width + spacing + max_col1_width
@@ -182,7 +182,7 @@ func TestCreateTableLines_SingleColumn(t *testing.T) {
 		{"Row2"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -205,7 +205,7 @@ func TestCreateTableLines_UnevenColumnWidths(t *testing.T) {
 		{"Test", "Data", "C"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))
@@ -233,7 +233,7 @@ func TestCreateTableLines_EmptyTable(t *testing.T) {
 	columnSpacing := 2
 	table := [][]string{}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 0 {
 		t.Errorf("Expected 0 lines for empty table, got %d", len(lines))
@@ -259,7 +259,7 @@ func TestCreateTableLines_InconsistentColumns(t *testing.T) {
 		}
 	}()
 
-	ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 }
 
 func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
@@ -273,7 +273,7 @@ func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
 		{"ABC"},
 	}
 
-	linesEvenDelta, _ := ap.CreateTableLines(alignment, columnSpacing, tableEvenDelta, BorderNone)
+	linesEvenDelta, _ := ap.createTableLines(alignment, columnSpacing, tableEvenDelta, BorderNone)
 
 	// "ABC" centered in 5 chars with delta=2 should be " ABC " (1 space left, 1 space right)
 	abcLine := linesEvenDelta[1]
@@ -287,7 +287,7 @@ func TestCreateTableLines_CenterAlignmentOddEven(t *testing.T) {
 		{"ABC"},
 	}
 
-	linesOddDelta, _ := ap.CreateTableLines(alignment, columnSpacing, tableOddDelta, BorderNone)
+	linesOddDelta, _ := ap.createTableLines(alignment, columnSpacing, tableOddDelta, BorderNone)
 
 	// "ABC" centered in 6 chars with delta=3 should be " ABC  " (1 space left, 2 spaces right due to odd delta)
 	abcLineOdd := linesOddDelta[1]
@@ -305,7 +305,7 @@ func TestCreateTableLines_ZeroColumnSpacing(t *testing.T) {
 		{"X", "Y", "Z"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	// Width should be sum of column widths with no spacing
 	expectedWidth := 3 // 1 + 1 + 1
@@ -333,7 +333,7 @@ func TestCreateTableLines_WithEmojisAndUnicode(t *testing.T) {
 		{"Charlie", "✨", "98"},
 	}
 
-	lines, width := ap.CreateTableLines(alignment, columnSpacing, table, BorderNone)
+	lines, width := ap.createTableLines(alignment, columnSpacing, table, BorderNone)
 
 	if len(lines) != 4 {
 		t.Errorf("Expected 4 lines, got %d", len(lines))
@@ -442,7 +442,7 @@ A         B|`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lines, _ := ap.CreateTableLines(tt.alignment, tt.columnSpacing, tt.table, BorderNone)
+			lines, _ := ap.createTableLines(tt.alignment, tt.columnSpacing, tt.table, BorderNone)
 			result := "\n" + strings.Join(lines, "\n")
 			expected := strings.ReplaceAll(tt.expected, "|", "")
 
@@ -684,7 +684,7 @@ A│B|`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lines, _ := ap.CreateTableLines(tt.alignment, tt.columnSpacing, tt.table, tt.borderStyle)
+			lines, _ := ap.createTableLines(tt.alignment, tt.columnSpacing, tt.table, tt.borderStyle)
 			result := "\n" + strings.Join(lines, "\n")
 			expected := strings.ReplaceAll(tt.expected, "|", "")
 
