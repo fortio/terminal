@@ -2,7 +2,7 @@ package terminal
 
 import (
 	"errors"
-	"os"
+	"io"
 	"sync"
 	"time"
 
@@ -18,12 +18,12 @@ type readResult struct {
 	err  error
 }
 
-// TimeoutReader wraps an os.File (typically os.Stdin) to provide read operations
+// TimeoutReader wraps an io.Reader (typically os.Stdin) to provide read operations
 // with a timeout using a persistent background reader goroutine and internal buffering.
 // It also allows a reset/restart without loosing data to a leftover/pending read if
-// the reset is triggered by say reading a ^C from the inpout (which will unblock the read).
+// the reset is triggered by say reading a ^C from the input (which will unblock the read).
 type TimeoutReader struct {
-	file    *os.File
+	file    io.Reader
 	timeout time.Duration
 
 	inRead     bool            // Indicates if a read is in progress/hasn't returned yet
@@ -40,7 +40,7 @@ type TimeoutReader struct {
 // NewTimeoutReader creates a new TimeoutReader with a persistent background reader.
 // The timeout applies to each Read call waiting for new data.
 // A duration of 0 or less is invalid and will panic.
-func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
+func NewTimeoutReader(stream io.Reader, timeout time.Duration) *TimeoutReader {
 	log.LogVf("Creating non select based TimeoutReader with timeout: %v", timeout)
 	if timeout < 0 {
 		panic("Timeout must be greater or equal to 0")
@@ -232,10 +232,13 @@ func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 }
 
 // Close signals the background reader goroutine to stop and waits for it to exit.
-// It purposely doesn't close the underlying file.
+// It purposely doesn't close the underlying file unless in blocking mode and it implements io.Closer.
 func (tr *TimeoutReader) Close() error {
 	if tr.blocking && tr.file != nil {
-		err := tr.file.Close()
+		var err error
+		if closer, ok := tr.file.(io.Closer); ok {
+			err = closer.Close()
+		}
 		tr.file = nil // Clear the stream reference
 		return err
 	}
