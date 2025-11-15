@@ -176,7 +176,7 @@ func DetectColorMode() (cm ColorMode) {
 }
 
 // Open sets the terminal in raw mode, gets the size and starts the shared input reader.
-// Also starts listening for signals (resize and interrupt) on ap.C and setsup logger if AutoLoggerSetup is set.
+// Also starts listening for signals (resize and interrupt) on ap.C and sets up logger if AutoLoggerSetup is set.
 func (ap *AnsiPixels) Open() error {
 	ap.firstClear = true
 	ap.restored = false
