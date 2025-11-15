@@ -70,7 +70,9 @@ type AnsiPixels struct {
 	ColorMode
 	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
 	ColorOutput tcolor.ColorOutput
-	fdOut       int
+	// Pluggable function to get terminal size (Width, Height). Should set ap.W and ap.H.
+	// The default implementation you get from [NewAnsiPixels] uses [term.GetSize] on os.Stdout's file descriptor.
+	GetSize     func() error
 	Out         terminal.Bufio // typically a bufio.Writer wrapping os.Stdout but can be swapped for testing or other uses.
 	SharedInput Input
 	buf         [bufSize]byte
@@ -120,13 +122,17 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		fdOut:           safecast.MustConv[int](os.Stdout.Fd()),
 		Out:             bufio.NewWriter(os.Stdout),
 		FPS:             fps,
 		SharedInput:     terminal.GetSharedInput(d),
 		C:               make(chan os.Signal, 1),
 		AutoSync:        true,
 		AutoLoggerSetup: true,
+	}
+	fdOut := safecast.MustConv[int](os.Stdout.Fd())
+	ap.GetSize = func() (err error) {
+		ap.W, ap.H, err = term.GetSize(fdOut)
+		return err
 	}
 	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
@@ -414,11 +420,6 @@ func (ap *AnsiPixels) FlushLogger() bool {
 func (ap *AnsiPixels) EndSyncMode() {
 	_, _ = ap.Out.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
-}
-
-func (ap *AnsiPixels) GetSize() (err error) {
-	ap.W, ap.H, err = term.GetSize(ap.fdOut)
-	return err
 }
 
 func (ap *AnsiPixels) Restore() {
