@@ -29,6 +29,36 @@ const (
 	bufSize    = 1024
 )
 
+// Input interface abstracts the input reading capabilities needed by AnsiPixels.
+// It is by default implemented by InterruptReader but can be replaced for instance
+// for ssh based input. Some of the complexity with [terminal.InterruptReader] is
+// because of sharing the reader between multiple users (Terminal, AnsiPixels) like
+// happens in Grol.
+type Input interface {
+	InputReader
+	// RawMode sets the terminal to raw mode.
+	RawMode() error
+	// NormalMode sets the terminal back to normal mode.
+	NormalMode() error
+	// StartDirect is called during Open to start a timeout reader if needed.
+	StartDirect()
+}
+
+// InputReader interface abstracts the reading capabilities needed by AnsiPixels, it is implemented by TimeoutReader
+// (in addition to InterruptReader).
+type InputReader interface {
+	// ChangeTimeout changes the timeout used for reading.
+	ChangeTimeout(timeout time.Duration)
+	// ReadBlocking will return at least 1 byte or an error, blocking until data is available.
+	// Used by ReadCursorPos where a response is expected from the terminal.
+	ReadBlocking(p []byte) (n int, err error)
+	// ReadWithTimeout reads from the underlying reader with the set timeout (which should match FPS).
+	ReadWithTimeout(p []byte) (n int, err error)
+	// ReadImmediate reads already or immediately available data from the underlying reader without any timeout.
+	// Used within FPSTicks to get data if any without changing the FPS frequency of updates.
+	ReadImmediate(p []byte) (n int, err error)
+}
+
 // ColorMode determines if images be monochrome, 256 or true color.
 // Additionally there is the option to convert to grayscale.
 type ColorMode struct {
@@ -46,9 +76,11 @@ type AnsiPixels struct {
 	ColorMode
 	// [tcolor.Color] converter to output the correct color codes when TrueColor is not supported.
 	ColorOutput tcolor.ColorOutput
-	fdOut       int
+	// Pluggable function to get terminal size (Width, Height). Should set ap.W and ap.H.
+	// The default implementation you get from [NewAnsiPixels] uses [term.GetSize] on os.Stdout's file descriptor.
+	GetSize     func() error
 	Out         terminal.Bufio // typically a bufio.Writer wrapping os.Stdout but can be swapped for testing or other uses.
-	SharedInput *terminal.InterruptReader
+	SharedInput Input
 	buf         [bufSize]byte
 	Data        []byte
 	W, H        int  // Width and Height
@@ -96,13 +128,17 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		fdOut:           safecast.MustConv[int](os.Stdout.Fd()),
 		Out:             bufio.NewWriter(os.Stdout),
 		FPS:             fps,
 		SharedInput:     terminal.GetSharedInput(d),
 		C:               make(chan os.Signal, 1),
 		AutoSync:        true,
 		AutoLoggerSetup: true,
+	}
+	fdOut := safecast.MustConv[int](os.Stdout.Fd())
+	ap.GetSize = func() (err error) {
+		ap.W, ap.H, err = term.GetSize(fdOut)
+		return err
 	}
 	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
@@ -151,9 +187,8 @@ func DetectColorMode() (cm ColorMode) {
 	return cm
 }
 
-// Open sets the terminal in raw mode, gets the size and starts the shared input reader using
-// default background context. Use [OpenWithContext] to pass a specific context for that underlying
-// reader.
+// Open sets the terminal in raw mode, gets the size and starts the shared input reader.
+// Also starts listening for signals (resize and interrupt) on ap.C and sets up logger if AutoLoggerSetup is set.
 func (ap *AnsiPixels) Open() error {
 	ap.firstClear = true
 	ap.restored = false
@@ -341,7 +376,7 @@ func (ap *AnsiPixels) ReadOrResizeOrSignalOnce() (int, error) {
 			return 0, err
 		}
 	default:
-		n, err := ap.SharedInput.DirectRead(ap.buf[0:bufSize])
+		n, err := ap.SharedInput.ReadWithTimeout(ap.buf[0:bufSize])
 		ap.Data = ap.buf[0:n]
 		if !ap.NoDecode {
 			ap.MouseDecodeAll()
@@ -391,11 +426,6 @@ func (ap *AnsiPixels) FlushLogger() bool {
 func (ap *AnsiPixels) EndSyncMode() {
 	_, _ = ap.Out.WriteString("\033[?2026l")
 	_ = ap.Out.Flush()
-}
-
-func (ap *AnsiPixels) GetSize() (err error) {
-	ap.W, ap.H, err = term.GetSize(ap.fdOut)
-	return err
 }
 
 func (ap *AnsiPixels) Restore() {

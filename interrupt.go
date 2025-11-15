@@ -30,7 +30,7 @@ type InterruptReader struct {
 	timeout time.Duration
 	stopped bool
 	// TimeoutReader is the timeout reader for the interrupt reader.
-	tr *TimeoutReader
+	tr *SystemTimeoutReader
 	// Terminal state (raw mode vs normal)
 	st *term.State
 }
@@ -86,7 +86,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 	ir.reset = ir.buf
 	if timeout == 0 {
 		// This won't be starting a thread/goroutine, just a passthrough reader in the mode so we can create it early/here.
-		ir.tr = NewTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
+		ir.tr = NewSystemTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
 	} else {
 		ir.cond = *sync.NewCond(&ir.mu)
 		log.Config.GoroutineID = true // must be set before (on windows/with non select reader) we start the goroutine.
@@ -106,7 +106,7 @@ func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	}
 	ir.timeout = timeout
 	if ir.tr == nil || ir.tr.IsClosed() {
-		ir.tr = NewTimeoutReader(ir.In, timeout)
+		ir.tr = NewSystemTimeoutReader(ir.In, timeout)
 	} else {
 		ir.tr.ChangeTimeout(timeout)
 	}
@@ -153,7 +153,7 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
 	if ir.tr == nil {
-		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
 	}
 	if ir.timeout != 0 {
 		go func() {
@@ -168,17 +168,18 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 func (ir *InterruptReader) StartDirect() {
 	ir.mu.Lock()
 	if ir.tr == nil {
-		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
 	}
 	ir.mu.Unlock()
 }
 
-// DirectRead reads directly from the underlying reader, bypassing the interrupt handling.
-// this is what happens in stopped mode.
-func (ir *InterruptReader) DirectRead(p []byte) (int, error) {
+// ReadWithTimeout reads directly from the underlying reader, bypassing the interrupt handling
+// but still subject to the timeout set on said underlying reader.
+func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
 	return ir.tr.Read(p)
 }
 
+// ReadBlocking reads from the underlying reader in blocking mode (without timeout).
 func (ir *InterruptReader) ReadBlocking(p []byte) (int, error) {
 	return ir.tr.ReadBlocking(p)
 }
@@ -201,7 +202,7 @@ func (ir *InterruptReader) Read(p []byte) (int, error) {
 	for len(ir.buf) == 0 && ir.err == nil {
 		if ir.stopped {
 			ir.mu.Unlock()
-			return ir.DirectRead(p)
+			return ir.ReadWithTimeout(p)
 		}
 		ir.cond.Wait() // wait _until_ data or error
 	}
@@ -218,31 +219,10 @@ func (ir *InterruptReader) ReadNonBlocking(p []byte) (int, error) {
 	ir.mu.Lock()
 	if len(ir.buf) == 0 && ir.stopped {
 		ir.mu.Unlock()
-		return ir.DirectRead(p)
+		return ir.ReadWithTimeout(p)
 	}
 	n, err := ir.read(p)
 	ir.mu.Unlock()
-	return n, err
-}
-
-// ReadWithTimeout will block up to 1 timeout to read and return 0, nil if nothing is available within 1 cycle.
-// Note that in blocking mode this is like a normal Read() call (it will block). In order to preserve the
-// fortio.org/tev functionality of direct access despite it calling [ansipixels.ReadOrResizeOrSignalOnce].
-func (ir *InterruptReader) ReadWithTimeout(p []byte) (int, error) {
-	if ir.timeout == 0 {
-		return ir.tr.Read(p)
-	}
-	ir.mu.Lock()
-	if len(ir.buf) == 0 && ir.err == nil {
-		if ir.stopped {
-			ir.mu.Unlock()
-			return ir.DirectRead(p)
-		}
-		ir.cond.Wait() // single wait cycle.
-	}
-	n, err := ir.read(p)
-	ir.mu.Unlock()
-
 	return n, err
 }
 
@@ -323,7 +303,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	// they don't (at least on macOS, for the signals we are watching).
 	tr := ir.tr
 	if tr == nil || tr.IsClosed() {
-		tr = NewTimeoutReader(ir.In, ir.timeout)
+		tr = NewSystemTimeoutReader(ir.In, ir.timeout)
 		ir.tr = tr
 	} else {
 		tr.ChangeTimeout(ir.timeout)
