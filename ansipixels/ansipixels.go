@@ -35,12 +35,18 @@ const (
 // because of sharing the reader between multiple users (Terminal, AnsiPixels) like
 // happens in Grol.
 type Input interface {
+	InputReader
 	// RawMode sets the terminal to raw mode.
 	RawMode() error
 	// NormalMode sets the terminal back to normal mode.
 	NormalMode() error
 	// StartDirect is called during Open to start a timeout reader if needed.
 	StartDirect()
+}
+
+// InputReader interface abstracts the reading capabilities needed by AnsiPixels, it is implemented by TimeoutReader
+// (in addition to InterruptReader).
+type InputReader interface {
 	// ChangeTimeout changes the timeout used for reading.
 	ChangeTimeout(timeout time.Duration)
 	// ReadBlocking will return at least 1 byte or an error, blocking until data is available.

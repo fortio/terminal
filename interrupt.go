@@ -30,7 +30,7 @@ type InterruptReader struct {
 	timeout time.Duration
 	stopped bool
 	// TimeoutReader is the timeout reader for the interrupt reader.
-	tr *TimeoutReader
+	tr *SystemTimeoutReader
 	// Terminal state (raw mode vs normal)
 	st *term.State
 }
@@ -86,7 +86,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 	ir.reset = ir.buf
 	if timeout == 0 {
 		// This won't be starting a thread/goroutine, just a passthrough reader in the mode so we can create it early/here.
-		ir.tr = NewTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
+		ir.tr = NewSystemTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
 	} else {
 		ir.cond = *sync.NewCond(&ir.mu)
 		log.Config.GoroutineID = true // must be set before (on windows/with non select reader) we start the goroutine.
@@ -106,7 +106,7 @@ func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	}
 	ir.timeout = timeout
 	if ir.tr == nil || ir.tr.IsClosed() {
-		ir.tr = NewTimeoutReader(ir.In, timeout)
+		ir.tr = NewSystemTimeoutReader(ir.In, timeout)
 	} else {
 		ir.tr.ChangeTimeout(timeout)
 	}
@@ -153,7 +153,7 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
 	if ir.tr == nil {
-		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
 	}
 	if ir.timeout != 0 {
 		go func() {
@@ -168,7 +168,7 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 func (ir *InterruptReader) StartDirect() {
 	ir.mu.Lock()
 	if ir.tr == nil {
-		ir.tr = NewTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
 	}
 	ir.mu.Unlock()
 }
@@ -303,7 +303,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	// they don't (at least on macOS, for the signals we are watching).
 	tr := ir.tr
 	if tr == nil || tr.IsClosed() {
-		tr = NewTimeoutReader(ir.In, ir.timeout)
+		tr = NewSystemTimeoutReader(ir.In, ir.timeout)
 		ir.tr = tr
 	} else {
 		tr.ChangeTimeout(ir.timeout)

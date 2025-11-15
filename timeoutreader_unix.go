@@ -16,6 +16,12 @@ import (
 
 const IsUnix = true
 
+type SystemTimeoutReader = TimeoutReaderUnixFD
+
+func NewSystemTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReaderUnixFD {
+	return NewTimeoutReaderUnixFD(stream, timeout)
+}
+
 func TimeoutToTimeval(timeout time.Duration) *unix.Timeval {
 	tv := unix.NsecToTimeval(timeout.Nanoseconds())
 	return &tv
@@ -43,18 +49,18 @@ func ReadWithTimeout(fd int, tv *unix.Timeval, buf []byte) (int, error) {
 	return n, err
 }
 
-type TimeoutReader struct {
+type TimeoutReaderUnixFD struct {
 	fd       int
 	tv       *unix.Timeval
 	blocking bool     // true if the reader is blocking (timeout == 0), false if it has a timeout set
 	ostream  *os.File // original file/stream
 }
 
-func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
+func NewTimeoutReaderUnixFD(stream *os.File, timeout time.Duration) *TimeoutReaderUnixFD {
 	if timeout < 0 {
 		panic("Timeout must be greater or equal to 0")
 	}
-	return &TimeoutReader{
+	return &TimeoutReaderUnixFD{
 		fd:       safecast.MustConv[int](stream.Fd()),
 		tv:       TimeoutToTimeval(timeout),
 		blocking: timeout == 0,
@@ -62,18 +68,18 @@ func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 	}
 }
 
-func (tr *TimeoutReader) Read(buf []byte) (int, error) {
+func (tr *TimeoutReaderUnixFD) Read(buf []byte) (int, error) {
 	if tr.blocking {
 		return tr.ostream.Read(buf)
 	}
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
 }
 
-func (tr *TimeoutReader) ReadBlocking(buf []byte) (int, error) {
+func (tr *TimeoutReaderUnixFD) ReadBlocking(buf []byte) (int, error) {
 	return tr.ostream.Read(buf)
 }
 
-func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
+func (tr *TimeoutReaderUnixFD) ReadImmediate(buf []byte) (int, error) {
 	if tr.blocking {
 		return tr.ostream.Read(buf)
 	}
@@ -82,7 +88,7 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 }
 
 // ChangeTimeout on unix should be called from same goroutine as any Read* or not concurrently.
-func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
+func (tr *TimeoutReaderUnixFD) ChangeTimeout(timeout time.Duration) {
 	if tr.blocking && timeout > 0 {
 		panic("Cannot change from blocking to non-blocking mode")
 	}
@@ -91,7 +97,7 @@ func (tr *TimeoutReader) ChangeTimeout(timeout time.Duration) {
 
 // Close closes the underlying stream if we are in blocking mode.
 // nop otherwise.
-func (tr *TimeoutReader) Close() (err error) {
+func (tr *TimeoutReaderUnixFD) Close() (err error) {
 	if tr.blocking && tr.ostream != nil {
 		err = tr.ostream.Close()
 		tr.ostream = nil // Clear the stream reference
@@ -102,6 +108,6 @@ func (tr *TimeoutReader) Close() (err error) {
 // IsClosed returns true if Close() has been called (and for the other implementation a new one should be created).
 // Always false on unix/select mode because we can keep using it forever, unlike the goroutine based one.
 // Unless we are in blocking mode and Close() was called.
-func (tr *TimeoutReader) IsClosed() bool {
+func (tr *TimeoutReaderUnixFD) IsClosed() bool {
 	return tr.ostream == nil
 }
