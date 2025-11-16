@@ -215,6 +215,11 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 	}
 }
 
+// ReadWithTimeout is an alias to [TimeoutReader.Read] for the InputReader interface compatibility.
+func (tr *TimeoutReader) ReadWithTimeout(buf []byte) (int, error) {
+	return tr.Read(buf)
+}
+
 // ChangeTimeout updates the timeout duration for subsequent Read calls
 // when waiting for new data from the background reader. If called currently
 // it will block until the current read completes.

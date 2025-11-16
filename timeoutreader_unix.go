@@ -75,6 +75,10 @@ func (tr *TimeoutReaderUnixFD) Read(buf []byte) (int, error) {
 	return ReadWithTimeout(tr.fd, tr.tv, buf)
 }
 
+func (tr *TimeoutReaderUnixFD) ReadWithTimeout(buf []byte) (int, error) {
+	return ReadWithTimeout(tr.fd, tr.tv, buf)
+}
+
 func (tr *TimeoutReaderUnixFD) ReadBlocking(buf []byte) (int, error) {
 	return tr.ostream.Read(buf)
 }
