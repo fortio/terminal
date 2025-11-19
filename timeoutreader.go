@@ -53,7 +53,7 @@ func NewTimeoutReader(stream io.Reader, timeout time.Duration) *TimeoutReader {
 	}
 
 	if !blocking {
-		tr.inputChan = make(chan []byte, 1)
+		tr.inputChan = make(chan []byte)
 		tr.resultChan = make(chan readResult)
 		tr.stopChan = make(chan struct{})
 		tr.wg.Add(1)
@@ -174,20 +174,29 @@ func (tr *TimeoutReader) ReadBlocking(buf []byte) (int, error) {
 	return n, res.err
 }
 
-// ReadImmediate attempts to read into the buffer buf if there is something immediately available.
-func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
+// PrimeReadImmediate starts a read to be returned later by ReadImmediate.
+func (tr *TimeoutReader) PrimeReadImmediate(buf []byte) {
 	if tr.blocking {
-		panic("ReadImmediate not meaningful in blocking mode")
+		panic("PrimeReadImmediate not meaningful in blocking mode")
 	}
-	sameBuf := false
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if tr.inRead {
+		panic("Unexpected to be already in read when PrimeReadImmediate is called")
+	}
+	log.Debugf("PrimeReadImmediate: Not in read, sending to inputChan")
+	tr.inputChan <- buf // Send what to read and signal to the goroutine to do read
+	tr.inRead = true
+}
+
+// ReadImmediate to return immediately what was read since PrimeReadImmediate if any.
+// Data is returned into the buffer provided in PrimeReadImmediate.
+func (tr *TimeoutReader) ReadImmediate() (int, error) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 	// If we are already in a read, we don't want to send to the inputChan, we'll reuse the one in flight.
 	if !tr.inRead {
-		log.Debugf("Immediate: Not in read, sending to inputChan")
-		tr.inputChan <- buf // Send what to read and signal to the goroutine to do read
-		sameBuf = true
-		tr.inRead = true
+		panic("ReadImmediate called without prior PrimeReadImmediate")
 	}
 	select {
 	case res, ok := <-tr.resultChan:
@@ -199,18 +208,10 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 		if res.err != nil {
 			tr.lastErr = res.err
 		}
-		if sameBuf {
-			return res.n, res.err
-		}
-		if res.n > len(buf) {
-			// Unexpected.
-			log.Warnf("Read %d bytes from earlier Read request, but new buffer is only %d bytes", res.n, len(buf))
-			res.err = ErrDataTruncated
-		}
-		n := copy(buf, res.data[:res.n]) // Copy the data to the provided buffer
-		return n, res.err
+		return res.n, res.err
 	default:
-		// no data ready yet (will be in next call most likely)
+		// no data ready yet
+		log.Debugf("No data ready for immediate read")
 		return 0, nil
 	}
 }

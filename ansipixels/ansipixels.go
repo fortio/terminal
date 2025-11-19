@@ -54,9 +54,12 @@ type InputReader interface {
 	ReadBlocking(p []byte) (n int, err error)
 	// ReadWithTimeout reads from the underlying reader with the set timeout (which should match FPS).
 	ReadWithTimeout(p []byte) (n int, err error)
-	// ReadImmediate reads already or immediately available data from the underlying reader without any timeout.
+	// PrimeReadImmediate starts a read request for subsequent ReadImmediate.
 	// Used within FPSTicks to get data if any without changing the FPS frequency of updates.
-	ReadImmediate(p []byte) (n int, err error)
+	PrimeReadImmediate(p []byte)
+	// ReadImmediate returns data already read since last PrimeReadImmediate (without any timeout).
+	// Used within FPSTicks to get data if any without changing the FPS frequency of updates.
+	ReadImmediate() (n int, err error)
 }
 
 // ColorMode determines if images be monochrome, 256 or true color.
@@ -334,6 +337,8 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	defer func() {
 		timer.Stop()
 	}()
+	// Start the reading ahead of frames. Needed for windows and non fd based readers.
+	ap.SharedInput.PrimeReadImmediate(ap.buf[0:bufSize])
 	for {
 		select {
 		case s := <-ap.C:
@@ -342,7 +347,7 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 				return err
 			}
 		case <-timer.C:
-			n, err := ap.SharedInput.ReadImmediate(ap.buf[0:bufSize])
+			n, err := ap.SharedInput.ReadImmediate()
 			if err != nil {
 				return err
 			}
@@ -359,6 +364,10 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 			}
 			if !cont {
 				return nil // exit the loop
+			}
+			// Prep next read/frame. Only if we're not exiting this loop (and we did get data above).
+			if n > 0 {
+				ap.SharedInput.PrimeReadImmediate(ap.buf[0:bufSize])
 			}
 		}
 	}
