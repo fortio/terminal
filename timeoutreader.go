@@ -53,7 +53,7 @@ func NewTimeoutReader(stream io.Reader, timeout time.Duration) *TimeoutReader {
 	}
 
 	if !blocking {
-		tr.inputChan = make(chan []byte, 1)
+		tr.inputChan = make(chan []byte)
 		tr.resultChan = make(chan readResult)
 		tr.stopChan = make(chan struct{})
 		tr.wg.Add(1)
@@ -188,6 +188,9 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 		tr.inputChan <- buf // Send what to read and signal to the goroutine to do read
 		sameBuf = true
 		tr.inRead = true
+		// Unfortunate that runtime.Gosched() is not enough nor the blocking channel send above
+		log.Debugf("Small sleep to let read goroutine run")
+		time.Sleep(tr.timeout / 20) // Small sleep to let read goroutine run
 	}
 	select {
 	case res, ok := <-tr.resultChan:
@@ -211,6 +214,7 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 		return n, res.err
 	default:
 		// no data ready yet (will be in next call most likely)
+		log.Debugf("No data ready for immediate read")
 		return 0, nil
 	}
 }

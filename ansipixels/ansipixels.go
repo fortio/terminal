@@ -346,6 +346,16 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 			if err != nil {
 				return err
 			}
+			/*
+				// Give it a 2nd chance to read data (issue #204).
+				if n == 0 {
+					log.Debugf("No data on first immediate read, trying another")
+					n, err = ap.SharedInput.ReadImmediate(ap.buf[0:bufSize])
+					if err != nil {
+						return err
+					}
+				}
+			*/
 			ap.Data = ap.buf[0:n]
 			if !ap.NoDecode {
 				ap.MouseDecodeAll()
