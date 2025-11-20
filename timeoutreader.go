@@ -1,20 +1,13 @@
-//go:build !unix || test_alt_timeoutreader
-
-// To test on unix/mac use for instance:
-// make GO_BUILD_TAGS=test_alt_timeoutreader,no_net,no_json,no_pprof
-
 package terminal
 
 import (
 	"errors"
-	"os"
+	"io"
 	"sync"
 	"time"
 
 	"fortio.org/log"
 )
-
-const IsUnix = false
 
 var ErrDataTruncated = errors.New("data truncated")
 
@@ -25,12 +18,12 @@ type readResult struct {
 	err  error
 }
 
-// TimeoutReader wraps an os.File (typically os.Stdin) to provide read operations
+// TimeoutReader wraps an io.Reader (typically os.Stdin) to provide read operations
 // with a timeout using a persistent background reader goroutine and internal buffering.
 // It also allows a reset/restart without loosing data to a leftover/pending read if
-// the reset is triggered by say reading a ^C from the inpout (which will unblock the read).
+// the reset is triggered by say reading a ^C from the input (which will unblock the read).
 type TimeoutReader struct {
-	file    *os.File
+	file    io.Reader
 	timeout time.Duration
 
 	inRead     bool            // Indicates if a read is in progress/hasn't returned yet
@@ -47,7 +40,7 @@ type TimeoutReader struct {
 // NewTimeoutReader creates a new TimeoutReader with a persistent background reader.
 // The timeout applies to each Read call waiting for new data.
 // A duration of 0 or less is invalid and will panic.
-func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
+func NewTimeoutReader(stream io.Reader, timeout time.Duration) *TimeoutReader {
 	log.LogVf("Creating non select based TimeoutReader with timeout: %v", timeout)
 	if timeout < 0 {
 		panic("Timeout must be greater or equal to 0")
@@ -60,7 +53,7 @@ func NewTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReader {
 	}
 
 	if !blocking {
-		tr.inputChan = make(chan []byte, 1)
+		tr.inputChan = make(chan []byte)
 		tr.resultChan = make(chan readResult)
 		tr.stopChan = make(chan struct{})
 		tr.wg.Add(1)
@@ -181,20 +174,29 @@ func (tr *TimeoutReader) ReadBlocking(buf []byte) (int, error) {
 	return n, res.err
 }
 
-// ReadImmediate attempts to read into the buffer buf if there is something immediately available.
-func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
+// PrimeReadImmediate starts a read to be returned later by ReadImmediate.
+func (tr *TimeoutReader) PrimeReadImmediate(buf []byte) {
 	if tr.blocking {
-		panic("ReadImmediate not meaningful in blocking mode")
+		panic("PrimeReadImmediate not meaningful in blocking mode")
 	}
-	sameBuf := false
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if tr.inRead {
+		panic("Unexpected to be already in read when PrimeReadImmediate is called")
+	}
+	log.Debugf("PrimeReadImmediate: Not in read, sending to inputChan")
+	tr.inputChan <- buf // Send what to read and signal to the goroutine to do read
+	tr.inRead = true
+}
+
+// ReadImmediate to return immediately what was read since PrimeReadImmediate if any.
+// Data is returned into the buffer provided in PrimeReadImmediate.
+func (tr *TimeoutReader) ReadImmediate() (int, error) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 	// If we are already in a read, we don't want to send to the inputChan, we'll reuse the one in flight.
 	if !tr.inRead {
-		log.Debugf("Immediate: Not in read, sending to inputChan")
-		tr.inputChan <- buf // Send what to read and signal to the goroutine to do read
-		sameBuf = true
-		tr.inRead = true
+		panic("ReadImmediate called without prior PrimeReadImmediate")
 	}
 	select {
 	case res, ok := <-tr.resultChan:
@@ -206,20 +208,17 @@ func (tr *TimeoutReader) ReadImmediate(buf []byte) (int, error) {
 		if res.err != nil {
 			tr.lastErr = res.err
 		}
-		if sameBuf {
-			return res.n, res.err
-		}
-		if res.n > len(buf) {
-			// Unexpected.
-			log.Warnf("Read %d bytes from earlier Read request, but new buffer is only %d bytes", res.n, len(buf))
-			res.err = ErrDataTruncated
-		}
-		n := copy(buf, res.data[:res.n]) // Copy the data to the provided buffer
-		return n, res.err
+		return res.n, res.err
 	default:
-		// no data ready yet (will be in next call most likely)
+		// no data ready yet
+		log.Debugf("No data ready for immediate read")
 		return 0, nil
 	}
+}
+
+// ReadWithTimeout is an alias to [TimeoutReader.Read] for the InputReader interface compatibility.
+func (tr *TimeoutReader) ReadWithTimeout(buf []byte) (int, error) {
+	return tr.Read(buf)
 }
 
 // ChangeTimeout updates the timeout duration for subsequent Read calls
@@ -239,10 +238,13 @@ func (tr *TimeoutReader) ChangeTimeout(newTimeout time.Duration) {
 }
 
 // Close signals the background reader goroutine to stop and waits for it to exit.
-// It purposely doesn't close the underlying file.
+// It purposely doesn't close the underlying file unless in blocking mode and it implements io.Closer.
 func (tr *TimeoutReader) Close() error {
 	if tr.blocking && tr.file != nil {
-		err := tr.file.Close()
+		var err error
+		if closer, ok := tr.file.(io.Closer); ok {
+			err = closer.Close()
+		}
 		tr.file = nil // Clear the stream reference
 		return err
 	}
