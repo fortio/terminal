@@ -1,18 +1,13 @@
-package main
+package cli
 
 import (
 	"flag"
-	"os"
 
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/life/conway"
 )
-
-func main() {
-	os.Exit(Main())
-}
 
 func Main() int {
 	fpsFlag := flag.Float64("fps", 60, "Frames per second")

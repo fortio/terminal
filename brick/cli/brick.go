@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -15,10 +15,6 @@ import (
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
 )
-
-func main() {
-	os.Exit(Main())
-}
 
 type MoveRecord struct {
 	Frame     uint64
