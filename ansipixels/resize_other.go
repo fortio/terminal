@@ -3,11 +3,6 @@
 
 package ansipixels
 
-import (
-	"os"
-	"syscall"
-)
+import "syscall"
 
-var signalList = []os.Signal{os.Interrupt, syscall.SIGTERM}
-
-func (ap *AnsiPixels) IsResizeSignal(s os.Signal) bool { return false }
+const ResizeSignal = syscall.Signal(999) // Virtual signal, for ssh on windows for instance and once we figure out #202.

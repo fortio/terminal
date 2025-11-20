@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"fortio.org/log"
@@ -802,4 +803,10 @@ func NonRawTerminalSize() (width, height int, err error) {
 	}
 	log.Warnf("Unable to get terminal size from any of stdout, stderr, stdin: %v", err)
 	return 80, 24, err
+}
+
+var signalList = []os.Signal{os.Interrupt, syscall.SIGTERM, ResizeSignal}
+
+func (ap *AnsiPixels) IsResizeSignal(s os.Signal) bool {
+	return s == ResizeSignal
 }
