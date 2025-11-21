@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"testing"
@@ -142,8 +142,8 @@ func TestGameBalance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &Game{
-				balance: tt.initialBalance,
-				bet:     tt.bet,
+				Balance: tt.initialBalance,
+				Bet:     tt.bet,
 				player:  tt.playerCards,
 				dealer:  tt.dealerCards,
 			}
@@ -153,13 +153,13 @@ func TestGameBalance(t *testing.T) {
 				g.dealerTurn()
 			} else {
 				// Test bust case
-				g.state = StateGameOver
+				g.State = StateGameOver
 				g.message = tt.expectedMessage
-				g.balance -= tt.bet
+				g.Balance -= tt.bet
 			}
 
-			if g.balance != tt.expectedBalance {
-				t.Errorf("balance = %v, want %v", g.balance, tt.expectedBalance)
+			if g.Balance != tt.expectedBalance {
+				t.Errorf("balance = %v, want %v", g.Balance, tt.expectedBalance)
 			}
 			if g.message != tt.expectedMessage {
 				t.Errorf("message = %v, want %v", g.message, tt.expectedMessage)
