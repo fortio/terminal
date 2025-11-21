@@ -373,6 +373,16 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
+type BrickConfig struct {
+	FPS      float64
+	NumLives int
+	NoDeath  bool
+	NoSave   bool
+	Seed     uint64
+	Replay   string
+	AutoPlay bool
+}
+
 func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
@@ -382,7 +392,20 @@ func Main() int {
 	replay := flag.String("replay", "", "Replay a `game` from a JSON file")
 	autoPlay := flag.Bool("autoplay", false, "Computer plays mode")
 	cli.Main()
-	ap := ansipixels.NewAnsiPixels(*fpsFlag)
+	cfg := BrickConfig{
+		FPS:      *fpsFlag,
+		NumLives: *numLives,
+		NoDeath:  *noDeath,
+		NoSave:   *noSave,
+		Seed:     *seed,
+		Replay:   *replay,
+		AutoPlay: *autoPlay,
+	}
+	return cfg.Run()
+}
+
+func (cfg *BrickConfig) Run() int {
+	ap := ansipixels.NewAnsiPixels(cfg.FPS)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
@@ -390,10 +413,10 @@ func Main() int {
 	defer ap.Restore()
 	ap.HideCursor()
 	ap.Margin = 1
-	if *replay != "" {
-		return ReplayGame(ap, *replay)
+	if cfg.Replay != "" {
+		return ReplayGame(ap, cfg.Replay)
 	}
-	seedV := *seed
+	seedV := cfg.Seed
 	if seedV == 0 {
 		seedV = safecast.MustConv[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
@@ -405,8 +428,8 @@ func Main() int {
 		if b != nil {
 			prevInfo = b.ShowInfo
 		}
-		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath, seedV) // half pixels vertically.
-		b.Auto = *autoPlay
+		b = NewBrick(ap.W, ap.H, cfg.NumLives, !cfg.NoDeath, seedV) // half pixels vertically.
+		b.Auto = cfg.AutoPlay
 		b.ShowInfo = prevInfo
 		Draw(ap, b)
 		ap.WriteCentered(ap.H/2+1, "Any key to start...")
@@ -428,7 +451,7 @@ func Main() int {
 			return true
 		}
 		if handleKeys(ap, b) {
-			if !*noSave {
+			if !cfg.NoSave {
 				result = b.SaveGame()
 			}
 			return false // exit the loop

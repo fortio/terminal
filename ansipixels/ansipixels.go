@@ -120,13 +120,20 @@ type AnsiPixels struct {
 	logbuffer terminal.FlushableBytesBuffer
 	// Setup fortio logger unless this is set to false (defaults to true in NewAnsiPixels, clear before Open if desired).
 	AutoLoggerSetup bool
+	// Skip open (already opened/setup, eg by fortio/sshd).
+	SkipOpen bool
 }
+
+var SharedAnsiPixels *AnsiPixels // Used by fortio/sshd to allow multiple/NewAnsiPixels and Open in same process.
 
 // NewAnsiPixels creates a new ansipixels object (to be [Open] post customization if any).
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
 // Otherwise a non blocking reader is setup with 1/fps timeout. Reader is / can be shared
 // with Terminal.
 func NewAnsiPixels(fps float64) *AnsiPixels {
+	if SharedAnsiPixels != nil {
+		return SharedAnsiPixels
+	}
 	var d time.Duration
 	if fps > 0 {
 		d = time.Duration(1e9 / fps)
@@ -144,9 +151,9 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		ap.W, ap.H, err = term.GetSize(fdOut)
 		return err
 	}
-	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
+	SharedAnsiPixels = ap
 	return ap
 }
 
@@ -197,6 +204,12 @@ func (ap *AnsiPixels) Open() error {
 	ap.firstClear = true
 	ap.restored = false
 	ap.ColorOutput.TrueColor = ap.TrueColor // sync, in case it was changed by flags from auto detect.
+	if ap.Logger == nil {
+		ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
+	}
+	if ap.SkipOpen {
+		return nil
+	}
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()

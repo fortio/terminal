@@ -16,7 +16,11 @@ func Main() int {
 	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
 	cli.Main()
 	game := &conway.Game{HasMouse: !*noMouseFlag}
-	ap := ansipixels.NewAnsiPixels(*fpsFlag)
+	return RunGame(game, *fpsFlag, *flagRandomFill, *flagGlider)
+}
+
+func RunGame(game *conway.Game, fps float64, randomFill float64, glider bool) int {
+	ap := ansipixels.NewAnsiPixels(fps)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
@@ -27,10 +31,10 @@ func Main() int {
 	if game.HasMouse {
 		ap.MouseClickOn() // start with just clicks, we turn on drag after a click.
 	}
-	fillFactor := float32(*flagRandomFill)
+	fillFactor := float32(randomFill)
 	ap.OnResize = func() error {
 		game.C = conway.NewConway(ap.W, 2*ap.H) // half pixels vertically.
-		if *flagGlider {
+		if glider {
 			game.C.Glider(ap.W/3, 2*ap.H/3) // first third of the screen
 		} else {
 			// Random
