@@ -124,6 +124,8 @@ type AnsiPixels struct {
 	SkipOpen bool
 }
 
+// SharedAnsiPixels is temp hack.
+// TODO: remove / would need to be goroutine local storage.
 var SharedAnsiPixels *AnsiPixels // Used by fortio/sshd to allow multiple/NewAnsiPixels and Open in same process.
 
 // NewAnsiPixels creates a new ansipixels object (to be [Open] post customization if any).
@@ -171,17 +173,23 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 //
 //	defaultTrueColor := ansipixels.DetectColorMode().TrueColor
 func DetectColorMode() (cm ColorMode) {
+	return DetectColorModeEnv(os.Getenv)
+}
+
+// DetectColorModeEnv is like DetectColorMode but takes a function to get environment variables.
+// Useful for testing or for sshdtui.
+func DetectColorModeEnv(getenv func(string) string) (cm ColorMode) {
 	cm.MonoColor = tcolor.Blue // default mono (16) color
-	if os.Getenv("NO_COLOR") != "" {
+	if getenv("NO_COLOR") != "" {
 		cm.Color256 = false
 		cm.TrueColor = false
 		cm.MonoColor = tcolor.White
 		return cm
 	}
-	if os.Getenv("COLORTERM") != "" {
+	if getenv("COLORTERM") != "" {
 		cm.TrueColor = true
 	}
-	cm.TermEnv = os.Getenv("TERM")
+	cm.TermEnv = getenv("TERM")
 	switch cm.TermEnv {
 	case "xterm-256color":
 		cm.Color256 = true
