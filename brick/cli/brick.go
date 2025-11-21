@@ -381,6 +381,7 @@ type BrickConfig struct {
 	Seed     uint64
 	Replay   string
 	AutoPlay bool
+	Ap       *ansipixels.AnsiPixels
 }
 
 func Main() int {
@@ -392,25 +393,26 @@ func Main() int {
 	replay := flag.String("replay", "", "Replay a `game` from a JSON file")
 	autoPlay := flag.Bool("autoplay", false, "Computer plays mode")
 	cli.Main()
+	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	cfg := BrickConfig{
-		FPS:      *fpsFlag,
 		NumLives: *numLives,
 		NoDeath:  *noDeath,
 		NoSave:   *noSave,
 		Seed:     *seed,
 		Replay:   *replay,
 		AutoPlay: *autoPlay,
+		Ap:       ap,
 	}
-	return cfg.Run()
-}
-
-func (cfg *BrickConfig) Run() int {
-	ap := ansipixels.NewAnsiPixels(cfg.FPS)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
 	defer ap.Restore()
+	return cfg.Run()
+}
+
+func (cfg *BrickConfig) Run() int {
+	ap := cfg.Ap
 	ap.HideCursor()
 	ap.Margin = 1
 	if cfg.Replay != "" {
@@ -445,7 +447,7 @@ func (cfg *BrickConfig) Run() int {
 	result := 0
 	n := 0
 
-	err = ap.FPSTicks(func() bool {
+	err := ap.FPSTicks(func() bool {
 		if b.waitForInput && len(ap.Data) == 0 {
 			// Pause mode after resize or death.
 			return true

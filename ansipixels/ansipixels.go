@@ -124,18 +124,11 @@ type AnsiPixels struct {
 	SkipOpen bool
 }
 
-// SharedAnsiPixels is temp hack.
-// TODO: remove / would need to be goroutine local storage.
-var SharedAnsiPixels *AnsiPixels // Used by fortio/sshd to allow multiple/NewAnsiPixels and Open in same process.
-
 // NewAnsiPixels creates a new ansipixels object (to be [Open] post customization if any).
 // A 0 fps means bypassing the interrupt reader and using the underlying os.Stdin directly.
 // Otherwise a non blocking reader is setup with 1/fps timeout. Reader is / can be shared
 // with Terminal.
 func NewAnsiPixels(fps float64) *AnsiPixels {
-	if SharedAnsiPixels != nil {
-		return SharedAnsiPixels
-	}
 	var d time.Duration
 	if fps > 0 {
 		d = time.Duration(1e9 / fps)
@@ -155,7 +148,6 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 	}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
-	SharedAnsiPixels = ap
 	return ap
 }
 

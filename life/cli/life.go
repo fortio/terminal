@@ -16,17 +16,18 @@ func Main() int {
 	noMouseFlag := flag.Bool("nomouse", false, "Disable mouse tracking")
 	cli.Main()
 	game := &conway.Game{HasMouse: !*noMouseFlag}
-	return RunGame(game, *fpsFlag, *flagRandomFill, *flagGlider)
-}
-
-func RunGame(game *conway.Game, fps float64, randomFill float64, glider bool) int {
-	ap := ansipixels.NewAnsiPixels(fps)
+	ap := ansipixels.NewAnsiPixels(*fpsFlag)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
 	game.AP = ap
 	defer game.End()
+	return RunGame(game, *flagRandomFill, *flagGlider)
+}
+
+func RunGame(game *conway.Game, randomFill float64, glider bool) int {
+	ap := game.AP
 	ap.HideCursor()
 	if game.HasMouse {
 		ap.MouseClickOn() // start with just clicks, we turn on drag after a click.
