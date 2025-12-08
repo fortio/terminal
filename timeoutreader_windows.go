@@ -3,7 +3,6 @@
 package terminal
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"syscall"
@@ -31,9 +30,16 @@ type TimeoutReaderWindows struct {
 	mut      sync.Mutex
 }
 
+const fdwMode = windows.ENABLE_EXTENDED_FLAGS
+
 func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration) *TimeoutReaderWindows {
 	if timeout < 0 {
 		panic("Timeout must be greater than or equal to 0")
+	}
+	// if we don't set console mode, the inputrecord struct's values become.... corrupted?
+	err := windows.SetConsoleMode(windows.Handle(stream.Fd()), uint32(fdwMode))
+	if err != nil {
+		// TODO: decide how to handle this
 	}
 	return &TimeoutReaderWindows{
 		handle:   syscall.Handle(os.Stdin.Fd()),
@@ -72,6 +78,9 @@ func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 }
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
+	// TODO: figure out why we need these two lines every time we ReadBlocking but not for ReadWithTimeout
+	fdwMode := windows.ENABLE_EXTENDED_FLAGS
+	_ = windows.SetConsoleMode(windows.Handle(tr.handle), uint32(fdwMode))
 	var iR InputRecord
 	var read uint32
 	err := ReadConsoleInput(syscall.Handle(tr.handle), &iR, 1, &read)
@@ -127,7 +136,6 @@ func ReadWithTimeout(handle syscall.Handle, tv time.Duration, buf []byte) (int, 
 		return 0, err
 	}
 	err = ReadConsoleInput(syscall.Handle(handle), &iR, 1, &read)
-	fmt.Println(iR.Data)
 	if err != nil {
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
@@ -137,6 +145,7 @@ func ReadWithTimeout(handle syscall.Handle, tv time.Duration, buf []byte) (int, 
 		return 0, nil // timeout case
 	}
 	n, err := iR.Read(buf)
+
 	return n, err
 }
 
@@ -183,19 +192,17 @@ type InputRecord struct {
 	Data [8]uint16
 }
 
-// TODO: fully create function to go
+// TODO: fully create function to translate keypresses to buffer
 func (ir *InputRecord) Read(buf []byte) (int, error) {
-	log.Infof("falkdjfas")
-	fmt.Println(ir.Data)
 	switch ir.Type {
 	case 0x1: // key event
 		if ir.Data[1] == 0 {
 			return 0, nil
 		}
 		arrowCheck1, arrowCheck2 := ir.Data[4], ir.Data[5]
-		fmt.Println(arrowCheck1, arrowCheck2)
 		switch {
 		case arrowCheck1 == 38 && arrowCheck2 == 72: // up
+			copy(buf, "\x1b[A")
 			return 3, nil
 		case arrowCheck1 == 40 && arrowCheck2 == 80: // down
 			copy(buf, "\x1b[B")
