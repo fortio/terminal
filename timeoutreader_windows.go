@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"fortio.org/log"
+	"fortio.org/safecast"
 	"golang.org/x/sys/windows"
 )
 
@@ -22,12 +23,12 @@ func NewSystemTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutRead
 }
 
 type TimeoutReaderWindows struct {
-	handle   syscall.Handle
-	timeout  time.Duration
-	blocking bool
-	ostream  *os.File
-	buf      []byte
-	mut      sync.Mutex
+	handle              syscall.Handle
+	timeoutMilliseconds uint32
+	blocking            bool
+	ostream             *os.File
+	buf                 []byte
+	mut                 sync.Mutex
 }
 
 const fdwMode = windows.ENABLE_EXTENDED_FLAGS
@@ -42,10 +43,10 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration) *TimeoutRea
 		// TODO: decide how to handle this
 	}
 	return &TimeoutReaderWindows{
-		handle:   syscall.Handle(os.Stdin.Fd()),
-		timeout:  timeout,
-		blocking: timeout == 0,
-		ostream:  stream,
+		handle:              syscall.Handle(os.Stdin.Fd()),
+		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
+		blocking:            timeout == 0,
+		ostream:             stream,
 	}
 }
 
@@ -74,7 +75,7 @@ func (tr *TimeoutReaderWindows) StartDirect() {
 }
 
 func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
-	tr.timeout = timeout
+	tr.timeoutMilliseconds = safecast.MustConv[uint32](timeout.Milliseconds())
 }
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
@@ -83,7 +84,7 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	_ = windows.SetConsoleMode(windows.Handle(tr.handle), uint32(fdwMode))
 	var iR InputRecord
 	var read uint32
-	err := ReadConsoleInput(syscall.Handle(tr.handle), &iR, 1, &read)
+	err := ReadConsoleInput(tr.handle, &iR, 1, &read)
 	if err != nil {
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
@@ -105,37 +106,36 @@ func (tr *TimeoutReaderWindows) Read(buf []byte) (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(buf)
 	}
-	return ReadWithTimeout(tr.handle, tr.timeout, buf)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf)
 }
 
 func (tr *TimeoutReaderWindows) ReadImmediate() (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(tr.buf)
 	}
-	return ReadWithTimeout(tr.handle, time.Duration(0), tr.buf)
+	return ReadWithTimeout(tr.handle, 0, tr.buf)
 }
 
 func (tr *TimeoutReaderWindows) ReadWithTimeout(buf []byte) (int, error) {
-	return ReadWithTimeout(tr.handle, tr.timeout, buf)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf)
 }
 
 const (
-	WAIT_OBJECT_0 = 0x00000000
-	WAIT_TIMEOUT  = 0x00000102
+	WAITOBJECT0 = 0x00000000
+	WAITTIMEOUT = 0x00000102
 )
 
-func ReadWithTimeout(handle syscall.Handle, tv time.Duration, buf []byte) (int, error) {
+func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte) (int, error) {
 	var iR InputRecord
 	var read uint32
-
-	event, err := windows.WaitForSingleObject(windows.Handle(handle), uint32(tv))
-	if event == WAIT_TIMEOUT {
+	event, err := windows.WaitForSingleObject(windows.Handle(handle), ms)
+	if event == WAITTIMEOUT {
 		return 0, nil
 	}
 	if err != nil {
 		return 0, err
 	}
-	err = ReadConsoleInput(syscall.Handle(handle), &iR, 1, &read)
+	err = ReadConsoleInput(handle, &iR, 1, &read)
 	if err != nil {
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
@@ -192,8 +192,8 @@ type InputRecord struct {
 	Data [8]uint16
 }
 
-// TODO: fully create function to translate keypresses to buffer
 func (ir *InputRecord) Read(buf []byte) (int, error) {
+	// TODO: fully create function to translate keypresses to buffer
 	switch ir.Type {
 	case 0x1: // key event
 		if ir.Data[1] == 0 {
@@ -218,7 +218,7 @@ func (ir *InputRecord) Read(buf []byte) (int, error) {
 		// buf[0] = byte(ir.Data[6])
 		return 1, nil
 	case 0x4: // window buffer size event
-
+		// TODO: decide best approach for handling window size events
 	}
 	return 0, nil
 }
@@ -226,20 +226,21 @@ func (ir *InputRecord) Read(buf []byte) (int, error) {
 func errnoErr(e syscall.Errno) error {
 	switch e {
 	case 0:
-		return errERROR_EINVAL
-	case errnoERROR_IO_PENDING:
-		return errERROR_IO_PENDING
+		return errERROREINVAL
+	case errnoERRORIOPENDING:
+		return errERRORIOPENDING
+	default:
+		return e
 	}
-	return e
 }
 
 // Do the interface allocations only once for common
 // Errno values.
 const (
-	errnoERROR_IO_PENDING = 997
+	errnoERRORIOPENDING = 997
 )
 
 var (
-	errERROR_IO_PENDING error = syscall.Errno(errnoERROR_IO_PENDING)
-	errERROR_EINVAL     error = syscall.EINVAL
+	errERRORIOPENDING error = syscall.Errno(errnoERRORIOPENDING)
+	errERROREINVAL    error = syscall.EINVAL
 )
