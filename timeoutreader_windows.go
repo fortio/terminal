@@ -29,6 +29,7 @@ type TimeoutReaderWindows struct {
 	ostream             *os.File
 	buf                 []byte
 	mut                 sync.Mutex
+	resizeChannel       chan WindowsResize
 }
 
 const fdwMode = windows.ENABLE_EXTENDED_FLAGS
@@ -93,7 +94,7 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	return iR.Read(p)
+	return iR.Read(p, tr.resizeChannel)
 }
 
 func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
@@ -106,18 +107,26 @@ func (tr *TimeoutReaderWindows) Read(buf []byte) (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(buf)
 	}
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.resizeChannel)
 }
 
 func (tr *TimeoutReaderWindows) ReadImmediate() (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(tr.buf)
 	}
-	return ReadWithTimeout(tr.handle, 0, tr.buf)
+	return ReadWithTimeout(tr.handle, 0, tr.buf, tr.resizeChannel)
 }
 
 func (tr *TimeoutReaderWindows) ReadWithTimeout(buf []byte) (int, error) {
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.resizeChannel)
+}
+
+func (tr *TimeoutReaderWindows) resizeLoop() (int, error) {
+	for {
+		select {
+		case size := <-tr.resizeChannel:
+		}
+	}
 }
 
 const (
@@ -125,7 +134,7 @@ const (
 	WAITTIMEOUT = 0x00000102
 )
 
-func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte) (int, error) {
+func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, resizeChannel chan WindowsResize) (int, error) {
 	var iR InputRecord
 	var read uint32
 	event, err := windows.WaitForSingleObject(windows.Handle(handle), ms)
@@ -144,7 +153,7 @@ func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte) (int, error) 
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	n, err := iR.Read(buf)
+	n, err := iR.Read(buf, resizeChannel)
 
 	return n, err
 }
@@ -154,14 +163,15 @@ var (
 	modkernel32           = windows.NewLazySystemDLL("kernel32.dll")
 )
 
-func ReadConsoleInput(console syscall.Handle, rec *InputRecord, toread uint32, read *uint32) (err error) {
+func ReadConsoleInput(console syscall.Handle, rec *InputRecord, toread uint32, read *uint32) error {
 	r1, _, e1 := syscall.Syscall6(procReadConsoleInputW.Addr(), 4,
 		uintptr(console), uintptr(unsafe.Pointer(rec)), uintptr(toread),
 		uintptr(unsafe.Pointer(read)), 0, 0)
+	var err error
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
-	return
+	return err
 }
 
 type InputRecord struct {
@@ -192,7 +202,7 @@ type InputRecord struct {
 	Data [8]uint16
 }
 
-func (ir *InputRecord) Read(buf []byte) (int, error) {
+func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, error) {
 	// TODO: fully create function to translate keypresses to buffer
 	switch ir.Type {
 	case 0x1: // key event
@@ -219,6 +229,7 @@ func (ir *InputRecord) Read(buf []byte) (int, error) {
 		return 1, nil
 	case 0x4: // window buffer size event
 		// TODO: decide best approach for handling window size events
+
 	}
 	return 0, nil
 }
@@ -244,3 +255,7 @@ var (
 	errERRORIOPENDING error = syscall.Errno(errnoERRORIOPENDING)
 	errERROREINVAL    error = syscall.EINVAL
 )
+
+type WindowsResize struct {
+	height, width int
+}
