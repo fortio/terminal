@@ -48,6 +48,7 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration) *TimeoutRea
 		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
 		blocking:            timeout == 0,
 		ostream:             stream,
+		resizeChannel:       make(chan WindowsResize, 1),
 	}
 }
 
@@ -119,14 +120,6 @@ func (tr *TimeoutReaderWindows) ReadImmediate() (int, error) {
 
 func (tr *TimeoutReaderWindows) ReadWithTimeout(buf []byte) (int, error) {
 	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.resizeChannel)
-}
-
-func (tr *TimeoutReaderWindows) resizeLoop() (int, error) {
-	for {
-		select {
-		case size := <-tr.resizeChannel:
-		}
-	}
 }
 
 const (
@@ -228,7 +221,14 @@ func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, 
 		// buf[0] = byte(ir.Data[6])
 		return 1, nil
 	case 0x4: // window buffer size event
-		// TODO: decide best approach for handling window size events
+		bufsize := WindowsResize{
+			height: safecast.MustConv[int](ir.Data[1]),
+			width:  safecast.MustConv[int](ir.Data[2]),
+		}
+		select {
+		case resizeChannel <- bufsize:
+		default:
+		}
 
 	}
 	return 0, nil
