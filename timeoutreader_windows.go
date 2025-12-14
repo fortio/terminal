@@ -218,7 +218,6 @@ func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, 
 			return 3, nil
 		}
 		copy(buf, []byte{byte(ir.Data[6])})
-		// buf[0] = byte(ir.Data[6])
 		return 1, nil
 	case 0x4: // window buffer size event
 		bufsize := WindowsResize{
@@ -229,7 +228,6 @@ func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, 
 		case resizeChannel <- bufsize:
 		default:
 		}
-
 	}
 	return 0, nil
 }
