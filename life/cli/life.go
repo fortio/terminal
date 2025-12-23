@@ -1,18 +1,13 @@
-package main
+package cli
 
 import (
 	"flag"
-	"os"
 
 	"fortio.org/cli"
 	"fortio.org/log"
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/life/conway"
 )
-
-func main() {
-	os.Exit(Main())
-}
 
 func Main() int {
 	fpsFlag := flag.Float64("fps", 60, "Frames per second")
@@ -28,14 +23,19 @@ func Main() int {
 	}
 	game.AP = ap
 	defer game.End()
+	return RunGame(game, *flagRandomFill, *flagGlider)
+}
+
+func RunGame(game *conway.Game, randomFill float64, glider bool) int {
+	ap := game.AP
 	ap.HideCursor()
 	if game.HasMouse {
 		ap.MouseClickOn() // start with just clicks, we turn on drag after a click.
 	}
-	fillFactor := float32(*flagRandomFill)
+	fillFactor := float32(randomFill)
 	ap.OnResize = func() error {
 		game.C = conway.NewConway(ap.W, 2*ap.H) // half pixels vertically.
-		if *flagGlider {
+		if glider {
 			game.C.Glider(ap.W/3, 2*ap.H/3) // first third of the screen
 		} else {
 			// Random
