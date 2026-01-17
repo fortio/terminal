@@ -36,3 +36,8 @@ flags:
   -wide
         Draw a wide border around the cards
 ```
+
+## Bugs
+
+Ghostty has a bug on macos where it picks a different glyph for just the heart causing it to look hollow and double the width of the others.
+Maybe they'll fix it. Reported April 2025. See https://github.com/fortio/terminal/pull/213
