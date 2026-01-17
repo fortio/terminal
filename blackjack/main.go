@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"runtime"
 
 	clishell "fortio.org/cli"
 	"fortio.org/terminal/ansipixels"
@@ -34,9 +33,6 @@ func main() {
 	}
 	if *initialBalance < *betAmount {
 		log.Fatalf("Initial balance (%d) must be at least the bet amount (%d)", *initialBalance, *betAmount)
-	}
-	if runtime.GOOS == "darwin" && os.Getenv("TERM") == "xterm-ghostty" {
-		cli.Heart = "❤"
 	}
 	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
