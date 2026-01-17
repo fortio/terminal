@@ -45,14 +45,15 @@ type Game struct {
 	message     string
 }
 
-// Heart symbol used in the blackjack game.
-// Because of https://github.com/ghostty-org/ghostty/discussions/7204
-// we change ♥ to ❤ (the wrong one) for ghostty on macos.
-var Heart = "♥"
+// Heart symbol used in the blackjack game used to be configurable because
+// (only) Ghostty is broken and maybe will get fixed some day...
+// https://github.com/ghostty-org/ghostty/discussions/7204
+// Removing this idiotic workaround (before we switched
+// ♥ to ❤ (the wrong one) for ghostty on macos, not anymore).
 
 // InitDeck initializes a new shuffled deck.
 func (g *Game) InitDeck(numDecks int) {
-	suits := []string{"♠", Heart, "♦", "♣"}
+	suits := []string{"♠", "♥", "♦", "♣"}
 	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "1 0", "J", "Q", "K"}
 
 	g.deck = &Deck{
@@ -110,7 +111,7 @@ func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	}
 	// Top suit
 	var cardContent string
-	if card.Suit == Heart || card.Suit == "♦" {
+	if card.Suit == "♥" || card.Suit == "♦" {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
 	} else {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)

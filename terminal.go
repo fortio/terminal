@@ -190,7 +190,7 @@ func (t *Terminal) AddToHistory(commands ...string) {
 
 // History returns the current history state.
 func (t *Terminal) History() []string {
-	res := []string{}
+	res := make([]string, 0, t.term.History.Len())
 	for i := range t.term.History.Len() {
 		res = append(res, t.term.History.At(i))
 	}
