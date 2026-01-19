@@ -351,7 +351,7 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	defer func() {
 		timer.Stop()
 	}()
-	// Flush the output to set terminal modes, in case no sync mode is used for a while or at all (e.g tev -ticks).
+	// Flush the output in case no sync mode is used for a while.
 	ap.Out.Flush()
 	// Start the reading ahead of frames. Needed for windows and non fd based readers.
 	ap.SharedInput.PrimeReadImmediate(ap.buf[0:bufSize])
