@@ -321,9 +321,6 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 // ReadOrResizeOrSignal reads something or return terminal.ErrSignal if signal is received (normal exit requested case),
 // will automatically call OnResize if set and if a resize signal is received and continue trying to read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
-	if !ap.NoDecode {
-		ap.EndSyncMode()
-	}
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -351,6 +348,8 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	defer func() {
 		timer.Stop()
 	}()
+	// Flush the output in case no sync mode is used for a while.
+	ap.Out.Flush()
 	// Start the reading ahead of frames. Needed for windows and non fd based readers.
 	ap.SharedInput.PrimeReadImmediate(ap.buf[0:bufSize])
 	for {
