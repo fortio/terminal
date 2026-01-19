@@ -19,6 +19,7 @@ func (ap *AnsiPixels) SyncBackgroundColor() bool {
 		return true
 	}
 	ap.RequestBackgroundColor()
+	ap.Out.Flush()
 	_ = ap.ReadOrResizeOrSignal()
 	ap.Transparency = ap.OSCDecode()
 	return ap.GotBackground // Same as ap.Transparency now.
