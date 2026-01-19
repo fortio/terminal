@@ -320,6 +320,9 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 
 // ReadOrResizeOrSignal reads something or return terminal.ErrSignal if signal is received (normal exit requested case),
 // will automatically call OnResize if set and if a resize signal is received and continue trying to read.
+// Note that if you are handling start/end sync mode yourself (eg. in FPSTicks with AutoSync false or
+// additional manual reads) you might need to call EndSyncMode or Out.Flush before calling this for latest output
+// to be visible to the user before this blocking read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
