@@ -31,6 +31,7 @@ func RunGame(game *conway.Game, randomFill float64, glider bool) int {
 	ap.HideCursor()
 	if game.HasMouse {
 		ap.MouseClickOn() // start with just clicks, we turn on drag after a click.
+		ap.MouseShiftOn()
 	}
 	fillFactor := float32(randomFill)
 	ap.OnResize = func() error {
