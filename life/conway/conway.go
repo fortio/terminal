@@ -192,6 +192,7 @@ func (g *Game) Next() {
 func (g *Game) End() {
 	g.AP.MouseTrackingOff()
 	g.AP.MouseClickOff()
+	g.AP.MouseShiftOff()
 	g.AP.ShowCursor()
 	g.AP.MoveCursor(0, g.AP.H-2)
 	g.AP.Restore()
