@@ -44,6 +44,7 @@ const (
 
 	Bold       = "\x1b[1m"
 	Dim        = "\x1b[2m"
+	Italic     = "\x1b[3m"
 	Underlined = "\x1b[4m"
 	Blink      = "\x1b[5m"
 

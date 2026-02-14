@@ -103,7 +103,7 @@ func (t *Terminal) Setup(ctx context.Context) error {
 // This is called automatically when the terminal is opened, but can be called
 // again if the terminal size changes (e.g. when resizing the window).
 func (t *Terminal) UpdateSize() error {
-	w, h, err := term.GetSize(t.fdOut)
+	w, h, err := platformGetSize(t.fdOut)
 	if err != nil {
 		log.Errf("Error getting terminal size: %v", err)
 		return err
@@ -126,7 +126,7 @@ func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, contex
 }
 
 func (t *Terminal) IsTerminal() bool {
-	return term.IsTerminal(t.fd)
+	return platformIsTerminal(t.fd)
 }
 
 // LoggerSetup sets up fortio logger (and thus stdlib "log" too)
@@ -190,7 +190,7 @@ func (t *Terminal) AddToHistory(commands ...string) {
 
 // History returns the current history state.
 func (t *Terminal) History() []string {
-	res := []string{}
+	res := make([]string, 0, t.term.History.Len())
 	for i := range t.term.History.Len() {
 		res = append(res, t.term.History.At(i))
 	}
@@ -324,12 +324,19 @@ func (t *Terminal) Close() error {
 	// t.Out = os.Stdout // races during exit.
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.
+	t.SaveHistory()
+	return err
+}
+
+// SaveHistory saves the current history to the history file set by [SetHistoryFile].
+// This is also called automatically by [Close]. This method allows callers to
+// flush history at any time (e.g., before a WASM page unload).
+func (t *Terminal) SaveHistory() {
 	if t.historyFile == "" || t.capacity <= 0 {
 		log.Debugf("No history file %q or capacity %d, not saving history", t.historyFile, t.capacity)
-		return nil
+		return
 	}
 	h := t.History()
-	// log.LogVf("got history %v", h)
 	slices.Reverse(h)
 	extra := len(h) - t.capacity
 	if extra > 0 {
@@ -337,7 +344,6 @@ func (t *Terminal) Close() error {
 	}
 	log.Infof("Saving history (%d commands) to %s", len(h), t.historyFile)
 	saveHistory(t.historyFile, h)
-	return err
 }
 
 // ReadLine reads a line from the terminal using the setup prompt and history

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -15,10 +15,6 @@ import (
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
 )
-
-func main() {
-	os.Exit(Main())
-}
 
 type MoveRecord struct {
 	Frame     uint64
@@ -377,6 +373,17 @@ func (b *Brick) SaveGame() int {
 	return 0
 }
 
+type BrickConfig struct {
+	FPS      float64
+	NumLives int
+	NoDeath  bool
+	NoSave   bool
+	Seed     uint64
+	Replay   string
+	AutoPlay bool
+	Ap       *ansipixels.AnsiPixels
+}
+
 func Main() int {
 	fpsFlag := flag.Float64("fps", 30, "Frames per second")
 	numLives := flag.Int("lives", 3, "Number of lives - 0 is infinite")
@@ -387,17 +394,31 @@ func Main() int {
 	autoPlay := flag.Bool("autoplay", false, "Computer plays mode")
 	cli.Main()
 	ap := ansipixels.NewAnsiPixels(*fpsFlag)
+	cfg := BrickConfig{
+		NumLives: *numLives,
+		NoDeath:  *noDeath,
+		NoSave:   *noSave,
+		Seed:     *seed,
+		Replay:   *replay,
+		AutoPlay: *autoPlay,
+		Ap:       ap,
+	}
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("Error opening AnsiPixels: %v", err)
 	}
 	defer ap.Restore()
+	return cfg.Run()
+}
+
+func (cfg *BrickConfig) Run() int {
+	ap := cfg.Ap
 	ap.HideCursor()
 	ap.Margin = 1
-	if *replay != "" {
-		return ReplayGame(ap, *replay)
+	if cfg.Replay != "" {
+		return ReplayGame(ap, cfg.Replay)
 	}
-	seedV := *seed
+	seedV := cfg.Seed
 	if seedV == 0 {
 		seedV = safecast.MustConv[uint64](time.Now().UnixNano() % (1<<16 - 1))
 	}
@@ -409,8 +430,8 @@ func Main() int {
 		if b != nil {
 			prevInfo = b.ShowInfo
 		}
-		b = NewBrick(ap.W, ap.H, *numLives, !*noDeath, seedV) // half pixels vertically.
-		b.Auto = *autoPlay
+		b = NewBrick(ap.W, ap.H, cfg.NumLives, !cfg.NoDeath, seedV) // half pixels vertically.
+		b.Auto = cfg.AutoPlay
 		b.ShowInfo = prevInfo
 		Draw(ap, b)
 		ap.WriteCentered(ap.H/2+1, "Any key to start...")
@@ -426,13 +447,13 @@ func Main() int {
 	result := 0
 	n := 0
 
-	err = ap.FPSTicks(func() bool {
+	err := ap.FPSTicks(func() bool {
 		if b.waitForInput && len(ap.Data) == 0 {
 			// Pause mode after resize or death.
 			return true
 		}
 		if handleKeys(ap, b) {
-			if !*noSave {
+			if !cfg.NoSave {
 				result = b.SaveGame()
 			}
 			return false // exit the loop
@@ -540,6 +561,6 @@ func atEnd(ap *ansipixels.AnsiPixels, b *Brick) {
 	b.ShowInfo = true
 	showInfo(ap, b)
 	ap.MoveCursor(0, ap.H-PaddleYDelta) // so 0,1 is great for shells that don't clear the bottom of the screen... yet zsh does that.
-	ap.Out.Flush()
+	ap.EndSyncMode()
 	_ = ap.ReadOrResizeOrSignal()
 }

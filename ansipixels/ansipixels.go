@@ -120,6 +120,8 @@ type AnsiPixels struct {
 	logbuffer terminal.FlushableBytesBuffer
 	// Setup fortio logger unless this is set to false (defaults to true in NewAnsiPixels, clear before Open if desired).
 	AutoLoggerSetup bool
+	// Skip open (already opened/setup, eg by fortio/sshd).
+	SkipOpen bool
 }
 
 // NewAnsiPixels creates a new ansipixels object (to be [Open] post customization if any).
@@ -144,7 +146,6 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		ap.W, ap.H, err = term.GetSize(fdOut)
 		return err
 	}
-	ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
 	ap.ColorMode = DetectColorMode()
 	ap.ColorOutput = tcolor.ColorOutput{TrueColor: ap.TrueColor}
 	return ap
@@ -164,17 +165,23 @@ func (ap *AnsiPixels) ChangeFPS(fps float64) {
 //
 //	defaultTrueColor := ansipixels.DetectColorMode().TrueColor
 func DetectColorMode() (cm ColorMode) {
+	return DetectColorModeEnv(os.Getenv)
+}
+
+// DetectColorModeEnv is like DetectColorMode but takes a function to get environment variables.
+// Useful for testing or for sshdtui.
+func DetectColorModeEnv(getenv func(string) string) (cm ColorMode) {
 	cm.MonoColor = tcolor.Blue // default mono (16) color
-	if os.Getenv("NO_COLOR") != "" {
+	if getenv("NO_COLOR") != "" {
 		cm.Color256 = false
 		cm.TrueColor = false
 		cm.MonoColor = tcolor.White
 		return cm
 	}
-	if os.Getenv("COLORTERM") != "" {
+	if getenv("COLORTERM") != "" {
 		cm.TrueColor = true
 	}
-	cm.TermEnv = os.Getenv("TERM")
+	cm.TermEnv = getenv("TERM")
 	switch cm.TermEnv {
 	case "xterm-256color":
 		cm.Color256 = true
@@ -197,6 +204,12 @@ func (ap *AnsiPixels) Open() error {
 	ap.firstClear = true
 	ap.restored = false
 	ap.ColorOutput.TrueColor = ap.TrueColor // sync, in case it was changed by flags from auto detect.
+	if ap.Logger == nil {
+		ap.Logger = &terminal.SyncWriter{Out: &ap.logbuffer}
+	}
+	if ap.SkipOpen {
+		return nil
+	}
 	err := ap.SharedInput.RawMode()
 	if err == nil {
 		err = ap.GetSize()
@@ -307,10 +320,10 @@ func (ap *AnsiPixels) HandleSignal(s os.Signal) error {
 
 // ReadOrResizeOrSignal reads something or return terminal.ErrSignal if signal is received (normal exit requested case),
 // will automatically call OnResize if set and if a resize signal is received and continue trying to read.
+// Note that if you are handling start/end sync mode yourself (eg. in FPSTicks with AutoSync false or
+// additional manual reads) you might need to call EndSyncMode or Out.Flush before calling this for latest output
+// to be visible to the user before this blocking read.
 func (ap *AnsiPixels) ReadOrResizeOrSignal() error {
-	if !ap.NoDecode {
-		ap.EndSyncMode()
-	}
 	for {
 		n, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
@@ -338,6 +351,8 @@ func (ap *AnsiPixels) FPSTicks(callback func() bool) error {
 	defer func() {
 		timer.Stop()
 	}()
+	// Flush the output to set terminal modes, in case no sync mode is used for a while or at all (e.g tev -ticks).
+	ap.Out.Flush()
 	// Start the reading ahead of frames. Needed for windows and non fd based readers.
 	ap.SharedInput.PrimeReadImmediate(ap.buf[0:bufSize])
 	for {

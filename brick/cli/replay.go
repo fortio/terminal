@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -98,6 +98,7 @@ func replayGame(ap *ansipixels.AnsiPixels, b *Brick, numFrames uint64) int {
 		} else {
 			ap.WriteCentered(ap.H/2, "%s🔂 Replay done... any key to exit...", ansipixels.Reset)
 			ap.MoveCursor(0, 1)
+			ap.Out.Flush()
 			_ = ap.ReadOrResizeOrSignal()
 			return 0
 		}

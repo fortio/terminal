@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"fortio.org/log"
-	"golang.org/x/term"
 )
 
 // DefaultReaderTimeout is the default timeout for the timeout reader.
@@ -49,7 +48,7 @@ func (ir *InterruptReader) RawMode() error {
 	}
 	fd := ir.In.Fd()
 	var err error
-	ir.st, err = term.MakeRaw(int(fd))
+	ir.st, err = platformMakeRaw(int(fd))
 	ir.mu.Unlock()
 	if err != nil {
 		log.Errf("Failed to set raw mode: %v", err)
@@ -66,7 +65,7 @@ func (ir *InterruptReader) NormalMode() error {
 		log.Debugf("NormalMode already set - noop")
 		return nil
 	}
-	err := term.Restore(int(ir.In.Fd()), ir.st)
+	err := platformRestore(int(ir.In.Fd()), ir.st)
 	ir.st = nil
 	ir.mu.Unlock()
 	return err

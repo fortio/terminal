@@ -1,14 +1,9 @@
-package main
+package cli
 
 import (
-	"flag"
 	"fmt"
 	"math/rand/v2"
-	"os"
-	"runtime"
 
-	"fortio.org/cli"
-	"fortio.org/log"
 	"fortio.org/terminal/ansipixels"
 )
 
@@ -35,29 +30,30 @@ const (
 
 // Game represents the blackjack game state.
 type Game struct {
-	ap          *ansipixels.AnsiPixels
+	AP          *ansipixels.AnsiPixels
+	Playing     bool
+	State       GameState
+	Balance     int
+	Bet         int
+	BorderColor string
+	BorderBG    string
+	WideBorder  bool
+	first       bool
 	deck        *Deck
 	player      []Card
 	dealer      []Card
-	playing     bool
-	state       GameState
 	message     string
-	balance     int
-	bet         int
-	borderColor string
-	borderBG    string
-	wideBorder  bool
-	first       bool
 }
 
-// Heart symbol used in the blackjack game.
-// Because of https://github.com/ghostty-org/ghostty/discussions/7204
-// we change ♥ to ❤ (the wrong one) for ghostty on macos.
-var Heart = "♥"
+// Heart symbol used in the blackjack game used to be configurable because
+// (only) Ghostty is broken and maybe will get fixed some day...
+// https://github.com/ghostty-org/ghostty/discussions/7204
+// Removing this idiotic workaround (before we switched
+// ♥ to ❤ (the wrong one) for ghostty on macos, not anymore).
 
-// initDeck initializes a new shuffled deck.
-func (g *Game) initDeck(numDecks int) {
-	suits := []string{"♠", Heart, "♦", "♣"}
+// InitDeck initializes a new shuffled deck.
+func (g *Game) InitDeck(numDecks int) {
+	suits := []string{"♠", "♥", "♦", "♣"}
 	values := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "1 0", "J", "Q", "K"}
 
 	g.deck = &Deck{
@@ -85,7 +81,7 @@ func (g *Game) drawCard() Card {
 	card := g.deck.Cards[0]
 	g.deck.Cards = g.deck.Cards[1:]
 	if len(g.deck.Cards) == 0 {
-		g.initDeck(g.deck.Decks)
+		g.InitDeck(g.deck.Decks)
 		g.message = "New deck shuffled!"
 	}
 	return card
@@ -100,39 +96,39 @@ const (
 // drawCardOnScreen draws a card on the screen at the specified position.
 func (g *Game) drawCardOnScreen(x, y int, card Card, hidden bool) {
 	// Draw card border: mostly redundant with the outer one except for the middle in between cards
-	if g.borderColor != "" {
-		g.ap.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.borderColor, false)
+	if g.BorderColor != "" {
+		g.AP.DrawColoredBox(x-1, y-1, cardWidth+1, cardHeight+1, g.BorderColor, false)
 	}
 	// Draw card content
-	g.ap.MoveCursor(x, y)
+	g.AP.MoveCursor(x, y)
 	if hidden {
-		g.ap.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
-		g.ap.MoveCursor(x, y+1)
-		g.ap.WriteString(cardBack)
-		g.ap.MoveCursor(x, y+2)
-		g.ap.WriteString(cardBack + ansipixels.Reset)
+		g.AP.WriteString(ansipixels.WhiteBG + ansipixels.Black + cardBack)
+		g.AP.MoveCursor(x, y+1)
+		g.AP.WriteString(cardBack)
+		g.AP.MoveCursor(x, y+2)
+		g.AP.WriteString(cardBack + ansipixels.Reset)
 		return
 	}
 	// Top suit
 	var cardContent string
-	if card.Suit == Heart || card.Suit == "♦" {
+	if card.Suit == "♥" || card.Suit == "♦" {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Red, card.Suit)
 	} else {
 		cardContent = fmt.Sprintf("%s%s    ", ansipixels.WhiteBG+ansipixels.Black, card.Suit)
 	}
-	g.ap.WriteString(cardContent)
+	g.AP.WriteString(cardContent)
 	// Center value
-	g.ap.MoveCursor(x, y+1)
+	g.AP.MoveCursor(x, y+1)
 	if len(card.Value) == 1 {
 		cardContent = fmt.Sprintf("  %s  ", card.Value)
 	} else { // "1 0"
 		cardContent = fmt.Sprintf(" %s ", card.Value)
 	}
-	g.ap.WriteString(cardContent)
+	g.AP.WriteString(cardContent)
 	// Bottom suit
-	g.ap.MoveCursor(x, y+2)
+	g.AP.MoveCursor(x, y+2)
 	cardContent = fmt.Sprintf("    %s%s", card.Suit, ansipixels.Reset)
-	g.ap.WriteString(cardContent)
+	g.AP.WriteString(cardContent)
 }
 
 // drawHand draws a hand of cards at the specified position.
@@ -144,8 +140,8 @@ func (g *Game) drawHand(x, y int, cards []Card, hideFirst bool) {
 	}
 	// For wide mode: erase top/bottom thin border and add extra bars
 	// vertically so space around cards is even on height vs width (as pixels are 2x tall than wide)
-	if g.borderColor != "" && g.wideBorder {
-		g.ap.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.borderBG, true)
+	if g.BorderColor != "" && g.WideBorder {
+		g.AP.DrawColoredBox(x-1, y-1, cardWidth*len(cards)+1, cardHeight+1, g.BorderBG, true)
 	}
 }
 
@@ -188,15 +184,15 @@ func (g *Game) isBlackjack(hand []Card) bool {
 // Run starts the game loop.
 func (g *Game) Run() {
 	defer func() {
-		g.ap.MoveCursor(0, g.ap.H-1)
-		g.ap.Restore()
+		g.AP.MoveCursor(0, g.AP.H-1)
+		g.AP.Restore()
 	}()
 
 	// Initial deal
 	g.resetGame()
 	g.first = true
 
-	for g.playing {
+	for g.Playing {
 		g.draw()
 		if g.first {
 			g.first = false
@@ -204,42 +200,42 @@ func (g *Game) Run() {
 Aces are either 1pt or 11pts. Blackjack (21 in 2 cards) pays 3:2.
 Dealer always hits (gets another card) on 16pts or less,
 stands (no more card) on 17pts or more. Space to continue.`
-			g.ap.WriteBoxed(g.ap.H/2-1, "%s", helpText)
+			g.AP.WriteBoxed(g.AP.H/2-1, "%s", helpText)
 		}
-		if g.state == StatePlayerTurn && g.calculateHand(g.player) == 21 {
-			g.state = StateDealerTurn
+		if g.State == StatePlayerTurn && g.calculateHand(g.player) == 21 {
+			g.State = StateDealerTurn
 			g.dealerTurn()
 			g.draw()
 		}
 		// Handle input
-		err := g.ap.ReadOrResizeOrSignal()
+		err := g.AP.ReadOrResizeOrSignal()
 		if err != nil {
 			break
 		}
 
 		// Process input based on game state
-		if len(g.ap.Data) > 0 {
-			switch g.ap.Data[0] {
+		if len(g.AP.Data) > 0 {
+			switch g.AP.Data[0] {
 			case 'q', 'Q':
-				g.playing = false
+				g.Playing = false
 			default:
-				switch g.state {
+				switch g.State {
 				case StatePlayerTurn:
-					switch g.ap.Data[0] {
+					switch g.AP.Data[0] {
 					case 'h', 'H':
 						g.player = append(g.player, g.drawCard())
 						playerScore := g.calculateHand(g.player)
 						if playerScore > 21 {
-							g.state = StateGameOver
-							g.message = fmt.Sprintf("Bust! You lose $%d!", g.bet)
-							g.balance -= g.bet
+							g.State = StateGameOver
+							g.message = fmt.Sprintf("Bust! You lose $%d!", g.Bet)
+							g.Balance -= g.Bet
 						}
 					case 's', 'S':
-						g.state = StateDealerTurn
+						g.State = StateDealerTurn
 						g.dealerTurn()
 					}
 				case StateGameOver:
-					if g.balance >= g.bet {
+					if g.Balance >= g.Bet {
 						g.resetGame()
 					}
 				case StateDealerTurn:
@@ -262,11 +258,11 @@ func (g *Game) dealerTurn() {
 			g.message = "Both have blackjack! Push! Your bet is returned."
 		} else {
 			// 3:2 payout for blackjack
-			winnings := (g.bet * 3) / 2
+			winnings := (g.Bet * 3) / 2
 			g.message = fmt.Sprintf("Blackjack! You win $%d!", winnings)
-			g.balance += winnings
+			g.Balance += winnings
 		}
-		g.state = StateGameOver
+		g.State = StateGameOver
 		return
 	}
 
@@ -279,62 +275,62 @@ func (g *Game) dealerTurn() {
 	// Determine winner and update balance
 	switch {
 	case dealerScore > 21:
-		g.message = fmt.Sprintf("Dealer busts! You win $%d!", g.bet)
-		g.balance += g.bet
+		g.message = fmt.Sprintf("Dealer busts! You win $%d!", g.Bet)
+		g.Balance += g.Bet
 	case dealerScore > playerScore:
-		g.message = fmt.Sprintf("Dealer wins! You lose $%d!", g.bet)
-		g.balance -= g.bet
+		g.message = fmt.Sprintf("Dealer wins! You lose $%d!", g.Bet)
+		g.Balance -= g.Bet
 	case dealerScore < playerScore:
-		g.message = fmt.Sprintf("You win $%d!", g.bet)
-		g.balance += g.bet
+		g.message = fmt.Sprintf("You win $%d!", g.Bet)
+		g.Balance += g.Bet
 	default:
 		g.message = "Push! Your bet is returned."
 	}
 
-	g.state = StateGameOver
+	g.State = StateGameOver
 }
 
 // resetGame resets the game state for a new round.
 func (g *Game) resetGame() {
 	// Check if player has enough balance
-	if g.balance < g.bet {
-		g.message = fmt.Sprintf("Not enough balance! You have $%d but need $%d to play.", g.balance, g.bet)
+	if g.Balance < g.Bet {
+		g.message = fmt.Sprintf("Not enough balance! You have $%d but need $%d to play.", g.Balance, g.Bet)
 		return
 	}
 
 	g.player = []Card{g.drawCard(), g.drawCard()}
 	g.dealer = []Card{g.drawCard(), g.drawCard()}
-	g.state = StatePlayerTurn
+	g.State = StatePlayerTurn
 	g.message = ""
 }
 
 func (g *Game) LeftMostCardPos(numCards int) int {
 	// Calculate the starting horizontal position for the cards
 	width := cardWidth*numCards - 1 // -1 because of right space on last card
-	return (g.ap.W - width) / 2
+	return (g.AP.W - width) / 2
 }
 
 // draw draws the current game state.
 func (g *Game) draw() {
-	g.ap.ClearScreen()
+	g.AP.ClearScreen()
 
 	// Draw balance and bet
-	g.ap.WriteAt(2, 1, "Balance: $%d", g.balance)
-	g.ap.WriteRight(1, "Bet: $%d   ", g.bet)
+	g.AP.WriteAt(2, 1, "Balance: $%d", g.Balance)
+	g.AP.WriteRight(1, "Bet: $%d   ", g.Bet)
 
 	// Draw dealer's hand
-	g.ap.WriteCentered(2, "Dealer's Hand")
+	g.AP.WriteCentered(2, "Dealer's Hand")
 	dealerOffset := g.LeftMostCardPos(len(g.dealer))
-	g.drawHand(dealerOffset, 5, g.dealer, g.state == StatePlayerTurn)
+	g.drawHand(dealerOffset, 5, g.dealer, g.State == StatePlayerTurn)
 
 	// Draw player's hand
-	g.ap.WriteCentered(g.ap.H-12, "Your Hand")
+	g.AP.WriteCentered(g.AP.H-12, "Your Hand")
 	playerOffset := g.LeftMostCardPos(len(g.player))
-	g.drawHand(playerOffset, g.ap.H-9, g.player, false)
+	g.drawHand(playerOffset, g.AP.H-9, g.player, false)
 
 	// Draw scores
 	dealerScore := g.calculateHand(g.dealer)
-	if g.state == StatePlayerTurn {
+	if g.State == StatePlayerTurn {
 		dealerScore = g.calculateHand(g.dealer[1:]) // Only show visible cards
 	}
 	playerScore := g.calculateHand(g.player)
@@ -345,114 +341,57 @@ func (g *Game) draw() {
 		extraText = " (Blackjack!)"
 	}
 
-	g.ap.WriteAt(2, g.ap.H-2, "Your Score: %d%s", playerScore, extraText)
-	g.ap.WriteRight(g.ap.H-2, "Dealer's Score: %d   ", dealerScore)
+	g.AP.WriteAt(2, g.AP.H-2, "Your Score: %d%s", playerScore, extraText)
+	g.AP.WriteRight(g.AP.H-2, "Dealer's Score: %d   ", dealerScore)
 
 	// Draw game message
 	if g.message != "" {
-		g.ap.WriteCentered(g.ap.H-3, "%s", g.message)
+		g.AP.WriteCentered(g.AP.H-3, "%s", g.message)
 	}
 
 	// Number of cards left in the deck:
 	cardsLeft := len(g.deck.Cards)
 	totalCards := 52 * g.deck.Decks
-	g.ap.WriteRight(g.ap.H-1, "%d cards   ", cardsLeft)
+	g.AP.WriteRight(g.AP.H-1, "%d cards   ", cardsLeft)
 
 	// Draw deck size indicator
 	percentage := float64(cardsLeft) / float64(totalCards)
-	indicatorHeight := int(2 * float64(g.ap.H-4) * percentage) // -4 to account for scores and instructions
+	indicatorHeight := int(2 * float64(g.AP.H-4) * percentage) // -4 to account for scores and instructions
 
 	// Draw the indicator from bottom to top using half-height pixels
 	for y := 0; y < indicatorHeight-1; y += 2 {
-		g.ap.MoveCursor(g.ap.W-1, g.ap.H-3-y/2)
-		g.ap.WriteRune(ansipixels.FullPixel)
+		g.AP.MoveCursor(g.AP.W-1, g.AP.H-3-y/2)
+		g.AP.WriteRune(ansipixels.FullPixel)
 	}
 	if indicatorHeight%2 == 1 {
-		g.ap.MoveCursor(g.ap.W-1, g.ap.H-3-indicatorHeight/2)
-		g.ap.WriteRune(ansipixels.BottomHalfPixel)
+		g.AP.MoveCursor(g.AP.W-1, g.AP.H-3-indicatorHeight/2)
+		g.AP.WriteRune(ansipixels.BottomHalfPixel)
 	}
-
 	// Draw instructions
-	switch g.state {
+	switch g.State {
 	case StatePlayerTurn:
-		g.ap.WriteCentered(g.ap.H-1, "Press 'h' to hit, 's' to stand, 'q' to quit")
+		g.AP.WriteCentered(g.AP.H-1, "Press 'h' to hit, 's' to stand, 'q' to quit")
 	case StateGameOver:
-		if g.balance >= g.bet {
-			g.ap.WriteCentered(g.ap.H-1, "Any key for new game, 'q' to quit")
+		if g.Balance >= g.Bet {
+			g.AP.WriteCentered(g.AP.H-1, "Any key for new game, 'q' to quit")
 		} else {
-			g.ap.WriteCentered(g.ap.H-1, "Press 'q' to quit")
+			g.AP.WriteCentered(g.AP.H-1, "Press 'q' to quit")
 		}
 	case StateDealerTurn:
 		// nothing
 	}
-
-	g.ap.EndSyncMode()
+	g.AP.EndSyncMode()
 }
 
-func main() {
-	initialBalance := flag.Int("balance", 100, "Initial balance in `dollars`")
-	betAmount := flag.Int("bet", 10, "Bet amount in `dollars`")
-	numDecks := flag.Int("decks", 4, "Number of decks to use")
-	fps := flag.Float64("fps", 60, "Frames per second (for resize/refreshes/animations)")
-	greenFlag := flag.Bool("green", false, "Use green instead of black around the cards")
-	noBorder := flag.Bool("no-border", false, "Don't draw the border at all around the cards")
-	wideBorder := flag.Bool("wide", false, "Draw a wide border around the cards")
-	cli.Main()
-	if *fps < 1 {
-		log.Fatalf("Invalid fps (%f) must be at least 1", *fps)
-	}
-	if *fps > 100000 {
-		log.Fatalf("Invalid fps (%f) must be less than 100000", *fps)
-	}
-	if *numDecks < 1 {
-		log.Fatalf("Invalid number of decks (%d) must be at least 1", *numDecks)
-	}
-	if *betAmount < 1 {
-		log.Fatalf("Invalid bet amount (%d) must be at least 1", *betAmount)
-	}
-	if *initialBalance < *betAmount {
-		log.Fatalf("Initial balance (%d) must be at least the bet amount (%d)", *initialBalance, *betAmount)
-	}
-	if runtime.GOOS == "darwin" && os.Getenv("TERM") == "xterm-ghostty" {
-		Heart = "❤"
-	}
-
-	ap := ansipixels.NewAnsiPixels(*fps)
-	err := ap.Open()
-	if err != nil {
-		panic(err)
-	}
-
-	game := &Game{
-		ap:          ap,
-		playing:     true,
-		state:       StatePlayerTurn,
-		balance:     *initialBalance,
-		bet:         *betAmount,
-		borderColor: ansipixels.Black,
-		borderBG:    ansipixels.BlackBG,
-		wideBorder:  *wideBorder,
-	}
-	if *wideBorder {
-		game.borderColor = ansipixels.BlackBG
-	}
-	if *greenFlag {
-		game.borderColor = ansipixels.Green
-		game.borderBG = ansipixels.GreenBG
-	}
-	if *noBorder {
-		game.borderColor = ""
-		game.borderBG = ""
-	}
-	game.initDeck(*numDecks)
-
+func (g *Game) RunGame(ap *ansipixels.AnsiPixels) int {
 	// Handle terminal resize
 	ap.OnResize = func() error {
 		ap.ClearScreen()
 		ap.StartSyncMode()
-		game.draw()
+		g.draw()
 		ap.EndSyncMode()
 		return nil
 	}
-	game.Run()
+	g.Run()
+	return 0
 }

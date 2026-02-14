@@ -12,10 +12,8 @@ import (
 // MouseClickOn turns on mouse click and wheel tracking.
 // It will set decoded Mx, My, MButtons, Mouse flag etc... and call OnMouse.
 // If you call *On do call *Off in your defer restore.
+// If you need to see Shift-Clicks you also need to call MouseShiftOn.
 func (ap *AnsiPixels) MouseClickOn() {
-	// https://github.com/ghostty-org/website/blob/main/docs/vt/csi/xtshiftescape.mdx
-	// Let us see shift key modifiers:
-	ap.WriteString("\033[>1s")
 	// Set the SGR mouse mode (SGR = Select Graphic Rendition) to be able to get coordinates
 	// past 95 in windows terminal and past 223 for everyone else:
 	ap.WriteString("\033[?1006h")
@@ -29,14 +27,26 @@ func (ap *AnsiPixels) MouseClickOff() {
 // MouseTrackingOn turns on tracking for mouse movements and click tracking.
 // It will set decoded Mx, My, MButtons, Mouse flag etc... and call OnMouse.
 // If you call *On do call *Off in your defer restore.
+// If you need to see Shift mouse events you also need to call MouseShiftOn.
 func (ap *AnsiPixels) MouseTrackingOn() {
-	// https://ghostty.org/docs/vt/csi/xtshiftescape
-	// Let us see shift key modifiers:
-	ap.WriteString("\033[>1s")
 	// Set the SGR mouse mode (SGR = Select Graphic Rendition) to be able to get coordinates
 	// past 95 in windows terminal and past 223 for everyone else:
 	ap.WriteString("\033[?1006h")
 	ap.WriteString("\033[?1003h")
+}
+
+// MouseShiftOn also request Shift modifier reporting by the terminal (for clicks and movements
+// requested via MouseClickOn and MouseTrackingOn). It's important to call MouseShiftOff in defer
+// to avoid breaking shift-selection in other TUIs.
+func (ap *AnsiPixels) MouseShiftOn() {
+	// https://ghostty.org/docs/vt/csi/xtshiftescape
+	// Let us see shift key modifiers:
+	ap.WriteString("\033[>1s")
+}
+
+// MouseShiftOff stops reporting Shift modifier in mouse events.
+func (ap *AnsiPixels) MouseShiftOff() {
+	ap.WriteString("\033[>0s")
 }
 
 func (ap *AnsiPixels) MouseTrackingOff() {
