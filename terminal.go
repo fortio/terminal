@@ -324,12 +324,19 @@ func (t *Terminal) Close() error {
 	// t.Out = os.Stdout // races during exit.
 	// saving history if any - ok to panic (in a bad History implementation)
 	// after this point as we already restored the terminal.
+	t.SaveHistory()
+	return err
+}
+
+// SaveHistory saves the current history to the history file set by [SetHistoryFile].
+// This is also called automatically by [Close]. This method allows callers to
+// flush history at any time (e.g., before a WASM page unload).
+func (t *Terminal) SaveHistory() {
 	if t.historyFile == "" || t.capacity <= 0 {
 		log.Debugf("No history file %q or capacity %d, not saving history", t.historyFile, t.capacity)
-		return nil
+		return
 	}
 	h := t.History()
-	// log.LogVf("got history %v", h)
 	slices.Reverse(h)
 	extra := len(h) - t.capacity
 	if extra > 0 {
@@ -337,7 +344,6 @@ func (t *Terminal) Close() error {
 	}
 	log.Infof("Saving history (%d commands) to %s", len(h), t.historyFile)
 	saveHistory(t.historyFile, h)
-	return err
 }
 
 // ReadLine reads a line from the terminal using the setup prompt and history
