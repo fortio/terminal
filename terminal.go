@@ -103,7 +103,7 @@ func (t *Terminal) Setup(ctx context.Context) error {
 // This is called automatically when the terminal is opened, but can be called
 // again if the terminal size changes (e.g. when resizing the window).
 func (t *Terminal) UpdateSize() error {
-	w, h, err := term.GetSize(t.fdOut)
+	w, h, err := platformGetSize(t.fdOut)
 	if err != nil {
 		log.Errf("Error getting terminal size: %v", err)
 		return err
@@ -126,7 +126,7 @@ func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, contex
 }
 
 func (t *Terminal) IsTerminal() bool {
-	return term.IsTerminal(t.fd)
+	return platformIsTerminal(t.fd)
 }
 
 // LoggerSetup sets up fortio logger (and thus stdlib "log" too)
