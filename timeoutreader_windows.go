@@ -3,6 +3,7 @@
 package terminal
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"syscall"
@@ -14,27 +15,31 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const IsUnix = false
+const (
+	IsUnix       = false
+	ResizeSignal = syscall.Signal(999)
+)
 
 type SystemTimeoutReader = TimeoutReaderWindows
 
-func NewSystemTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReaderWindows {
-	return NewTimeoutReaderWindows(stream, timeout)
+func NewSystemTimeoutReader(stream *os.File, timeout time.Duration, signalChan chan os.Signal) *TimeoutReaderWindows {
+	return NewTimeoutReaderWindows(stream, timeout, signalChan)
 }
 
 type TimeoutReaderWindows struct {
 	handle              syscall.Handle
 	timeoutMilliseconds uint32
 	blocking            bool
+	inRead              bool
 	ostream             *os.File
+	signalChan          chan os.Signal
 	buf                 []byte
 	mut                 sync.Mutex
-	resizeChannel       chan WindowsResize
 }
 
 const fdwMode = windows.ENABLE_EXTENDED_FLAGS
 
-func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration) *TimeoutReaderWindows {
+func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration, signalChan chan os.Signal) *TimeoutReaderWindows {
 	if timeout < 0 {
 		panic("Timeout must be greater than or equal to 0")
 	}
@@ -48,7 +53,8 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration) *TimeoutRea
 		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
 		blocking:            timeout == 0,
 		ostream:             stream,
-		resizeChannel:       make(chan WindowsResize, 1),
+		signalChan:          signalChan,
+		inRead:              false,
 	}
 }
 
@@ -82,6 +88,7 @@ func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	// TODO: figure out why we need these two lines every time we ReadBlocking but not for ReadWithTimeout
+	fmt.Println("reading blocking")
 	fdwMode := windows.ENABLE_EXTENDED_FLAGS
 	_ = windows.SetConsoleMode(windows.Handle(tr.handle), uint32(fdwMode))
 	var iR InputRecord
@@ -95,7 +102,7 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	return iR.Read(p, tr.resizeChannel)
+	return iR.Read(p, tr.signalChan)
 }
 
 func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
@@ -103,23 +110,23 @@ func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
 }
 
 func (tr *TimeoutReaderWindows) Read(buf []byte) (int, error) {
-	tr.mut.Lock()
-	defer tr.mut.Unlock()
 	if tr.blocking {
 		return tr.ReadBlocking(buf)
 	}
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.resizeChannel)
+	tr.mut.Lock()
+	defer tr.mut.Unlock()
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChan)
 }
 
 func (tr *TimeoutReaderWindows) ReadImmediate() (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(tr.buf)
 	}
-	return ReadWithTimeout(tr.handle, 0, tr.buf, tr.resizeChannel)
+	return ReadWithTimeout(tr.handle, 0, tr.buf, tr.signalChan)
 }
 
 func (tr *TimeoutReaderWindows) ReadWithTimeout(buf []byte) (int, error) {
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.resizeChannel)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChan)
 }
 
 const (
@@ -127,7 +134,8 @@ const (
 	WAITTIMEOUT = 0x00000102
 )
 
-func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, resizeChannel chan WindowsResize) (int, error) {
+func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, signalChan chan os.Signal) (int, error) {
+	fmt.Println("reading with timeout")
 	var iR InputRecord
 	var read uint32
 	event, err := windows.WaitForSingleObject(windows.Handle(handle), ms)
@@ -146,9 +154,7 @@ func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, resizeChannel
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	n, err := iR.Read(buf, resizeChannel)
-
-	return n, err
+	return iR.Read(buf, signalChan)
 }
 
 var (
@@ -195,7 +201,7 @@ type InputRecord struct {
 	Data [8]uint16
 }
 
-func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, error) {
+func (ir *InputRecord) Read(buf []byte, signalChan chan os.Signal) (int, error) {
 	// TODO: fully create function to translate keypresses to buffer
 	switch ir.Type {
 	case 0x1: // key event
@@ -220,12 +226,8 @@ func (ir *InputRecord) Read(buf []byte, resizeChannel chan WindowsResize) (int, 
 		copy(buf, []byte{byte(ir.Data[6])})
 		return 1, nil
 	case 0x4: // window buffer size event
-		bufsize := WindowsResize{
-			height: safecast.MustConv[int](ir.Data[1]),
-			width:  safecast.MustConv[int](ir.Data[2]),
-		}
 		select {
-		case resizeChannel <- bufsize:
+		case signalChan <- ResizeSignal:
 		default:
 		}
 	}

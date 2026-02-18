@@ -75,7 +75,7 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // When not in blocking mode, one of [Start] or [StartDirect] must be called after creating it to add the intermediate layer.
 // Note doing it in NewInterruptReader() allows for logger configuration to happen single threaded and
 // thus avoid races.
-func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *InterruptReader {
+func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration, signalChannel chan os.Signal) *InterruptReader {
 	ir := &InterruptReader{
 		In:      reader,
 		bufSize: bufSize,
@@ -86,7 +86,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 	ir.reset = ir.buf
 	if timeout == 0 {
 		// This won't be starting a thread/goroutine, just a passthrough reader in the mode so we can create it early/here.
-		ir.tr = NewSystemTimeoutReader(ir.In, 0) // will not start goroutine, just a passthrough reader.
+		ir.tr = NewSystemTimeoutReader(ir.In, 0, signalChannel) // will not start goroutine, just a passthrough reader.
 	} else {
 		ir.cond = *sync.NewCond(&ir.mu)
 		log.Config.GoroutineID = true // must be set before (on windows/with non select reader) we start the goroutine.
@@ -95,7 +95,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration) *In
 	return ir
 }
 
-func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
+func (ir *InterruptReader) ChangeTimeout(timeout time.Duration, signalChan chan os.Signal) {
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
 	if timeout == ir.timeout {
@@ -106,7 +106,7 @@ func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	}
 	ir.timeout = timeout
 	if ir.tr == nil || ir.tr.IsClosed() {
-		ir.tr = NewSystemTimeoutReader(ir.In, timeout)
+		ir.tr = NewSystemTimeoutReader(ir.In, timeout, signalChan)
 	} else {
 		ir.tr.ChangeTimeout(timeout)
 	}
@@ -142,7 +142,7 @@ func (ir *InterruptReader) InEOF() bool {
 }
 
 // Start or restart (after a cancel/interrupt) the interrupt reader.
-func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.CancelFunc) {
+func (ir *InterruptReader) Start(ctx context.Context, signalChan chan os.Signal) (context.Context, context.CancelFunc) {
 	log.Debugf("InterruptReader starting")
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
@@ -153,11 +153,11 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
 	if ir.tr == nil {
-		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, signalChan) // will start goroutine on windows.
 	}
 	if ir.timeout != 0 {
 		go func() {
-			ir.start(nctx)
+			ir.start(nctx, signalChan)
 		}()
 	}
 	return nctx, cancel
@@ -165,10 +165,10 @@ func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.
 
 // StartDirect ensures the underlying reader is started (in case of non blocking mode),
 // this is used by [ansipixels.Open].
-func (ir *InterruptReader) StartDirect() {
+func (ir *InterruptReader) StartDirect(signalChan chan os.Signal) {
 	ir.mu.Lock()
 	if ir.tr == nil {
-		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, signalChan) // will start goroutine on windows.
 	}
 	ir.mu.Unlock()
 }
@@ -299,7 +299,7 @@ func (ir *InterruptReader) read(p []byte) (int, error) {
 
 const CtrlC = 3 // Control-C is ascii 3 (C is 3rd letter of the alphabet)
 
-func (ir *InterruptReader) start(ctx context.Context) {
+func (ir *InterruptReader) start(ctx context.Context, signalChan chan os.Signal) {
 	localBuf := make([]byte, ir.bufSize)
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
@@ -307,7 +307,7 @@ func (ir *InterruptReader) start(ctx context.Context) {
 	// they don't (at least on macOS, for the signals we are watching).
 	tr := ir.tr
 	if tr == nil || tr.IsClosed() {
-		tr = NewSystemTimeoutReader(ir.In, ir.timeout)
+		tr = NewSystemTimeoutReader(ir.In, ir.timeout, signalChan)
 		ir.tr = tr
 	} else {
 		tr.ChangeTimeout(ir.timeout)

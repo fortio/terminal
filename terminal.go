@@ -63,7 +63,7 @@ type Terminal struct {
 // and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
 	t := &Terminal{
-		IntrReader: GetSharedInput(250 * time.Millisecond),
+		IntrReader: GetSharedInput(250*time.Millisecond, nil),
 		history:    NewHistory(DefaultHistoryCapacity),
 	}
 	err := t.Setup(ctx)
@@ -121,7 +121,7 @@ func (t *Terminal) UpdateSize() error {
 // ResetInterrupts resets and restarts if you want to continue after an interrupt.
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
-	t.Context, t.Cancel = t.IntrReader.Start(ctx)
+	t.Context, t.Cancel = t.IntrReader.Start(ctx, make(chan os.Signal))
 	return t.Context, t.Cancel
 }
 

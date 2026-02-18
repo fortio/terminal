@@ -7,6 +7,7 @@ package terminal
 
 import (
 	"io"
+	"os"
 	"time"
 )
 
@@ -14,6 +15,6 @@ const IsUnix = false
 
 type SystemTimeoutReader = TimeoutReader
 
-func NewSystemTimeoutReader(stream io.Reader, timeout time.Duration) *TimeoutReader {
+func NewSystemTimeoutReader(stream io.Reader, timeout time.Duration, _ chan os.Signal) *TimeoutReader {
 	return NewTimeoutReader(stream, timeout)
 }
