@@ -42,14 +42,14 @@ type Input interface {
 	// NormalMode sets the terminal back to normal mode.
 	NormalMode() error
 	// StartDirect is called during Open to start a timeout reader if needed.
-	StartDirect(_ chan os.Signal)
+	StartDirect()
 }
 
 // InputReader interface abstracts the reading capabilities needed by AnsiPixels, it is implemented by TimeoutReader
 // (in addition to InterruptReader).
 type InputReader interface {
 	// ChangeTimeout changes the timeout used for reading.
-	ChangeTimeout(timeout time.Duration, signalChan chan os.Signal)
+	ChangeTimeout(timeout time.Duration)
 	// ReadBlocking will return at least 1 byte or an error, blocking until data is available.
 	// Used by ReadCursorPos where a response is expected from the terminal.
 	ReadBlocking(p []byte) (n int, err error)
@@ -134,14 +134,12 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 		d = time.Duration(1e9 / fps)
 	}
 	ap := &AnsiPixels{
-		Out: bufio.NewWriter(os.Stdout),
-		FPS: fps,
-		// SharedInput:     terminal.GetSharedInput(d),
-		C:               make(chan os.Signal, 1),
+		Out:             bufio.NewWriter(os.Stdout),
+		FPS:             fps,
 		AutoSync:        true,
 		AutoLoggerSetup: true,
 	}
-	ap.SharedInput = terminal.GetSharedInput(d, ap.C)
+	ap.SharedInput, ap.C = terminal.GetSharedInput(d)
 	fdOut := safecast.MustConv[int](os.Stdout.Fd())
 	ap.GetSize = func() (err error) {
 		ap.W, ap.H, err = term.GetSize(fdOut)
@@ -153,7 +151,7 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 }
 
 func (ap *AnsiPixels) ChangeFPS(fps float64) {
-	ap.SharedInput.ChangeTimeout(1*time.Second/time.Duration(fps), ap.C)
+	ap.SharedInput.ChangeTimeout(1 * time.Second / time.Duration(fps))
 }
 
 // DetectColorMode uses environment variables COLORTERM,
@@ -219,7 +217,7 @@ func (ap *AnsiPixels) Open() error {
 	if ap.AutoLoggerSetup {
 		ap.LoggerSetup()
 	}
-	ap.SharedInput.StartDirect(ap.C)
+	ap.SharedInput.StartDirect()
 	return err
 }
 

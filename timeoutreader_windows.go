@@ -30,7 +30,7 @@ type TimeoutReaderWindows struct {
 	blocking            bool
 	inRead              bool
 	ostream             *os.File
-	signalChan          chan os.Signal
+	signalChannel       chan os.Signal
 	buf                 []byte
 	mut                 sync.Mutex
 }
@@ -51,7 +51,7 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration, signalChan 
 		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
 		blocking:            timeout == 0,
 		ostream:             stream,
-		signalChan:          signalChan,
+		signalChannel:       signalChan,
 		inRead:              false,
 	}
 }
@@ -99,7 +99,7 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	return iR.Read(p, tr.signalChan)
+	return iR.Read(p, tr.signalChannel)
 }
 
 func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
@@ -112,18 +112,18 @@ func (tr *TimeoutReaderWindows) Read(buf []byte) (int, error) {
 	}
 	tr.mut.Lock()
 	defer tr.mut.Unlock()
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChan)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChannel)
 }
 
 func (tr *TimeoutReaderWindows) ReadImmediate() (int, error) {
 	if tr.blocking {
 		return tr.ReadBlocking(tr.buf)
 	}
-	return ReadWithTimeout(tr.handle, 0, tr.buf, tr.signalChan)
+	return ReadWithTimeout(tr.handle, 0, tr.buf, tr.signalChannel)
 }
 
 func (tr *TimeoutReaderWindows) ReadWithTimeout(buf []byte) (int, error) {
-	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChan)
+	return ReadWithTimeout(tr.handle, tr.timeoutMilliseconds, buf, tr.signalChannel)
 }
 
 const (

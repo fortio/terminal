@@ -19,16 +19,17 @@ import (
 // It supports both blocking and non-blocking modes based on the timeout value provided during initialization.
 // When stopped the reads are directly to the underlying timeoutreader.
 type InterruptReader struct {
-	In      *os.File // stdin typically
-	buf     []byte
-	reset   []byte // original buffer start
-	bufSize int
-	err     error
-	mu      sync.Mutex
-	cond    sync.Cond
-	cancel  context.CancelFunc
-	timeout time.Duration
-	stopped bool
+	In            *os.File // stdin typically
+	buf           []byte
+	reset         []byte // original buffer start
+	bufSize       int
+	err           error
+	mu            sync.Mutex
+	cond          sync.Cond
+	cancel        context.CancelFunc
+	timeout       time.Duration
+	stopped       bool
+	signalChannel chan os.Signal
 	// TimeoutReader is the timeout reader for the interrupt reader.
 	tr *SystemTimeoutReader
 	// Terminal state (raw mode vs normal)
@@ -77,11 +78,12 @@ func NewErrInterruptedWithErr(reason string, err error) InterruptedError {
 // thus avoid races.
 func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration, signalChannel chan os.Signal) *InterruptReader {
 	ir := &InterruptReader{
-		In:      reader,
-		bufSize: bufSize,
-		timeout: timeout,
-		buf:     make([]byte, 0, bufSize),
-		stopped: true,
+		In:            reader,
+		bufSize:       bufSize,
+		timeout:       timeout,
+		buf:           make([]byte, 0, bufSize),
+		stopped:       true,
+		signalChannel: signalChannel,
 	}
 	ir.reset = ir.buf
 	if timeout == 0 {
@@ -95,7 +97,7 @@ func NewInterruptReader(reader *os.File, bufSize int, timeout time.Duration, sig
 	return ir
 }
 
-func (ir *InterruptReader) ChangeTimeout(timeout time.Duration, signalChan chan os.Signal) {
+func (ir *InterruptReader) ChangeTimeout(timeout time.Duration) {
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
 	if timeout == ir.timeout {
@@ -106,7 +108,7 @@ func (ir *InterruptReader) ChangeTimeout(timeout time.Duration, signalChan chan 
 	}
 	ir.timeout = timeout
 	if ir.tr == nil || ir.tr.IsClosed() {
-		ir.tr = NewSystemTimeoutReader(ir.In, timeout, signalChan)
+		ir.tr = NewSystemTimeoutReader(ir.In, timeout, ir.signalChannel)
 	} else {
 		ir.tr.ChangeTimeout(timeout)
 	}
@@ -142,7 +144,7 @@ func (ir *InterruptReader) InEOF() bool {
 }
 
 // Start or restart (after a cancel/interrupt) the interrupt reader.
-func (ir *InterruptReader) Start(ctx context.Context, signalChan chan os.Signal) (context.Context, context.CancelFunc) {
+func (ir *InterruptReader) Start(ctx context.Context) (context.Context, context.CancelFunc) {
 	log.Debugf("InterruptReader starting")
 	ir.mu.Lock()
 	defer ir.mu.Unlock()
@@ -153,11 +155,11 @@ func (ir *InterruptReader) Start(ctx context.Context, signalChan chan os.Signal)
 	nctx, cancel := context.WithCancel(ctx)
 	ir.cancel = cancel
 	if ir.tr == nil {
-		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, signalChan) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, ir.signalChannel) // will start goroutine on windows.
 	}
 	if ir.timeout != 0 {
 		go func() {
-			ir.start(nctx, signalChan)
+			ir.start(nctx, ir.signalChannel)
 		}()
 	}
 	return nctx, cancel
@@ -165,10 +167,10 @@ func (ir *InterruptReader) Start(ctx context.Context, signalChan chan os.Signal)
 
 // StartDirect ensures the underlying reader is started (in case of non blocking mode),
 // this is used by [ansipixels.Open].
-func (ir *InterruptReader) StartDirect(signalChan chan os.Signal) {
+func (ir *InterruptReader) StartDirect() {
 	ir.mu.Lock()
 	if ir.tr == nil {
-		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, signalChan) // will start goroutine on windows.
+		ir.tr = NewSystemTimeoutReader(ir.In, ir.timeout, ir.signalChannel) // will start goroutine on windows.
 	}
 	ir.mu.Unlock()
 }

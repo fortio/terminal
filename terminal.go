@@ -63,9 +63,10 @@ type Terminal struct {
 // and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
 	t := &Terminal{
-		IntrReader: GetSharedInput(250*time.Millisecond, nil),
-		history:    NewHistory(DefaultHistoryCapacity),
+		// IntrReader: GetSharedInput(250*time.Millisecond, nil),
+		history: NewHistory(DefaultHistoryCapacity),
 	}
+	t.IntrReader, _ = GetSharedInput(250 * time.Millisecond)
 	err := t.Setup(ctx)
 	return t, err
 }
@@ -122,7 +123,7 @@ func (t *Terminal) UpdateSize() error {
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
 	// adding a chan os.Signal to the function interface means i am not sure what to do here, pass nil for now - geoffrey
-	t.Context, t.Cancel = t.IntrReader.Start(ctx, nil)
+	t.Context, t.Cancel = t.IntrReader.Start(ctx)
 	return t.Context, t.Cancel
 }
 
