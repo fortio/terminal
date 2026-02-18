@@ -3,7 +3,6 @@
 package terminal
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"syscall"
@@ -16,7 +15,6 @@ import (
 )
 
 const (
-	IsUnix       = false
 	ResizeSignal = syscall.Signal(999)
 )
 
@@ -88,7 +86,6 @@ func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	// TODO: figure out why we need these two lines every time we ReadBlocking but not for ReadWithTimeout
-	fmt.Println("reading blocking")
 	fdwMode := windows.ENABLE_EXTENDED_FLAGS
 	_ = windows.SetConsoleMode(windows.Handle(tr.handle), uint32(fdwMode))
 	var iR InputRecord
@@ -135,7 +132,6 @@ const (
 )
 
 func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, signalChan chan os.Signal) (int, error) {
-	fmt.Println("reading with timeout")
 	var iR InputRecord
 	var read uint32
 	event, err := windows.WaitForSingleObject(windows.Handle(handle), ms)
@@ -163,6 +159,9 @@ var (
 )
 
 func ReadConsoleInput(console syscall.Handle, rec *InputRecord, toread uint32, read *uint32) error {
+	// r1, _, e1 := syscall.SyscallN(procReadConsoleInputW.Addr(), 4,
+	// 	uintptr(console), uintptr(unsafe.Pointer(rec)), uintptr(toread),
+	// 	uintptr(unsafe.Pointer(read)), 0, 0)
 	r1, _, e1 := syscall.Syscall6(procReadConsoleInputW.Addr(), 4,
 		uintptr(console), uintptr(unsafe.Pointer(rec)), uintptr(toread),
 		uintptr(unsafe.Pointer(read)), 0, 0)
@@ -230,6 +229,8 @@ func (ir *InputRecord) Read(buf []byte, signalChan chan os.Signal) (int, error) 
 		case signalChan <- ResizeSignal:
 		default:
 		}
+	// TODO: handle mouse events
+	case 0x2: // mouse event
 	}
 	return 0, nil
 }
@@ -255,7 +256,3 @@ var (
 	errERRORIOPENDING error = syscall.Errno(errnoERRORIOPENDING)
 	errERROREINVAL    error = syscall.EINVAL
 )
-
-type WindowsResize struct {
-	height, width int
-}

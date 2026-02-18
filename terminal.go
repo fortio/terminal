@@ -121,7 +121,8 @@ func (t *Terminal) UpdateSize() error {
 // ResetInterrupts resets and restarts if you want to continue after an interrupt.
 func (t *Terminal) ResetInterrupts(ctx context.Context) (context.Context, context.CancelFunc) {
 	// locking should not be needed as we're (supposed to be) in the main thread.
-	t.Context, t.Cancel = t.IntrReader.Start(ctx, make(chan os.Signal))
+	// adding a chan os.Signal to the function interface means i am not sure what to do here, pass nil for now - geoffrey
+	t.Context, t.Cancel = t.IntrReader.Start(ctx, nil)
 	return t.Context, t.Cancel
 }
 
