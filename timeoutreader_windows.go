@@ -1,4 +1,4 @@
-//go:build windows || test_alt_timeoutreader
+//go:build windows && !test_alt_timeoutreader
 
 package terminal
 
@@ -25,7 +25,7 @@ func NewSystemTimeoutReader(stream *os.File, timeout time.Duration, signalChan c
 }
 
 type TimeoutReaderWindows struct {
-	handle              syscall.Handle
+	handle              windows.Handle
 	timeoutMilliseconds uint32
 	blocking            bool
 	inRead              bool
@@ -35,19 +35,21 @@ type TimeoutReaderWindows struct {
 	mut                 sync.Mutex
 }
 
-const fdwMode = windows.ENABLE_EXTENDED_FLAGS
+const fdwMode = windows.ENABLE_EXTENDED_FLAGS |
+	windows.ENABLE_WINDOW_INPUT |
+	windows.ENABLE_MOUSE_INPUT &
+		^windows.ENABLE_QUICK_EDIT_MODE
 
 func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration, signalChan chan os.Signal) *TimeoutReaderWindows {
 	if timeout < 0 {
 		panic("Timeout must be greater than or equal to 0")
 	}
-	// if we don't set console mode, the inputrecord struct's values become.... corrupted?
 	err := windows.SetConsoleMode(windows.Handle(stream.Fd()), uint32(fdwMode))
 	if err != nil {
 		// TODO: decide how to handle this
 	}
 	return &TimeoutReaderWindows{
-		handle:              syscall.Handle(os.Stdin.Fd()),
+		handle:              windows.Handle(syscall.Handle(stream.Fd())),
 		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
 		blocking:            timeout == 0,
 		ostream:             stream,
@@ -85,17 +87,28 @@ func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 }
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
-	// TODO: figure out why we need these two lines every time we ReadBlocking but not for ReadWithTimeout
-	fdwMode := windows.ENABLE_EXTENDED_FLAGS
-	_ = windows.SetConsoleMode(windows.Handle(tr.handle), uint32(fdwMode))
+	// TODO: figure out why we need to setconsolemode every time we ReadBlocking but not for ReadWithTimeout
+	var curMode uint32
+	err := windows.GetConsoleMode(tr.handle, &curMode)
+	if err != nil {
+		// TODO: handle error
+		return 0, err
+	}
+	if curMode != fdwMode {
+		err = windows.SetConsoleMode(tr.handle, uint32(fdwMode))
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	var iR InputRecord
 	var read uint32
-	err := ReadConsoleInput(tr.handle, &iR, 1, &read)
+	err = ReadConsoleInput(tr.handle, &iR, 1, &read)
 	if err != nil {
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
 	}
-	nilCheck := InputRecord{}
+	var nilCheck InputRecord
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
@@ -131,10 +144,10 @@ const (
 	WAITTIMEOUT = 0x00000102
 )
 
-func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, signalChan chan os.Signal) (int, error) {
+func ReadWithTimeout(handle windows.Handle, ms uint32, buf []byte, signalChan chan os.Signal) (int, error) {
 	var iR InputRecord
 	var read uint32
-	event, err := windows.WaitForSingleObject(windows.Handle(handle), ms)
+	event, err := windows.WaitForSingleObject(handle, ms)
 	if event == WAITTIMEOUT {
 		return 0, nil
 	}
@@ -146,7 +159,7 @@ func ReadWithTimeout(handle syscall.Handle, ms uint32, buf []byte, signalChan ch
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
 	}
-	nilCheck := InputRecord{}
+	var nilCheck InputRecord
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
@@ -158,7 +171,7 @@ var (
 	modkernel32           = windows.NewLazySystemDLL("kernel32.dll")
 )
 
-func ReadConsoleInput(console syscall.Handle, rec *InputRecord, toread uint32, read *uint32) error {
+func ReadConsoleInput(console windows.Handle, rec *InputRecord, toread uint32, read *uint32) error {
 	// r1, _, e1 := syscall.SyscallN(procReadConsoleInputW.Addr(), 4,
 	// 	uintptr(console), uintptr(unsafe.Pointer(rec)), uintptr(toread),
 	// 	uintptr(unsafe.Pointer(read)), 0, 0)
@@ -202,8 +215,9 @@ type InputRecord struct {
 
 func (ir *InputRecord) Read(buf []byte, signalChan chan os.Signal) (int, error) {
 	// TODO: fully create function to translate keypresses to buffer
+	log.LogVf("reading: %v", ir.Data)
 	switch ir.Type {
-	case 0x1: // key event
+	case windows.KEY_EVENT: // key event
 		if ir.Data[1] == 0 {
 			return 0, nil
 		}
@@ -224,13 +238,16 @@ func (ir *InputRecord) Read(buf []byte, signalChan chan os.Signal) (int, error) 
 		}
 		copy(buf, []byte{byte(ir.Data[6])})
 		return 1, nil
-	case 0x4: // window buffer size event
+	case windows.WINDOW_BUFFER_SIZE_EVENT: // window buffer size event
 		select {
 		case signalChan <- ResizeSignal:
 		default:
 		}
 	// TODO: handle mouse events
-	case 0x2: // mouse event
+	case windows.MOUSE_EVENT: // mouse event
+		if log.LogVerbose() {
+			log.LogVf("Mouse event: %v", ir.Data)
+		}
 	}
 	return 0, nil
 }
