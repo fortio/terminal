@@ -35,7 +35,7 @@ type TimeoutReaderWindows struct {
 	mut                 sync.Mutex
 }
 
-const fdwMode = windows.ENABLE_EXTENDED_FLAGS |
+const FDWMODE = windows.ENABLE_EXTENDED_FLAGS |
 	windows.ENABLE_WINDOW_INPUT |
 	windows.ENABLE_MOUSE_INPUT &
 		^windows.ENABLE_QUICK_EDIT_MODE
@@ -44,7 +44,7 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration, signalChan 
 	if timeout < 0 {
 		panic("Timeout must be greater than or equal to 0")
 	}
-	err := windows.SetConsoleMode(windows.Handle(stream.Fd()), uint32(fdwMode))
+	err := windows.SetConsoleMode(windows.Handle(stream.Fd()), uint32(FDWMODE))
 	if err != nil {
 		// TODO: decide how to handle this
 	}
@@ -71,31 +71,20 @@ func (tr *TimeoutReaderWindows) Close() error {
 	return err
 }
 
-func (tr *TimeoutReaderWindows) RawMode() error {
-	return nil
-}
-
-func (tr *TimeoutReaderWindows) NormalMode() error {
-	return nil
-}
-
-func (tr *TimeoutReaderWindows) StartDirect() {
-}
-
 func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 	tr.timeoutMilliseconds = safecast.MustConv[uint32](timeout.Milliseconds())
 }
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
-	// TODO: figure out why we need to setconsolemode every time we ReadBlocking but not for ReadWithTimeout
+	// TODO: figure out why console mode isn't fdwMode despite setting
 	var curMode uint32
 	err := windows.GetConsoleMode(tr.handle, &curMode)
 	if err != nil {
 		// TODO: handle error
 		return 0, err
 	}
-	if curMode != fdwMode {
-		err = windows.SetConsoleMode(tr.handle, uint32(fdwMode))
+	if curMode != FDWMODE {
+		err = windows.SetConsoleMode(tr.handle, uint32(FDWMODE))
 		if err != nil {
 			return 0, err
 		}
@@ -112,7 +101,7 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	return iR.Read(p, tr.signalChannel)
+	return iR.Translate(p, tr.signalChannel)
 }
 
 func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
@@ -163,7 +152,7 @@ func ReadWithTimeout(handle windows.Handle, ms uint32, buf []byte, signalChan ch
 	if iR == nilCheck {
 		return 0, nil // timeout case
 	}
-	return iR.Read(buf, signalChan)
+	return iR.Translate(buf, signalChan)
 }
 
 var (
@@ -213,7 +202,7 @@ type InputRecord struct {
 	Data [8]uint16
 }
 
-func (ir *InputRecord) Read(buf []byte, signalChan chan os.Signal) (int, error) {
+func (ir *InputRecord) Translate(buf []byte, signalChan chan os.Signal) (int, error) {
 	// TODO: fully create function to translate keypresses to buffer
 	log.LogVf("reading: %v", ir.Data)
 	switch ir.Type {
