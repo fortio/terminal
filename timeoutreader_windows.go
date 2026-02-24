@@ -44,10 +44,6 @@ func NewTimeoutReaderWindows(stream *os.File, timeout time.Duration, signalChan 
 	if timeout < 0 {
 		panic("Timeout must be greater than or equal to 0")
 	}
-	err := windows.SetConsoleMode(windows.Handle(stream.Fd()), uint32(FDWMODE))
-	if err != nil {
-		// TODO: decide how to handle this
-	}
 	return &TimeoutReaderWindows{
 		handle:              windows.Handle(syscall.Handle(stream.Fd())),
 		timeoutMilliseconds: safecast.MustConv[uint32](timeout.Milliseconds()),
@@ -76,7 +72,6 @@ func (tr *TimeoutReaderWindows) ChangeTimeout(timeout time.Duration) {
 }
 
 func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
-	// TODO: figure out why console mode isn't fdwMode despite setting
 	var curMode uint32
 	err := windows.GetConsoleMode(tr.handle, &curMode)
 	if err != nil {
@@ -90,18 +85,14 @@ func (tr *TimeoutReaderWindows) ReadBlocking(p []byte) (int, error) {
 		}
 	}
 
-	var iR InputRecord
+	var iR InputRecords
 	var read uint32
-	err = ReadConsoleInput(tr.handle, &iR, 1, &read)
+	err = ReadConsoleInput(tr.handle, &iR, 8, &read)
 	if err != nil {
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
 	}
-	var nilCheck InputRecord
-	if iR == nilCheck {
-		return 0, nil // timeout case
-	}
-	return iR.Translate(p, tr.signalChannel)
+	return iR.Translate(p, tr.signalChannel, int(read))
 }
 
 func (tr *TimeoutReaderWindows) PrimeReadImmediate(buf []byte) {
@@ -134,7 +125,7 @@ const (
 )
 
 func ReadWithTimeout(handle windows.Handle, ms uint32, buf []byte, signalChan chan os.Signal) (int, error) {
-	var iR InputRecord
+	var iR InputRecords
 	var read uint32
 	event, err := windows.WaitForSingleObject(handle, ms)
 	if event == WAITTIMEOUT {
@@ -148,11 +139,7 @@ func ReadWithTimeout(handle windows.Handle, ms uint32, buf []byte, signalChan ch
 		log.Errf("ReadConsoleInput error: %v", err)
 		return 0, err
 	}
-	var nilCheck InputRecord
-	if iR == nilCheck {
-		return 0, nil // timeout case
-	}
-	return iR.Translate(buf, signalChan)
+	return iR.Translate(buf, signalChan, int(read))
 }
 
 var (
@@ -160,7 +147,7 @@ var (
 	modkernel32           = windows.NewLazySystemDLL("kernel32.dll")
 )
 
-func ReadConsoleInput(console windows.Handle, rec *InputRecord, toread uint32, read *uint32) error {
+func ReadConsoleInput(console windows.Handle, rec *InputRecords, toread uint32, read *uint32) error {
 	// r1, _, e1 := syscall.SyscallN(procReadConsoleInputW.Addr(), 4,
 	// 	uintptr(console), uintptr(unsafe.Pointer(rec)), uintptr(toread),
 	// 	uintptr(unsafe.Pointer(read)), 0, 0)
@@ -176,7 +163,7 @@ func ReadConsoleInput(console windows.Handle, rec *InputRecord, toread uint32, r
 
 type InputRecord struct {
 	// 0x1: Key event
-	// 0x2: Will never be read when using ReadConsoleInput
+	// 0x2: Mouse Event
 	// 0x4: Window buffer size event
 	// 0x8: Deprecated
 	// 0x10: Deprecated
@@ -199,7 +186,22 @@ type InputRecord struct {
 	//  - Data[0] is the new amount of character rows
 	//  - Data[1] is the new amount of character columns
 	// Original source: https://docs.microsoft.com/en-us/windows/console/window-buffer-size-record-str
-	Data [8]uint16
+	Data [10]uint16
+}
+
+type InputRecords [8]InputRecord
+
+func (irs *InputRecords) Translate(buf []byte, signalChan chan os.Signal, eventsRead int) (int, error) {
+	var bufferIndex int
+	for i := range eventsRead {
+		record := irs[i]
+		num, err := record.Translate(buf[bufferIndex:], signalChan)
+		if err != nil {
+			return 0, err
+		}
+		bufferIndex += num
+	}
+	return bufferIndex, nil
 }
 
 func (ir *InputRecord) Translate(buf []byte, signalChan chan os.Signal) (int, error) {
