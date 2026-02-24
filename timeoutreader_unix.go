@@ -18,7 +18,7 @@ const IsUnix = true
 
 type SystemTimeoutReader = TimeoutReaderUnixFD
 
-func NewSystemTimeoutReader(stream *os.File, timeout time.Duration) *TimeoutReaderUnixFD {
+func NewSystemTimeoutReader(stream *os.File, timeout time.Duration, _ chan os.Signal) *TimeoutReaderUnixFD {
 	return NewTimeoutReaderUnixFD(stream, timeout)
 }
 

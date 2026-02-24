@@ -23,16 +23,17 @@ var mu sync.Mutex // protects sharedInput, so that multiple calls to GetSharedIn
 // For instance both Terminal.ReadLine and AnsiPixels.ReadOrResizeOrSignal can share it.
 // It also changes the timeout for the timeout reader to the maxRead duration if different than before.
 // If 0 timeout is used, it can't be changed later and the reader will block on reads (raw/simple os.Stdin mode).
-func GetSharedInput(maxRead time.Duration) *InterruptReader {
+func GetSharedInput(maxRead time.Duration) (*InterruptReader, chan os.Signal) {
+	signalChan := make(chan os.Signal, 1)
 	mu.Lock()
 	if sharedInput == nil {
 		log.LogVf("Creating first shared input reader with timeout: %v", maxRead)
-		sharedInput = NewInterruptReader(os.Stdin, 256, maxRead)
+		sharedInput = NewInterruptReader(os.Stdin, 256, maxRead, signalChan)
 	} else {
 		sharedInput.ChangeTimeout(maxRead)
 	}
 	mu.Unlock()
-	return sharedInput
+	return sharedInput, signalChan
 }
 
 // RawMode sets the terminal to raw mode.
