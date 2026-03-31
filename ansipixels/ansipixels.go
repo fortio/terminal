@@ -811,7 +811,7 @@ func (ap *AnsiPixels) LoggerSetup() {
 // Used in tray and tbonsai for instance.
 func NonRawTerminalSize() (width, height int, err error) {
 	for _, attempt := range []*os.File{os.Stdout, os.Stderr, os.Stdin} {
-		width, height, err = term.GetSize(int(attempt.Fd()))
+		width, height, err = term.GetSize(safecast.MustConv[int](attempt.Fd()))
 		if err == nil {
 			return width, height, nil
 		}
