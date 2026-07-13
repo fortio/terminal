@@ -430,6 +430,9 @@ func (ap *AnsiPixels) startSyncMode() {
 // Returns true if something was output. if there was output a StartSyncMode is done before that output.
 func (ap *AnsiPixels) FlushLogger() bool {
 	var extra []byte
+	if ap.Logger == nil {
+		return false
+	}
 	ap.Logger.Lock()
 	hasOutput := ap.logbuffer.Len() > 0
 	if hasOutput {
