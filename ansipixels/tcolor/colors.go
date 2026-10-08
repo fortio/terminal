@@ -6,7 +6,7 @@
 //	tcolor
 //
 // Initially partially from images.go and tclock and generalized.
-package tcolor // import "fortio.org/terminal/ansipixels/tcolor"
+package tcolor
 
 import (
 	"fmt"

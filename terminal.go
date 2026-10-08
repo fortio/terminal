@@ -6,7 +6,7 @@
 // It also provides a way to share a single InterruptReader between multiple users of the terminal
 // (for instance both Terminal.ReadLine and AnsiPixels.ReadOrResizeOrSignal can share it).
 // See example/main.go for an example of usage.
-package terminal // import "fortio.org/terminal"
+package terminal
 
 import (
 	"bufio"

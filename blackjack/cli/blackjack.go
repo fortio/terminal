@@ -71,7 +71,7 @@ func (g *Game) InitDeck(numDecks int) {
 	}
 
 	// Shuffle the deck
-	rand.Shuffle(len(g.deck.Cards), func(i, j int) {
+	rand.Shuffle(len(g.deck.Cards), func(i, j int) { //nolint:gosec // this is a game not crypto.
 		g.deck.Cards[i], g.deck.Cards[j] = g.deck.Cards[j], g.deck.Cards[i]
 	})
 }
