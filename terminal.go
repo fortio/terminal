@@ -63,9 +63,9 @@ type Terminal struct {
 // and/or a custom history.
 func Open(ctx context.Context) (*Terminal, error) {
 	t := &Terminal{
-		IntrReader: GetSharedInput(250 * time.Millisecond),
-		history:    NewHistory(DefaultHistoryCapacity),
+		history: NewHistory(DefaultHistoryCapacity),
 	}
+	t.IntrReader, _ = GetSharedInput(250 * time.Millisecond)
 	err := t.Setup(ctx)
 	return t, err
 }
