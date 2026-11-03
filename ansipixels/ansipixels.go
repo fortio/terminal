@@ -136,11 +136,10 @@ func NewAnsiPixels(fps float64) *AnsiPixels {
 	ap := &AnsiPixels{
 		Out:             bufio.NewWriter(os.Stdout),
 		FPS:             fps,
-		SharedInput:     terminal.GetSharedInput(d),
-		C:               make(chan os.Signal, 1),
 		AutoSync:        true,
 		AutoLoggerSetup: true,
 	}
+	ap.SharedInput, ap.C = terminal.GetSharedInput(d)
 	fdOut := safecast.MustConv[int](os.Stdout.Fd())
 	ap.GetSize = func() (err error) {
 		ap.W, ap.H, err = term.GetSize(fdOut)
